@@ -175,11 +175,29 @@ if [ "$RUN_SELF_TEST" = "1" ]; then
     # BIP34's small heights and the reversed RandomX key -- are covered by
     # tests that were sitting in this directory, unbuilt, while a regtest chain
     # was used to find them instead.
+    # ONE OF THESE NEEDS A NODE, AND THIS LOOP HAS NONE.
+    #
+    # solo_jobs_test asks a running wamd for templates: it is the proof that a
+    # solved block can still be turned into a block, which is the defect that
+    # cost a miner his work on 2026-09-26. It cannot answer without a node,
+    # and on 2026-09-27 it stopped package_release.sh dead for exactly that
+    # reason -- a test that is right refusing a build that is fine.
+    #
+    # It is not skipped and it is not weakened. It is run by
+    # scripts/solo_gate.sh, which starts a regtest node for it, daily and
+    # before a release. Compiling it here anyway keeps the one thing this loop
+    # can still prove about it: that it builds.
     for t in "$HERE"/test/*_test.cpp; do
         [ -f "$t" ] || continue
         name=$(basename "$t" .cpp)
-        echo "  $name..."
         bin="${TMPDIR:-/tmp}/wam-$name.$$"
+        if [ "$name" = "solo_jobs_test" ]; then
+            echo "  $name... (compiled here; run by scripts/solo_gate.sh, which has a node)"
+            "$CXX" -std=c++17 -O1 -I"$HERE/src" "$t" -o "$bin"         || fail "$name did not compile"
+            rm -f "$bin"
+            continue
+        fi
+        echo "  $name..."
         "$CXX" -std=c++17 -O1 -I"$HERE/src" "$t" -o "$bin"             || fail "$name did not compile"
         "$bin" || { rm -f "$bin"; fail "$name failed; do not use this build"; }
         rm -f "$bin"
