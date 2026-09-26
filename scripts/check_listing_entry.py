@@ -54,6 +54,12 @@ KOMODO = REPO / "integration" / "komodo"
 # hardware, which is the only copy whose disappearance is ours to prevent.
 DOWNLOADS_URL = "https://wamcoin.org/downloads/"
 
+# The swap depth, decided once and read by two checks below: the Komodo entry
+# and the Block DX xbridge conf. It lived inside main() and the Block DX check
+# could not see it, which is how a constant that exists in one place still
+# manages to be missing from another.
+REQUIRED_CONFIRMATIONS = 15
+
 _fails = []
 
 
@@ -146,7 +152,6 @@ def main():
     # falls from two hours to thirty minutes. The depth this project publishes
     # for an exchange DEPOSIT is a different number and stays at 60; a deposit
     # can wait two hours and an atomic swap cannot.
-    REQUIRED_CONFIRMATIONS = 15
 
     rc = entry.get("required_confirmations")
     if rc != REQUIRED_CONFIRMATIONS:
@@ -320,6 +325,33 @@ def check_blockdx(prefix, num, hdr):
             bad(f"xbridge {key} is {mm.group(1)}, source says {want}")
         else:
             ok(f"{('xbridge ' + key):<18} {want}")
+
+    # CONFIRMATIONS, WHICH IS A DECISION AND NOT A CONSTANT.
+    #
+    # The Block DX submission carried Confirmations=60 -- the depth this
+    # project publishes for an exchange DEPOSIT -- on a venue where a swap
+    # completes when that number of confirmations is reached. 60 at a 120
+    # second target is a two hour swap. Of the 247 coins in that repository,
+    # 245 use 0 and one uses 1; we were the only 60 in it.
+    #
+    # It is 15 now, which is the number the Komodo maintainer arrived at after
+    # running a real swap, and the same number this project's own entry
+    # carries: half an hour rather than two, and still fifteen times more
+    # cautious than every other coin on that venue. The deposit depth stays
+    # 60 and is a different question with a different answer.
+    #
+    # Checked here because it was wrong once, in a file that looked finished.
+    mm = re.search(r"^Confirmations=(\d+)", xb, re.M)
+    if not mm:
+        bad("the xbridge conf has no Confirmations")
+    elif int(mm.group(1)) != REQUIRED_CONFIRMATIONS:
+        bad(f"xbridge Confirmations is {mm.group(1)}, and a swap on that venue "
+            f"completes at that depth. This project's swap depth is "
+            f"{REQUIRED_CONFIRMATIONS}; 60 is the DEPOSIT depth and would mean "
+            f"a two hour swap.")
+    else:
+        ok(f"{'xbridge Confirmations':<18} {REQUIRED_CONFIRMATIONS}  "
+           f"(a swap, not a deposit)")
 
     # Two faults, opposite directions, and until 19 September only one of
     # them could be seen from here.
