@@ -414,18 +414,21 @@ anyway.
 
 ### How, exactly
 
-> **This is not in a download yet.** `--solo` and `--check` do not exist in
-> v0.1.9 or anything before it. They are written, tested on Linux, Windows
-> and macOS, and committed — but the build that carried them was lost when
-> this project's code-hosting account was suspended on 2026-09-24, and the
-> replacement has to be built and signed here rather than by a service. Until
-> it is published, mining alone means building from source or running the pool
-> software for yourself, which `docs/POOL_OPERATOR.md` describes.
+> **A defect you should know about before you start.** `--solo` and `--check`
+> are in v0.1.10, which is published and downloadable. But the miner in
+> v0.1.10 can fail to send a block it has solved: it asks the node for work
+> every five seconds, treated every answer as a new job even when nothing had
+> changed, and remembered only the last eight. A worker keeps its job until
+> the chain moves on, about two minutes, so a block solved more than forty
+> seconds after its job was issued could not be rebuilt — and the miner
+> refused to send it rather than send something wrong. Roughly two blocks in
+> three were lost that way.
 >
-> The rest of this section is correct and will work the day the download
-> exists. It is left here rather than hidden, because a reader who was told
-> about solo mining and then finds the page silent concludes it was never
-> real.
+> It was reported by a miner on 2026-09-26, found the same morning, and fixed
+> in the source that day. **The fix needs v0.1.11 to reach you.** Until that
+> is published: mining to a pool loses nothing, and mining alone with
+> v0.1.10 will lose blocks. This is written here rather than left out because
+> anybody reading this page is deciding where to spend electricity.
 
 You need two things running: your own node, and the miner pointed at it.
 
