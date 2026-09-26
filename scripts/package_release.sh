@@ -396,12 +396,36 @@ BASELINE_GLIBCXX="3.4.30"
 
 vermax() { tr ' ' '\n' | sed 's/^[A-Z_]*_//' | sort -V | tail -1; }
 
-SYMS="$(objdump -T "$WORK/stage/wam-coin-$VERSION/bin/wamd" 2>/dev/null \
-        | grep -oE 'GLIBCXX_[0-9.]+|GLIBC_[0-9.]+' | sort -u)"
+# EVERY BINARY THAT SHIPS, NOT ONE OF THEM.
+#
+# This read bin/wamd and nothing else. The miner was never examined, and when
+# the graphical wallet moved into an archive of its own on 2026-09-27 it left
+# the only file this check looked at -- so a wallet that cannot start on the
+# oldest system we promise would have shipped without a word. The GUI is the
+# likeliest one to fail it: it links Qt, and Qt is where a newer symbol
+# requirement comes from.
+#
+# The worst requirement across all of them decides, because a release is only
+# as portable as the file a person happens to run.
+PORT_BINS=""
+for b in "$WORK/stage/wam-coin-$VERSION/bin"/*; do
+    [ -f "$b" ] && PORT_BINS="$PORT_BINS $b"
+done
+[ -f "$MINER_DIR/wam-miner" ] && PORT_BINS="$PORT_BINS $MINER_DIR/wam-miner"
+if [ "$HAVE_GUI" = "1" ] && [ -f "$WALLET_DIR/bin/wam-qt" ]; then
+    PORT_BINS="$PORT_BINS $WALLET_DIR/bin/wam-qt"
+fi
 
-REQ_GLIBC="$(printf '%s\n' "$SYMS" | grep '^GLIBC_'   | vermax)"
-REQ_GLIBCXX="$(printf '%s\n' "$SYMS" | grep '^GLIBCXX_' | vermax)"
-REQ_GLIBC="${REQ_GLIBC:-0}"; REQ_GLIBCXX="${REQ_GLIBCXX:-0}"
+REQ_GLIBC=0; REQ_GLIBCXX=0
+for b in $PORT_BINS; do
+    bsyms="$(objdump -T "$b" 2>/dev/null \
+             | grep -oE 'GLIBCXX_[0-9.]+|GLIBC_[0-9.]+' | sort -u)"
+    bg="$(printf '%s\n' "$bsyms" | grep '^GLIBC_'   | vermax)"; bg="${bg:-0}"
+    bx="$(printf '%s\n' "$bsyms" | grep '^GLIBCXX_' | vermax)"; bx="${bx:-0}"
+    printf '  %-14s glibc %-8s GLIBCXX %s\n' "$(basename "$b")" "$bg" "$bx"
+    [ "$(printf '%s\n%s\n' "$bg" "$REQ_GLIBC"   | sort -V | tail -1)" = "$bg" ] && REQ_GLIBC="$bg"
+    [ "$(printf '%s\n%s\n' "$bx" "$REQ_GLIBCXX" | sort -V | tail -1)" = "$bx" ] && REQ_GLIBCXX="$bx"
+done
 
 # `sort -V | head -1` picking the baseline means the requirement is <= it.
 newer_than() { [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -1)" != "$1" ]; }
