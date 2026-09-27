@@ -559,8 +559,15 @@ CHECKS = [
                                        "--node", "169.58.159.165",
                                        "--network", "mainnet"], 600),
     ("nodes agree", ["bash", "scripts/check_nodes_agree.sh"] + ALL_IPS, 150),
+    # 300, not 150. Measured at 55 seconds for three hosts on a quiet link,
+    # and it reads a git log from each of them over ssh -- so it is one slow
+    # host away from the old limit. On 2026-09-27 it hit it, and the panel
+    # said "unknown: did not finish within 150s" while the answer it could
+    # not finish printing was three servers fourteen commits behind. A check
+    # that times out reports nothing, and reporting nothing is the one thing
+    # this panel exists to prevent.
     ("deployed code is origin/main",
-     ["bash", "scripts/check_deployed_code.sh"] + ALL_IPS, 150),
+     ["bash", "scripts/check_deployed_code.sh"] + ALL_IPS, 300),
     ("the same keys get a shell everywhere",
      ["bash", "scripts/check_admin_keys.sh"] + ALL_IPS, 150),
     ("the repository agrees with itself", ["bash", "scripts/audit_repo.sh"], 200),
