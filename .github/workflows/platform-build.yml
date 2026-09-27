@@ -102,6 +102,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       v: ${{ steps.v.outputs.v }}
+      gui: ${{ steps.v.outputs.gui }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -119,6 +120,24 @@ jobs:
           fi
           echo "v=$v" >> "$GITHUB_OUTPUT"
           echo "### Packaging as \`$v\`" >> "$GITHUB_STEP_SUMMARY"
+
+          # THE WALLET SWITCH, AND WHY A BRANCH NAME CAN SET IT.
+          #
+          # with_gui is an input, and inputs exist only on a run somebody
+          # started by hand in a browser. Everything else in this project is
+          # driven from a terminal, and the one platform whose wallet cannot
+          # be tested anywhere but here is macOS -- so the test that matters
+          # most was the one test nobody at a keyboard could start.
+          #
+          # A push to platform/gui-* now means the same thing as ticking the
+          # box. The branch name is the request, which is how the rest of this
+          # repository works.
+          gui=false
+          case "${{ github.ref }}" in refs/heads/platform/gui-*) gui=true ;; esac
+          if [ "${{ github.event.inputs.with_gui }}" = "true" ]; then gui=true; fi
+          echo "gui=$gui" >> "$GITHUB_OUTPUT"
+          echo "the graphical wallet is $([ "$gui" = true ] && echo 'built' || echo 'skipped')" \
+               >> "$GITHUB_STEP_SUMMARY"
 
           # AND IS THAT THE VERSION THIS CHECKOUT ACTUALLY BUILDS?
           #
@@ -191,7 +210,7 @@ jobs:
 
       - name: Cross-compile for Windows
         env:
-          WAM_WITH_GUI: ${{ inputs.with_gui && '1' || '0' }}
+          WAM_WITH_GUI: ${{ needs.version.outputs.gui == 'true' && '1' || '0' }}
         run: |
           set -o pipefail
           bash scripts/build_windows.sh 2>&1 | tee build-step.log
@@ -476,7 +495,7 @@ jobs:
 
       - name: Build for macOS
         env:
-          WAM_WITH_GUI: ${{ inputs.with_gui && '1' || '0' }}
+          WAM_WITH_GUI: ${{ needs.version.outputs.gui == 'true' && '1' || '0' }}
         run: |
           set -o pipefail
           bash scripts/build_macos.sh 2>&1 | tee build-step.log
@@ -498,7 +517,7 @@ jobs:
       # not run: mining on a hosted runner is what cost this project its
       # code-hosting account on 2026-09-24.
       - name: Does the wallet open?
-        if: inputs.with_gui
+        if: needs.version.outputs.gui == 'true'
         run: |
           set -euo pipefail
           QT="$(ls -d out/macos-*/wam-qt 2>/dev/null | head -1)"
