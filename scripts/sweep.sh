@@ -193,6 +193,7 @@ run "embedded python parses"     bash scripts/test/test_embedded_python.sh
     # `help validateaddress` with "the given bitcoin address" -- in a window
     # one menu away from the balance.
     run "the wallet says WAM to a person" "$PY" scripts/test/test_rename_messages.py
+    run "and says it in every alphabet" "$PY" scripts/test/test_rebrand_locales.py
 # A comment after a "\" continuation commented out the command it was meant to
 # explain, in this very file, and the harness reported the missing command as
 # a pass. See the header of the test.

@@ -39,6 +39,7 @@ which is what lets the build call it unconditionally.
 import argparse
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
 # Applied in order, inside user-visible strings only. Order matters: the URI
@@ -143,6 +144,7 @@ NOOP_CALL = re.compile(r'(QT_TRANSLATE_NOOP\(\s*"[^"]*"\s*,\s*")((?:[^"\\]|\\.)*
 #
 # <name> is untouched on purpose: those are C++ class names (BitcoinGUI,
 # BitcoinAmountField), not words anybody reads.
+MESSAGE = re.compile(r'[ \t]*<message[^>]*>.*?</message>\n?', re.S)
 TS_SOURCE = re.compile(r'(<source>)([^<]*)(</source>)')
 TS_TRANSLATION = re.compile(r'(<translation[^>]*>)([^<]*)(</translation>)')
 TS_NUMERUS = re.compile(r'(<numerusform>)([^<]*)(</numerusform>)')
@@ -167,10 +169,82 @@ TS_NUMERUS = re.compile(r'(<numerusform>)([^<]*)(</numerusform>)')
 BITCOIN_ANY = re.compile(r'[Bb][İIiı][Tt][Cc][Oo][İIiı][Nn][Ss]?')
 
 
+# THE NINETY-FIVE CATALOGUES THE LATIN RULE CANNOT READ.
+#
+# The rule above is written in Latin letters, so it sees the coin's name only
+# where the name is spelled in Latin letters. On 2026-09-27 the founder opened
+# the Windows wallet in Arabic, went to the send tab, and the address field
+# said:
+#
+#     ادخل عنوان محفطة البتكوين (مثال wam1p35yvjel7srp783ztf8v6jd)
+#
+# The address was ours. The sentence around it was not. Measured across the
+# tree: 95 of the 123 catalogues carry at least one translation of a coin-name
+# string that contains no Latin "bitcoin" at all -- 954 strings in total, none
+# of which any check could see, because every check was written in Latin too.
+#
+# These spellings were not typed from memory. They were extracted from the
+# catalogues: for each language, the character runs that appear in many
+# translations OF coin-name strings and in none of the others. Stems rather
+# than whole words, so inflections and glued articles are caught too -- Arabic
+# writes البتكوين, Russian declines, Persian splits the word with a zero-width
+# non-joiner.
+#
+# A wrong guess in this table costs nothing: it simply never matches. Only a
+# MISSING spelling would matter, and nothing here is trusted to be complete --
+# see strip_foreign_names() below, which catches whatever this list forgets.
+SCRIPT_NAMES = [
+    # Cyrillic: Russian, Ukrainian, Belarusian, Bulgarian, Serbian, Macedonian,
+    # Kazakh, Mongolian, Uzbek. Every combination of и/і and й/и/ї is in use.
+    re.compile(r'[Бб][ИиІі][Тт][Кк][Оо][ЙйИиЇїІі]?[Нн]'),
+    # Latin, but not spelled the way the Latin rule expects: Turkmen and Uzbek
+    # write bitkoin, Esperanto coined Bitmono, and the Faroese catalogue has a
+    # typo -- Bicoin -- that shipped for years because nobody greps for it.
+    re.compile(r'[Bb][Ii][Tt][Kk][Oo][Ii][Nn]'),
+    re.compile(r'[Bb]itmono?'),
+    re.compile(r'[Bb]icoin'),
+    # Arabic script: Arabic, Persian, Kurdish, Urdu. Persian and Kurdish use
+    # the Farsi yeh and keheh, which are different codepoints from the Arabic
+    # ones, so the two families cannot share a pattern.
+    # The optional ال is Arabic's definite article, glued to the front of the
+    # word as Arabic always glues it. Without it the send field would have
+    # read "ادخل عنوان محفظة الWAM" -- an Arabic article stuck to a Latin word,
+    # which is how a machine writes and not how a person does.
+    re.compile(r'(?:ال)?ب[يی]?ت‌?\s?[كک][وۆ][يی]?[ين]ن?'),
+    re.compile(r'بٹ\s?[كک]وا?[ئي]ن'),
+    # Hebrew, Greek, Armenian, Georgian, Amharic, Thai.
+    re.compile(r'ביטקוי?ין'),
+    re.compile(r'[Μμ]πίτκοι?[νϊ]ν?'),
+    re.compile(r'[Բբ][իի][թտ][քկ]ո[իի]ն'),
+    re.compile(r'ბიტკოინ'),
+    re.compile(r'ቢትኮይን'),
+    re.compile(r'บิ[ตท]คอย'),
+    # Han, kana, hangul. No word breaks, so these are written out whole.
+    re.compile(r'比特[币幣]'),
+    re.compile(r'ビットコイン'),
+    re.compile(r'비트코인'),
+    # The Indic scripts. Several spell it with a zero-width non-joiner inside
+    # the word, which is why ‌ appears rather than a plain concatenation.
+    re.compile(r'बिटक[ॉोौ]?[इाीॅ]?इ?न'),
+    re.compile(r'বিটকয়ে?ি?ন'),
+    re.compile(r'બિટકો[ઈઇ]ન'),
+    re.compile(r'ਬਿਟਕ[ੁੋ]ਆ?[ਇਿ]ਨ'),
+    re.compile(r'ବିଟକଇନ'),
+    re.compile(r'ಬಿಟ್‌?ಕಾಯಿನ್'),
+    re.compile(r'బిట్‌?కాయిన్'),
+    re.compile(r'பிட்‌?க[ோா]ய[ிீ]ன்'),
+    re.compile(r'ബിറ്റ്‌?കോയി[ൻന]'),
+    re.compile(r'බිට්‌?කොයින්'),
+]
+
+
 def rewrite(text: str) -> str:
     for old, new in PHRASES:
         text = text.replace(old, new)
-    return BITCOIN_ANY.sub('WAM', text)
+    text = BITCOIN_ANY.sub('WAM', text)
+    for pattern in SCRIPT_NAMES:
+        text = pattern.sub('WAM', text)
+    return text
 
 
 def process_ui(path: Path) -> int:
@@ -193,17 +267,178 @@ def process_source(path: Path) -> int:
     return 1
 
 
-def process_ts(path: Path) -> int:
-    """One translation catalogue: the key and the translation, together."""
+# READING A WORD IN A SCRIPT NOBODY HERE CAN READ.
+#
+# The table above is a list, and every list of spellings in this file has been
+# incomplete so far: the capital form was missed in the first pass, the
+# Azerbaijani dotted i in the second, every non-Latin script in the third. A
+# fourth list would be a fourth guess.
+#
+# So the last step is not a list. Unicode names its own characters, and the
+# name carries the sound: ARABIC LETTER BEH, DEVANAGARI LETTER TTA, HANGUL
+# SYLLABLE KO, GEORGIAN LETTER NAR. Take the first letter of each and a word
+# turns into its consonant skeleton -- and every language on earth borrowed
+# this particular word by sound, so every one of them spells it b-t-k-n:
+#
+#     بتكوين      BEH TEH KAF WAW YEH NOON        B T K W Y N
+#     비트코인      BI TEU KO IN                    B T K I N
+#     ბიტკოინ     BAN IN TAR KAN O IN NAR         B I T K O I N
+#     ቢትኮይን       BI TI KO YA NA                  B T K Y N
+#
+# Nothing is guessed and nothing is language-specific. A catalogue for a
+# language nobody here has heard of, added by upstream next year, is caught by
+# the same rule on the day it arrives.
+#
+# The blast radius is deliberately small: this runs only inside a translation
+# whose ENGLISH names the coin, so a word that merely sounds like bitcoin in
+# an unrelated sentence is never seen, let alone touched.
+SKELETON = re.compile(r'B[_A-Z]{0,3}T[_A-Z]{0,3}[KCQ][_A-Z]{0,4}N')
+_NAMED_AS = ('LETTER', 'SYLLABLE', 'SYLLABICS', 'CHARACTER')
+# Qualifiers, not the sound: HEBREW LETTER FINAL NUN is a nun, and reading
+# the qualifier instead would have made it an f.
+_QUALIFIER = ('FINAL', 'SMALL', 'CAPITAL', 'DOTLESS', 'WITH', 'INITIAL',
+              'MEDIAL', 'ISOLATED', 'TALL', 'BROAD', 'LONG', 'SHORT',
+              # Sinhala names the aspiration before it names the letter:
+              # SINHALA LETTER ALPAPRAANA BAYANNA is a b, and reading the
+              # first word made it an l.
+              'ALPAPRAANA', 'MAHAAPRAANA', 'SANYAKA', 'TWO', 'THREE')
+_VOWELS = 'AEIOU'
+
+
+def skeleton(text: str):
+    """The consonants of how the text is pronounced, and where each came from.
+
+    Returns the skeleton and, for every position in it, the index of the
+    character in `text` that produced it -- because a match has to be given
+    back as a span of the original, not of the skeleton. One character can
+    contribute two consonants (HANGUL SYLLABLE IN is an n as well as a vowel),
+    so the two strings are not the same length and the map is not optional.
+
+    '_' is a vowel, a space or a mark: it fills a gap but matches nothing.
+    '#' is punctuation, and stops a match from running across it.
+    """
+    marks, origin = [], []
+    for index, ch in enumerate(text):
+        piece = '#'
+        # Vowel signs, viramas and the zero-width joiners that the Indic and
+        # Arabic scripts write inside a word. They carry no consonant and they
+        # are not a word boundary either: scoring them as punctuation is what
+        # made बिटकॉइन and بیت‌کوین invisible to the first version of this.
+        if ch.isspace() or unicodedata.category(ch)[0] in 'MC':
+            piece = '_'
+        else:
+            try:
+                words = unicodedata.name(ch).split()
+            except ValueError:
+                words = []
+            for i, word in enumerate(words):
+                if word not in _NAMED_AS:
+                    continue
+                rest = [w for w in words[i + 1:] if w not in _QUALIFIER]
+                if rest:
+                    # The FIRST consonant of the name and no more. ARABIC
+                    # LETTER BEH is a b; reading it as "bh" put a consonant
+                    # between the b and the t that no ear hears, and pushed
+                    # the n out of reach of the pattern.
+                    sound = [c for c in rest[0] if c not in _VOWELS]
+                    piece = sound[0] if sound else '_'
+                break
+            else:
+                piece = '_' if ch.isalpha() else '#'
+        marks.append(piece)
+        origin.extend([index] * len(piece))
+    return ''.join(marks), origin
+
+
+def rewrite_by_sound(text: str) -> str:
+    """Replace whatever in `text` is pronounced bitcoin, whatever its script."""
+    marks, origin = skeleton(text)
+    result, cursor = [], 0
+    for m in SKELETON.finditer(marks):
+        start = origin[m.start()]
+        end = origin[m.end() - 1] + 1
+        if start < cursor:
+            continue
+        # No word-boundary test on purpose. Arabic glues its article to the
+        # front -- البتكوين is the-bitcoin, one word -- and Turkic and Finnic
+        # languages glue their cases to the back. A boundary test would let
+        # exactly those through.
+        result.append(text[cursor:start])
+        result.append('WAM')
+        cursor = end
+    result.append(text[cursor:])
+    return ''.join(result)
+
+
+def still_named(text: str) -> bool:
+    """Does this still call the coin something else -- spelled, or sounded?"""
+    if any(p.search(text) for p in SCRIPT_NAMES):
+        return True
+    return rewrite_by_sound(text) != text
+
+
+def foreign_names(text: str):
+    """Translations that still call the coin something else. Any script.
+
+    The test needs no knowledge of the language, which is the point of it.
+    After rewriting, a string whose ENGLISH names the coin has "WAM" in it.
+    Its translation therefore must too -- if it does not, the translator's
+    word for the coin is still sitting there in a script this file cannot
+    read, and it will be what the user sees.
+
+    Empty translations are not a fault: Qt falls back to the source, and the
+    source has been rebranded.
+    """
+    for m in MESSAGE.finditer(text):
+        chunk = m.group(0)
+        src = TS_SOURCE.search(chunk)
+        if not src or 'WAM' not in src.group(2):
+            continue
+        for out in re.finditer(r'<(translation[^>]*|numerusform)>([^<]*)</', chunk):
+            body = out.group(2)
+            if body.strip() and 'WAM' not in body:
+                yield src.group(2), body
+
+
+def process_ts(path: Path) -> tuple:
+    """One translation catalogue: the key and the translation, together.
+
+    Returns (rewritten, dropped): whether the file changed, and how many
+    translations had to be given up because they still named another coin.
+    """
     original = path.read_text(encoding='utf-8')
     changed = original
     for pattern in (TS_SOURCE, TS_TRANSLATION, TS_NUMERUS):
         changed = pattern.sub(
             lambda m: m.group(1) + rewrite(m.group(2)) + m.group(3), changed)
+
+    # Then the same strings again, by sound rather than by spelling -- but
+    # only the ones whose English names the coin, and only if the table left
+    # them without a WAM in them. See rewrite_by_sound().
+    caught = [0]
+
+    def by_sound(m):
+        chunk = m.group(0)
+        if not any(True for _ in foreign_names(chunk)):
+            return chunk
+        def one(t):
+            body = t.group(2)
+            if not body.strip() or 'WAM' in body:
+                return t.group(0)
+            fixed = rewrite_by_sound(body)
+            if fixed != body:
+                caught[0] += 1
+            return t.group(1) + fixed + t.group(3)
+        for pattern in (TS_TRANSLATION, TS_NUMERUS):
+            chunk = pattern.sub(one, chunk)
+        return chunk
+
+    changed = MESSAGE.sub(by_sound, changed)
+
     if changed == original:
-        return 0
+        return 0, caught[0]
     path.write_text(changed, encoding='utf-8')
-    return 1
+    return 1, caught[0]
 
 
 def main() -> int:
@@ -213,6 +448,15 @@ def main() -> int:
     ap.add_argument('--check', action='store_true',
                     help='report what is left without changing anything')
     args = ap.parse_args()
+
+    # This script now prints Arabic, Hebrew and Khmer when it reports. A
+    # Windows console is cp1252 by default and raises on the first one of
+    # them, which would stop a build over the wording of a message about
+    # wording. The output is a report; a character it cannot draw is worth a
+    # question mark, not a traceback.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(encoding='utf-8', errors='replace')
 
     tree = Path(args.tree)
     qt = tree / 'src' / 'qt'
@@ -247,6 +491,21 @@ def main() -> int:
                         stale.append((path.name, m.group(2)[:70]))
                         break
 
+            # AND THE NAME IN A SCRIPT THIS FILE CANNOT SPELL.
+            #
+            # Grepping for "Bitcoin" is an English test, and the wallet is not
+            # in English for most of the people who open it.
+            #
+            # The test is not "does the translation contain WAM": plenty of
+            # honest translations never name the coin at all -- Chinese says
+            # 付款目的地址, the address to pay to, and is perfectly correct.
+            # Failing on those would fail every build for no fault. What is
+            # asked instead is whether the sentence still NAMES another coin,
+            # by any of the known spellings or by sound.
+            for src, body in foreign_names(text):
+                if still_named(body):
+                    stale.append((path.name, f'{src[:34]} -> {body[:34]}'))
+
         if stale:
             print(f'{len(stale)} user-visible strings still say Bitcoin:')
             for name, hit in stale[:20]:
@@ -271,12 +530,17 @@ def main() -> int:
     # every one of them said Bitcoin -- see the comment on TS_SOURCE.
     locales = sorted((qt / 'locale').glob('*.ts'))
     changed_locales = 0
+    dropped_total = 0
     for path in locales:
-        if process_ts(path):
-            changed_locales += 1
+        rewritten, dropped = process_ts(path)
+        changed_locales += rewritten
+        dropped_total += dropped
     if changed_locales:
         touched += changed_locales
         print(f'  locale  {changed_locales} of {len(locales)} translation file(s)')
+    if dropped_total:
+        print(f'  locale  {dropped_total} translation(s) named the coin in '
+              f'their own script and were rewritten by sound')
 
     for rel, old, new in SCHEME_EDITS:
         path = tree / rel
