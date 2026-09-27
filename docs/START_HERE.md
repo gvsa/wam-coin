@@ -103,14 +103,14 @@ else's answer.
 ### Download it
 
 ```bash
-curl -LO https://wamcoin.org/downloads/v0.1.10/wam-coin-v0.1.10-x86_64-linux-gnu.tar.gz
-curl -LO https://wamcoin.org/downloads/v0.1.10/SHA256SUMS
+curl -LO https://wamcoin.org/downloads/v0.1.11/wam-coin-v0.1.11-x86_64-linux-gnu.tar.gz
+curl -LO https://wamcoin.org/downloads/v0.1.11/SHA256SUMS
 ```
 
 ### Check that it is really our file
 
 ```bash
-curl -LO https://wamcoin.org/downloads/v0.1.10/SHA256SUMS.asc
+curl -LO https://wamcoin.org/downloads/v0.1.11/SHA256SUMS.asc
 curl -LO https://wamcoin.org/verify_release.sh
 curl -LO https://wamcoin.org/SIGNING-KEY.asc
 bash verify_release.sh .
@@ -123,8 +123,8 @@ it is the only thing standing between you and a file somebody else swapped in.
 ### Unpack and run
 
 ```bash
-tar -xzf wam-coin-v0.1.10-x86_64-linux-gnu.tar.gz
-cd wam-coin-v0.1.10/bin
+tar -xzf wam-coin-v0.1.11-x86_64-linux-gnu.tar.gz
+cd wam-coin-v0.1.11/bin
 ./wamd -printtoconsole
 ```
 
@@ -371,13 +371,13 @@ end.
 
 | archive | what is in it |
 |---|---|
-| `wam-coin-v0.1.10-…` | `wamd`, `wam-cli` — the node |
-| `wam-miner-v0.1.10-…` | `wam-miner` — the miner, and nothing else |
+| `wam-coin-v0.1.11-…` | `wamd`, `wam-cli` — the node |
+| `wam-miner-v0.1.11-…` | `wam-miner` — the miner, and nothing else |
 
 ```bash
-curl -LO https://wamcoin.org/downloads/v0.1.10/wam-miner-v0.1.10-x86_64-linux-gnu.tar.gz
-tar -xzf wam-miner-v0.1.10-x86_64-linux-gnu.tar.gz
-cd wam-miner-v0.1.10
+curl -LO https://wamcoin.org/downloads/v0.1.11/wam-miner-v0.1.11-x86_64-linux-gnu.tar.gz
+tar -xzf wam-miner-v0.1.11-x86_64-linux-gnu.tar.gz
+cd wam-miner-v0.1.11
 chmod +x wam-miner
 ```
 

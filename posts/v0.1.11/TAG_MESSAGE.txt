@@ -1,0 +1,83 @@
+WAM Coin v0.1.11 — the solo miner stops losing blocks, and there is a window
+
+THIS IS THE FILE THE ANNOUNCEMENT BOT READS. Read the warning before editing.
+
+    git tag -a v0.1.11 -F posts/v0.1.11/TAG_MESSAGE.txt
+
+The annotated tag message becomes the release notes, and bots/announce.js
+posts the FIRST WHOLE PARAGRAPHS THAT FIT IN TWELVE LINES to Telegram and
+Discord, automatically, the moment the release is published. Nobody reviews
+it in between.
+
+So the first two paragraphs below have to make sense on their own, to somebody
+who sees nothing else. Everything after them is for the release page.
+
+There is no MANDATORY: line, and that is a judgement, not an omission. This
+release changes no consensus rule. A v0.1.10 node validates exactly the same
+blocks and is in no danger. But every solo miner should update today: the
+defect below cost them blocks they had already found.
+
+Delete everything above this line before tagging.
+------------------------------------------------------------------------------
+
+If you mine solo, update. v0.1.10's miner threw away most of the blocks it
+found. It asked the node for new work every five seconds and remembered only
+the last eight jobs — about forty seconds — while a worker keeps hashing one
+job until the chain moves, which is around two minutes. So when a block was
+finally found, the miner usually no longer recognised the job it came from
+and dropped it without submitting. A miner reported it, and he was right.
+
+Roughly two blocks in three were lost this way. The fix keeps every job until
+the tip it was built on is gone, and the miner now counts blocks it found but
+could not send, writes each one to a file with its full header, and fails the
+run instead of finishing quietly. A block you found and did not send is the
+one failure this program must never report as success.
+
+WHAT ELSE IS IN IT
+------------------
+
+A graphical wallet, in a file of its own. `wam-qt` opens a window, syncs,
+creates and encrypts a wallet, sends and receives. It is a separate download
+on every platform so that a node is not several times larger for the people
+who never open a window:
+
+    wam-qt-v0.1.11-x86_64-linux-gnu.tar.gz
+    wam-qt-v0.1.11-x86_64-w64-mingw32.zip
+    wam-qt-v0.1.11-arm64-apple-darwin.tar.gz
+
+On Linux it needs your distribution's Qt 5 installed; the archive's README
+carries the one line for apt, dnf and pacman, read out of the binary rather
+than remembered.
+
+The wallet used to say it was somebody else's. Its welcome screen offered to
+download "the full Bitcoin block chain (4 GB) starting with the earliest
+transactions in 2009" — this chain is a few megabytes and started this
+September. Its Pay To field gave a Bitcoin address as the example of a WAM
+one. On Windows the firewall prompt named the publisher as "Bitcoin". And all
+123 translation catalogues inside it named that coin, in their own alphabets,
+where no check written in English could see them: 95 of the 123. All of it is
+corrected, and the check that now looks for it does not read English — it
+asks whether the translation says what the English says, which needs no
+alphabet to answer.
+
+WHAT IS NOT CLAIMED
+-------------------
+
+The macOS wallet has been built on a Mac, started on a Mac, and synced the
+test chain from genesis on a Mac, by the build machine. No person has sat in
+front of it. The Windows and Linux wallets have been opened by hand.
+
+This release changes no consensus rule.
+
+VERIFY BEFORE YOU RUN IT
+------------------------
+
+    curl -LO https://wamcoin.org/downloads/SHA256SUMS
+    curl -LO https://wamcoin.org/downloads/SHA256SUMS.asc
+    gpg --verify SHA256SUMS.asc SHA256SUMS
+    sha256sum --ignore-missing -c SHA256SUMS
+
+The fingerprint to check the key against is published in SECURITY.md in the
+source repository and at https://wamcoin.org/security/ and nowhere else:
+
+    4BD4 A8D3 AFD4 3F5C BCB5  00E2 3798 462F E00A DBA4
