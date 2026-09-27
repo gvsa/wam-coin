@@ -279,6 +279,64 @@ def apply_message_strings(tree, report):
     return touched
 
 
+# ---------------------------------------------------------------------------
+# THE WINDOWS VERSION RESOURCE -- what the operating system says about us.
+#
+# Found on 2026-09-27, by the founder double-clicking the first Windows wallet
+# this project ever built. Windows Firewall asked him whether to allow it and
+# named it:
+#
+#     WAM Coin (GUI node for Bitcoin)
+#     Publisher: Bitcoin
+#
+# That is the single most trust-sensitive sentence a Windows user ever reads
+# about a program, and it told him the publisher was another project. The same
+# strings are in the file's Properties dialog, and every Windows binary we
+# ship carries one: the node, the CLI, the tx and util tools, the wallet tool
+# and the GUI.
+#
+# None of it was reachable before. These .rc files compile only on Windows, so
+# no Linux build, no test and no check here had ever produced them -- and the
+# GUI's resource was never built at all until this week.
+#
+# PACKAGE_NAME is already ours; what is left is the prose around it.
+RC_EDITS = [
+    ('VALUE "CompanyName",        "Bitcoin"',
+     'VALUE "CompanyName",        "WAM Coin"'),
+    ('PACKAGE_NAME " (GUI node for Bitcoin)"',
+     'PACKAGE_NAME " (graphical wallet and node)"'),
+    ('"bitcoind (Bitcoin node with a JSON-RPC server)"',
+     '"wamd (WAM node with a JSON-RPC server)"'),
+    ('"bitcoin-cli (JSON-RPC client for " PACKAGE_NAME ")"',
+     '"wam-cli (JSON-RPC client for " PACKAGE_NAME ")"'),
+    ('"bitcoin-tx (CLI Bitcoin transaction editor utility)"',
+     '"wam-tx (CLI WAM transaction editor utility)"'),
+    ('"bitcoin-util (CLI Bitcoin utility)"',
+     '"wam-util (CLI WAM utility)"'),
+    ('"bitcoin-wallet (CLI tool for " PACKAGE_NAME " wallets)"',
+     '"wam-wallet (CLI tool for " PACKAGE_NAME " wallets)"'),
+]
+
+
+def apply_rc(tree, report):
+    """Every .rc under src/, including the GUI's own under src/qt/res."""
+    touched = 0
+    paths = sorted(list((tree / 'src').glob('*.rc')) +
+                   list((tree / 'src' / 'qt' / 'res').glob('*.rc')))
+    for path in paths:
+        text = path.read_text(encoding='utf-8')
+        new = text
+        for old, rep in RC_EDITS:
+            new = new.replace(old, rep)
+        if new != text:
+            path.write_text(new, encoding='utf-8')
+            report(f'  rc      {path.name}')
+            touched += 1
+    if not paths:
+        report('  skip    no .rc files in this tree')
+    return touched
+
+
 def apply_exact(tree, report):
     touched = 0
     for rel, old, new in EXACT:
@@ -386,6 +444,7 @@ def main():
 
     touched += apply_exact(tree, report)
     touched += apply_message_strings(tree, report)
+    touched += apply_rc(tree, report)
 
     report(f'\n{touched} files rewritten' if touched else '\nnothing to do; already renamed')
     return 0
