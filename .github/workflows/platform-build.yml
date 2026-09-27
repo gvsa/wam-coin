@@ -120,6 +120,25 @@ jobs:
           echo "v=$v" >> "$GITHUB_OUTPUT"
           echo "### Packaging as \`$v\`" >> "$GITHUB_STEP_SUMMARY"
 
+          # AND IS THAT THE VERSION THIS CHECKOUT ACTUALLY BUILDS?
+          #
+          # On 2026-09-27 this run was started with v0.1.11 against a tree
+          # that still builds 0.1.10. Both compiles went the whole way --
+          # thirty-three minutes on Windows, twenty-two on the Mac -- and the
+          # packaging step then refused the archives, correctly, for a reason
+          # that was knowable before a single file was compiled.
+          #
+          # package_platform.sh keeps its own copy of this check and must:
+          # it is run by hand as well. This one is not a second opinion, it is
+          # the same question asked while the answer is still cheap.
+          want="$(sed -n 's/^WAM_CLIENT_VERSION *= *"\([0-9.]*\)".*/\1/p' \
+                  scripts/patch_upstream.py | head -1)"
+          if [ -n "$want" ] && [ "$want" != "${v#v}" ]; then
+            echo "::error::this checkout builds v$want, and the run asked for $v. Move the version first (python3 scripts/set_version.py ${v#v}), or ask for v$want."
+            exit 1
+          fi
+          echo "::notice::the checkout builds v$want, which is what was asked"
+
   # -------------------------------------------------------------------------
   windows-cross:
     name: Windows x86_64 (cross-compiled on Linux)
@@ -504,17 +523,27 @@ jobs:
             echo "listen=0"
           } > "$D/wam.conf"
 
-          QT_QPA_PLATFORM=offscreen "$QT" -datadir="$D" -regtest &
+          # Its own output is kept, not just the node's log. When this failed
+          # on 2026-09-27 the only thing that reached anyone without a GitHub
+          # token was the sentence "the wallet did not finish starting" --
+          # which names the symptom and nothing else. A Qt program that cannot
+          # find a platform plugin says so on stderr and never writes a
+          # debug.log at all, and that is precisely the case the log cannot
+          # describe because it does not exist.
+          QT_QPA_PLATFORM=offscreen "$QT" -datadir="$D" -regtest > wallet-start.log 2>&1 &
           QTPID=$!
           for _ in $(seq 1 90); do
             if grep -q "init message: Done loading" "$D/regtest/debug.log" 2>/dev/null; then break; fi
+            if ! kill -0 "$QTPID" 2>/dev/null; then break; fi
             sleep 1
           done
           kill "$QTPID" 2>/dev/null || true
 
           if ! grep -q "init message: Done loading" "$D/regtest/debug.log" 2>/dev/null; then
+            cp "$D/regtest/debug.log" wallet-debug.log 2>/dev/null || true
             echo "::error::the wallet did not finish starting"
-            tail -30 "$D/regtest/debug.log" 2>/dev/null || true
+            bash scripts/ci_annotate_failure.sh wallet-start.log "the macOS wallet starting up" || true
+            bash scripts/ci_annotate_failure.sh wallet-debug.log "the node behind the macOS wallet" || true
             exit 1
           fi
           echo "the macOS wallet started, loaded, and initialised its GUI layer"
