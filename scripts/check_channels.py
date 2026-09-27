@@ -85,6 +85,25 @@ SOURCES = [
 SOURCES += [str(p.relative_to(ROOT)) for p in (ROOT / "posts").rglob("*.txt")
             if p.name != "launch.txt"]
 
+# AND THE WORKFLOWS, WHICH WRITE THE PAGE A STRANGER ACTUALLY READS.
+#
+# This list held documents, on the reasoning that documents are where we talk
+# about ourselves. release.yml is not a document and it talks about us to more
+# people than any of them: it composes the release notes, including the five
+# commands that tell a reader how to verify what he just downloaded.
+#
+# On 2026-09-27 the draft notes for v0.1.11 told everybody to fetch
+# SHA256SUMS, SHA256SUMS.asc, verify_release.sh and SIGNING-KEY.asc from
+# github.com/wam-coin-official -- the account suspended on 24 September.
+# Four dead URLs, in the one block whose entire purpose is to let somebody
+# distrust us and check for himself.
+#
+# Thirty-two files were corrected that day and this one was not, because the
+# check that finds them could not see it. A guard that reads only the places
+# the fault was already fixed is not a guard.
+SOURCES += [str(p.relative_to(ROOT))
+            for p in (ROOT / ".github" / "workflows").glob("*.yml")]
+
 # Hosts and handles that are ours. A URL is "ours" if it sits on one of
 # these, which is what makes the omission direction checkable at all.
 OURS = re.compile(
@@ -292,6 +311,71 @@ def main():
     else:
         print(f"  {GRN}ok{OFF}    nothing of ours is published outside the list "
               f"({scanned} documents scanned)")
+
+    # ---- 2b. and nothing DISOWNED is handed to somebody as a command ----
+    #
+    # The check above forgives a disowned name, and it must: this project
+    # writes about the account it lost, and saying "that one is not us" is the
+    # point of the file. But forgiveness was being applied to the whole text,
+    # and a name inside a curl line is not being written about. It is being
+    # handed to a reader as a place to fetch from.
+    #
+    # v0.1.11's draft release notes did exactly that: four curl lines pointing
+    # at the suspended account, composed by release.yml, in the block whose
+    # only purpose is to let a stranger verify the download without trusting
+    # us. Every one of them answers 404. A reader who tried would conclude the
+    # release cannot be checked, which is the worst thing this project can say
+    # about itself by accident.
+    # Two exclusions, and both are corrections to the first version of this.
+    #
+    # A name that is IN the list is not disowned, whatever paragraph it also
+    # appears in. The disown parser reads the tail of a section and takes the
+    # URLs in it, and that section explains where the downloads are -- so it
+    # was calling wamcoin.org, this project's own site, a name we disown.
+    #
+    # And posts/ is an archive. Those files are what was actually sent, on the
+    # day it was sent, and several were published before the account died.
+    # Editing them so a check passes would be falsifying the record of what
+    # this project told people. A reader of an archive is reading history; a
+    # reader of a release note is being given a command to run.
+    live = disowned - set(listed)
+    FETCH = re.compile(r"^[^\n]*\b(?:curl|wget|git\s+clone)\b[^\n]*$", re.M)
+    served = {}
+    for rel in dict.fromkeys(SOURCES):
+        if rel.replace("\\", "/").startswith("posts/"):
+            continue
+        p = ROOT / rel
+        if not p.exists():
+            continue
+        text = p.read_text(encoding="utf-8", errors="replace")
+
+        # A workflow is machine input, never narrative, so ANY occurrence in
+        # one is use. A line-based scan missed the case this was written for:
+        # release.yml assigns the host to BASE and RAW on their own lines and
+        # the curl lines say "$BASE". There was no dead name on any line with
+        # curl on it, and four dead curl commands came out the other end.
+        if rel.replace("\\", "/").startswith(".github/workflows/"):
+            for dead in live:
+                if dead in text:
+                    served.setdefault(rel, set()).add(dead)
+            continue
+
+        for line in FETCH.findall(text):
+            for dead in live:
+                if dead in line:
+                    served.setdefault(rel, set()).add(dead)
+
+    if served:
+        print(f"  {RED}FAIL{OFF}  a name the list disowns is used as a place to "
+              f"download from")
+        for rel, names in sorted(served.items()):
+            print(f"          {rel}: {', '.join(sorted(names))}")
+        print("        Writing about a dead name is honest. Telling somebody")
+        print("        to fetch from it is handing them a 404 and calling it")
+        print("        verification.")
+        bad += 1
+    elif live:
+        print(f"  {GRN}ok{OFF}    no disowned name is used as a download source")
 
     # ---- 3. every listed channel still answers ----------------------
     if args.offline:

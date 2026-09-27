@@ -69,15 +69,8 @@ front of it. The Windows and Linux wallets have been opened by hand.
 
 This release changes no consensus rule.
 
-VERIFY BEFORE YOU RUN IT
-------------------------
-
-    curl -LO https://wamcoin.org/downloads/SHA256SUMS
-    curl -LO https://wamcoin.org/downloads/SHA256SUMS.asc
-    gpg --verify SHA256SUMS.asc SHA256SUMS
-    sha256sum --ignore-missing -c SHA256SUMS
-
-The fingerprint to check the key against is published in SECURITY.md in the
-source repository and at https://wamcoin.org/security/ and nowhere else:
-
-    4BD4 A8D3 AFD4 3F5C BCB5  00E2 3798 462F E00A DBA4
+The verification commands are added below this text by the workflow, and are
+deliberately not repeated here: the first draft of these notes carried its own
+copy, so the page showed two verify blocks that did not agree -- one naming a
+download path that answers 404, the other naming an account that was suspended
+on 24 September. Two wrong answers to the one question a careful reader asks.

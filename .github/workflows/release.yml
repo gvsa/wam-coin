@@ -366,8 +366,28 @@ jobs:
                     | awk -v m="$mandatory" '!d && $0 == m { d = 1; next } { print }')"
           fi
 
-          BASE="https://github.com/wam-coin-official/wam-coin/releases"
-          RAW="https://raw.githubusercontent.com/wam-coin-official/wam-coin/main"
+          # THE ACCOUNT IN THESE TWO LINES WAS SUSPENDED ON 24 SEPTEMBER.
+          #
+          # Thirty-two files were corrected that day and this was not one of
+          # them, because no check read workflow files. So the draft notes for
+          # v0.1.11 told every reader to fetch SHA256SUMS, SHA256SUMS.asc,
+          # verify_release.sh and SIGNING-KEY.asc from a 404 -- in the one
+          # block whose entire purpose is to let somebody who does not trust
+          # us check the download for himself. A reader following it would
+          # conclude the release cannot be verified.
+          #
+          # These stay on GitHub rather than moving to wamcoin.org for one
+          # reason: the notes themselves are served from here. If this host is
+          # gone, the page carrying these commands is gone with it, so pointing
+          # them elsewhere buys nothing -- while pointing them here means they
+          # work the instant the release is published, before the site has
+          # been redeployed. The trust anchor was never the host anyway: it is
+          # the fingerprint in SECURITY.md, which verify_release.sh compares.
+          #
+          # scripts/check_channels.py now reads every workflow and fails if a
+          # name CHANNELS.txt disowns appears in one at all.
+          BASE="https://github.com/wamcoin-core-dev/wam-coin/releases"
+          RAW="https://raw.githubusercontent.com/wamcoin-core-dev/wam-coin/main"
           notes="$(mktemp)"
           {
             if [ -n "$mandatory" ]; then
@@ -424,9 +444,16 @@ jobs:
             echo "bash verify_release.sh ."
             echo '```'
             echo
-            echo "WAM has no market value and may never have one. This is testnet"
-            echo "software. Two independent developers have reviewed it and their"
-            echo "findings were adopted; no security firm has audited it."
+            # "This is testnet software" was true when it was written and
+            # stopped being true on 15 September 2026, when mainnet started.
+            # Left standing it tells a reader the coins are not real, on the
+            # release page of a chain that has been producing real blocks for
+            # a fortnight -- which is a false statement about the one thing a
+            # reader most needs to be right about.
+            echo "WAM has no market value and may never have one. Mainnet has been"
+            echo "running since 15 September 2026, and this is young software: two"
+            echo "independent developers have reviewed it and their findings were"
+            echo "adopted; no security firm has audited it."
             echo
             echo "Build it yourself instead, if you prefer -- the release above is"
             echo "produced by \`install.sh --build-only\`, the same script in this"
