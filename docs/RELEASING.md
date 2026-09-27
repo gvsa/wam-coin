@@ -90,7 +90,7 @@ for v0.1.6 is unknown, because nothing measured it.
 
 A draft is not downloadable and does not appear on the releases page.
 
-## 3b. The Windows archives, which the tag does not build
+## 3b. The Windows and macOS archives, which the tag does not build
 
 From v0.1.8 a release carries Windows as well as Linux, and `release.yml`
 builds neither Windows nor macOS. They come from `platform-build`, which is
@@ -106,19 +106,42 @@ reward arriving at the address given. If that fails on Windows or macOS, the
 artifact does not exist and there is nothing to attach — which is the point:
 before v0.1.10 both options were proved on one Linux laptop and shipped to
 the other two platforms untested.
-* when it is green, download the artifact **`wam-windows-x86_64`** from the
-  bottom of the run page — about 14 MB, and it holds the two finished
+* when it is green, download **both** artifacts from the bottom of the run
+  page — `wam-windows-x86_64` and `wam-macos-arm64`. Each holds finished
   archives, not loose binaries
-* unzip it into the same directory as the Linux files
+* unzip them into the same directory as the Linux files
+
+**Tick `Also build the graphical wallet` if this release carries one**, or
+push to a branch named `platform/gui-…` which means the same thing. Without
+it the run produces a node and a miner and no `wam-qt-…` archive at all, and
+the omission is silent: the release simply ships without a wallet on the two
+platforms that have no other way to get one.
 
 **Then add them to the list before signing, and compute the lines rather than
 typing them:**
 
 ```
-cd ~/Downloads/wam-v0.1.8
-sha256sum wam-coin-v0.1.11-x86_64-w64-mingw32.zip \
-          wam-miner-v0.1.11-x86_64-w64-mingw32.zip >> SHA256SUMS
+cd ~/Downloads/wam-v0.1.11
+sha256sum wam-*-v0.1.11-x86_64-w64-mingw32.zip \
+          wam-*-v0.1.11-arm64-apple-darwin.tar.gz >> SHA256SUMS
 ```
+
+The glob is deliberate and replaced two typed file names. Those two were
+written when a platform shipped a node and a miner; from v0.1.11 it also
+ships `wam-qt-…`, and a list of names typed out by hand goes stale every
+time the set grows — which is the same failure this whole section exists to
+prevent, one level up. `wam-*` takes whatever the platform build actually
+produced.
+
+Check what it appended before going further:
+
+```
+tail -6 SHA256SUMS
+```
+
+Six lines: a node, a miner and a wallet for each of Windows and macOS. If a
+wallet line is missing, the platform build ran without the GUI switch and
+the wallet has to be built before the release is signed, not after.
 
 This is the step that would be easiest to skip and the one whose absence does
 the most damage. `SHA256SUMS.asc` is a signature over `SHA256SUMS` and nothing
@@ -142,9 +165,11 @@ has no `gpg` on PATH; the one that works is
 `C:\Program Files\Git\usr\bin\gpg.exe`, which is what Git Bash runs.
 
 From the draft release page, download `SHA256SUMS` and **every package** into
-one empty directory — the two Linux tarballs, about 11 MB, plus the two
-Windows archives from §3b, about 14 MB. Then, after the `sha256sum … >>
-SHA256SUMS` line in §3b has been run:
+one empty directory — the Linux archives, plus the Windows and macOS ones
+from §3b. From v0.1.11 that is a node, a miner and a wallet for each of the
+three platforms: nine files, and `sign_release.sh` refuses to sign until
+every one of them is present and hashes to the line written beside it. Then,
+after the `sha256sum … >> SHA256SUMS` line in §3b has been run:
 
 ```
 bash scripts/sign_release.sh ~/Downloads/wam-v0.1.7
