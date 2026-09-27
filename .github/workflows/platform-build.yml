@@ -103,6 +103,7 @@ jobs:
     outputs:
       v: ${{ steps.v.outputs.v }}
       gui: ${{ steps.v.outputs.gui }}
+      only: ${{ steps.v.outputs.only }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -136,6 +137,22 @@ jobs:
           case "${{ github.ref }}" in refs/heads/platform/gui-*) gui=true ;; esac
           if [ "${{ github.event.inputs.with_gui }}" = "true" ]; then gui=true; fi
           echo "gui=$gui" >> "$GITHUB_OUTPUT"
+
+          # AND WHICH PLATFORMS, FOR THE SAME REASON.
+          #
+          # A wallet fix for macOS used to cost an hour of cross-building Qt
+          # for Windows before the Mac was even reached, every time, on a
+          # queue this repository shares with everybody else's free builds.
+          # A branch ending in -macos asks for the Mac alone; -windows for
+          # Windows alone. Anything else builds both, which stays the default
+          # because a release needs both.
+          only=all
+          case "${{ github.ref }}" in
+            *-macos)   only=macos ;;
+            *-windows) only=windows ;;
+          esac
+          echo "only=$only" >> "$GITHUB_OUTPUT"
+          echo "platforms: $only" >> "$GITHUB_STEP_SUMMARY"
           echo "the graphical wallet is $([ "$gui" = true ] && echo 'built' || echo 'skipped')" \
                >> "$GITHUB_STEP_SUMMARY"
 
@@ -161,6 +178,7 @@ jobs:
   # -------------------------------------------------------------------------
   windows-cross:
     name: Windows x86_64 (cross-compiled on Linux)
+    if: needs.version.outputs.only != 'macos'
     # 24.04, and release.yml stays on 22.04. Both are deliberate and the
     # reasons are opposite.
     #
@@ -457,6 +475,7 @@ jobs:
   # -------------------------------------------------------------------------
   macos:
     name: macOS ${{ matrix.arch }}
+    if: needs.version.outputs.only != 'windows'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 240
     needs: version
