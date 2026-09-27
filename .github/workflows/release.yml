@@ -102,7 +102,20 @@ jobs:
       # Shipping v0.1.11 without this step would put a wallet on the two
       # platforms this project owns no machine of, and none on the one every
       # server here runs.
+      # continue-on-error, deliberately, and only on this step.
+      #
+      # v0.1.11 carries the fix for a defect that loses a solo miner about two
+      # blocks in three. People are waiting for it. The wallet is new, its
+      # build pulls Qt from apt, and the first time anything runs on a runner
+      # is the time it breaks -- so it is not allowed to hold the miner's fix
+      # hostage.
+      #
+      # Nothing is hidden if it fails: the step goes red, package_release.sh
+      # says "no GUI in this build", SHA256SUMS lists no wallet and the notes
+      # offer none. The release is then a node release, which is what every
+      # release before it was.
       - name: The graphical wallet
+        continue-on-error: true
         run: |
           set -euo pipefail
           sudo apt-get update -qq

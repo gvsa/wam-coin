@@ -26,9 +26,27 @@ set -euo pipefail
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 . "$SCRIPTS_DIR/lib/python.sh"
 
-TREE="${TREE:-$HOME/wam/build/wam-core}"
 REPO="${REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-RANDOMX="${RANDOMX:-$HOME/wam/build/randomx}"
+
+# WHERE THE TREE IS, ASKED RATHER THAN REMEMBERED.
+#
+# This file said $HOME/wam/build and nothing else. fetch-upstream.sh builds
+# into <repo>/build, which is where install.sh leaves it and where
+# package_release.sh looks -- so on any machine that followed the documented
+# path, including the release runner, this script would have stopped at "no
+# tree at /home/runner/wam/build/wam-core" while the tree sat in the
+# repository beside it.
+#
+# package_release.sh and miner/build.sh both carried this defect and both were
+# fixed the same way. It is the third time, which is why it is written here in
+# the same words: a path remembered instead of asked.
+for base in "$REPO/build" "$HOME/wam/build"; do
+    [ -d "$base/wam-core" ] && BUILD_BASE="$base" && break
+done
+BUILD_BASE="${BUILD_BASE:-$REPO/build}"
+
+TREE="${TREE:-$BUILD_BASE/wam-core}"
+RANDOMX="${RANDOMX:-$BUILD_BASE/randomx}"
 JOBS="${JOBS:-$(nproc)}"
 
 fail() { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
