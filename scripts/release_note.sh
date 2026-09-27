@@ -60,6 +60,7 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --platform) PLATFORM="${2:-}"; shift 2 ;;
         --version)  VERSION="${2:-}";  shift 2 ;;
+        --with-gui) WITH_GUI=1;         shift 1 ;;
         -h|--help)  sed -n '5,50p' "$0"; exit 0 ;;
         *) printf 'unknown argument: %s\n' "$1" >&2; exit 2 ;;
     esac
@@ -112,6 +113,14 @@ another one afterwards."
         exit 2 ;;
 esac
 
+# Windows people expect a .zip and everyone else a .tar.gz, which is what
+# package_platform.sh makes. Named here so the note cannot name a file that
+# does not exist.
+case "$PLATFORM" in
+    windows) ARCHIVE_EXT="zip" ;;
+    *)       ARCHIVE_EXT="tar.gz" ;;
+esac
+
 # Three plain heredocs, appended in order, none of them nested and none inside
 # a command substitution. That is the whole of the portability requirement and
 # it is why this is written the long way round -- see (1) and (2) above.
@@ -142,6 +151,27 @@ That is what is being claimed, and all of it. What is NOT claimed:
   * before $VERSION the packaging and the signature covered Linux and
     nothing else, so this path is newer and less worn than that one
 TXT
+
+# THE WALLET IS A SEPARATE DOWNLOAD, AND THE NODE HAS TO SAY SO.
+#
+# It ships in its own archive so that a node is not several times larger for
+# the people who never open a window. That only works if the node's own notes
+# name the other file -- otherwise the wallet is a download nobody is told
+# about, and the separation reads as an omission.
+if [ "${WITH_GUI:-0}" = "1" ]; then
+cat <<TXT
+
+THE GRAPHICAL WALLET IS A SEPARATE FILE
+---------------------------------------
+This archive holds the node and its command-line tools. If you want a window,
+download it beside this one:
+
+  wam-qt-$VERSION-$TRIPLET.$ARCHIVE_EXT
+
+It is the same node underneath. Use it INSTEAD of wamd, not beside it: never
+run both against one data directory at the same time.
+TXT
+fi
 
 if [ "$PLATFORM" = "windows" ]; then
     cat <<'WARN'

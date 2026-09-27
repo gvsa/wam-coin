@@ -125,6 +125,33 @@ for plat in windows macos-arm64 macos-x86_64; do
         || bad "$plat: dropped the 'what is NOT claimed' list"
 done
 
+# THE WALLET IS A SEPARATE DOWNLOAD, SO THE NODE'S NOTE HAS TO NAME IT.
+#
+# It ships in its own archive so a node is not several times larger for people
+# who never open a window. That only works if the node's own notes point at
+# the other file; otherwise the separation is indistinguishable from having
+# forgotten the wallet. And the file name has to be right down to the
+# extension, because a reader will type it.
+for plat in windows macos-arm64 macos-x86_64; do
+    case "$plat" in
+        windows)      want="wam-qt-$V-x86_64-w64-mingw32.zip" ;;
+        macos-arm64)  want="wam-qt-$V-arm64-apple-darwin.tar.gz" ;;
+        macos-x86_64) want="wam-qt-$V-x86_64-apple-darwin.tar.gz" ;;
+    esac
+    out="$(bash "$NOTE" --platform "$plat" --version "$V" --with-gui)"
+    printf '%s' "$out" | grep -qF "$want" \
+        && ok "$plat: names the wallet archive, with the right extension" \
+        || bad "$plat: --with-gui did not name $want"
+
+    # And without the flag it must say nothing about a wallet: most runs of
+    # this build are the node alone, and a note that offers a download which
+    # was never made is worse than one that offers none.
+    out="$(bash "$NOTE" --platform "$plat" --version "$V")"
+    printf '%s' "$out" | grep -q "wam-qt" \
+        && bad "$plat: offers a wallet that this build did not produce" \
+        || ok "$plat: says nothing about a wallet when none was built"
+done
+
 # An unknown platform must be refused, not guessed at.
 if bash "$NOTE" --platform freebsd --version "$V" >/dev/null 2>&1; then
     bad "an unknown platform produced a note instead of an error"

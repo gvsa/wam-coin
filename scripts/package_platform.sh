@@ -232,6 +232,7 @@ for f in "$FROM"/*; do
     [ -f "$f" ] || continue
     case "${f##*/}" in
         wam-miner|wam-miner.exe) ;;                      # handled below
+        wam-qt|wam-qt.exe) ;;                            # handled below, too
         *.log|*.txt|*.md) ;;
         *) cp "$f" "$NODE/bin/" ;;
     esac
@@ -279,8 +280,12 @@ fi
 # version are enough -- so scripts/test/test_release_note.sh can exercise
 # every platform this project supports, in a second, before anything is
 # pushed to a runner.
+GUINOTE=""
+for cand in "$FROM/wam-qt.exe" "$FROM/wam-qt"; do
+    [ -f "$cand" ] && GUINOTE="--with-gui" && break
+done
 if ! bash "$REPO/scripts/release_note.sh" \
-        --platform "$PLATFORM" --version "$VERSION" > "$NODE/RELEASE.txt"; then
+        --platform "$PLATFORM" --version "$VERSION" $GUINOTE > "$NODE/RELEASE.txt"; then
     die "release_note.sh failed for $PLATFORM. Nothing was packaged."
 fi
 # Measured, not asserted. The line above used to print whatever happened,
@@ -319,6 +324,51 @@ else
     warn "the build script produced wam-miner$([ "$PLATFORM" = windows ] && echo .exe)."
 fi
 
+# THE WALLET, WHICH IS A DOWNLOAD OF ITS OWN.
+#
+# package_release.sh has shipped the Linux wallet as a separate file since the
+# founder asked for it: the node is not to be four times larger for the people
+# who never open a window. This script did not, so on Windows and macOS
+# wam-qt was simply another file in bin/ -- the same requirement answered two
+# different ways by two scripts, which is the shape of mistake this repository
+# has already paid for three times.
+#
+# Same layout as Linux, deliberately: bin/wam-qt, COPYING, and a README that
+# says the same sentences, so the three platforms do not describe the same
+# program differently.
+GUISRC=""
+for cand in "$FROM/wam-qt.exe" "$FROM/wam-qt"; do
+    [ -f "$cand" ] && GUISRC="$cand" && break
+done
+if [ -n "$GUISRC" ]; then
+    WAL="$STAGE/wam-qt-$VERSION"
+    mkdir -p "$WAL/bin"
+    cp "$GUISRC" "$WAL/bin/"
+    command -v "$STRIP" >/dev/null 2>&1 && "$STRIP" "$WAL/bin"/* 2>/dev/null || true
+    [ -f "$REPO/COPYING" ] && cp "$REPO/COPYING" "$WAL/"
+    cat > "$WAL/README.txt" <<WALLETEOF
+WAM Coin graphical wallet $VERSION -- $TRIPLET
+
+  bin/${GUISRC##*/}       the wallet, with a window
+
+It is the same node underneath: the wallet starts one, keeps the chain in the
+same data directory, and can be used instead of wamd, not beside it. Do not
+run both against one data directory at the same time.
+
+Nothing else is needed. If you already run wamd, stop it first.
+
+Verify what you downloaded before running it:
+  sha256sum --ignore-missing -c SHA256SUMS
+  gpg --verify SHA256SUMS.asc SHA256SUMS
+The fingerprint to check it against is at https://wamcoin.org/security/
+WALLETEOF
+    ok "wallet packaged separately, as on Linux"
+else
+    # Not a warning. Most runs of this workflow are about the node, and the
+    # wallet is built only when it is asked for.
+    ok "no wallet in this build, so none is packaged"
+fi
+
 # ---------------------------------------------------------------------------
 echo
 echo "${BLD}3. archives${OFF}"
@@ -338,6 +388,7 @@ pack() {   # pack <stage subdir> <archive base name>
 
 pack "wam-coin-$VERSION"  "wam-coin-$VERSION-$TRIPLET"
 [ -n "$MINERSRC" ] && pack "wam-miner-$VERSION" "wam-miner-$VERSION-$TRIPLET"
+[ -n "$GUISRC" ]   && pack "wam-qt-$VERSION"    "wam-qt-$VERSION-$TRIPLET"
 
 for a in "${made[@]}"; do
     sz=$(stat -c%s "$OUT/$a" 2>/dev/null || echo 0)
