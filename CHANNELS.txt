@@ -10,6 +10,7 @@
  --------
 
    website        https://wamcoin.org
+   reserve name   https://wamcoin.net       (empty on purpose -- see below)
    source         https://gitlab.com/WAMCoin/wam-coin
    source         https://github.com/wamcoin-core-dev/wam-coin
    source         https://gitea.com/WAMCoin/wam-coin
@@ -96,6 +97,29 @@
  listed in this file before anything on it is ours -- and if it is active
  and this file does not list it, it is not us. That is the whole reason
  this file is signed: the list is what counts, never the name.
+
+ A NAME HELD IN RESERVE
+
+ wamcoin.net was registered on 27 September 2026 and serves nothing. It is
+ written here while it is still empty, and that is the whole point of it.
+
+ Everything this project shows the world -- the site, the downloads, the
+ explorer, the pool, the Electrum server -- sits under one domain, at one
+ registrar, on one account. On 24 September a single account at a different
+ company was suspended, and the repository, every download link and the whole
+ website went dark in the same minute. The second name is the answer to that,
+ and it is at a different company, on a different account, with a different
+ address, so that no one decision can take both.
+
+ If wamcoin.org is ever lost, this project moves to wamcoin.net and to
+ nowhere else. A name that first appears on the day of a failure cannot be
+ told apart from an impostor's; a name written into a signed file weeks
+ before it is needed can. That is why it is listed now, holding nothing.
+
+ Neither name carries the chain. The seed addresses are compiled into the
+ software, not looked up by name, and a download proves itself by the
+ signature on SHA256SUMS wherever it is served from. What a lost domain costs
+ is people finding us, not the network running.
 
  THE ONE ACCOUNT THAT PROVES ITSELF WITHOUT US
 
@@ -191,6 +215,20 @@
 
 
 ---------------------------------------------------------------------------
+ Revision 5 -- 2026-09-27
+   A second domain, wamcoin.net, named here while it is still empty.
+
+   Everything this project publishes sits under one domain at one registrar.
+   That is the same shape of fault revision 4 fixed for the source code, and
+   it was left standing for the name that carries the site, the downloads,
+   the explorer, the pool and the Electrum server -- all five at once.
+
+   The reason to list it today rather than on the day it is needed is the
+   reason this file exists at all. A name that turns up during an outage is
+   indistinguishable from an impostor's, and an outage is exactly when a
+   reader has the least ability to check. Written here, and signed, it can
+   be checked before anybody needs it.
+
  Revision 4 -- 2026-09-25
    Three sources instead of one, a second contact address, and a correction
    about the fourth name.
