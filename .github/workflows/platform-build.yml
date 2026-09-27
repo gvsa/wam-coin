@@ -52,6 +52,22 @@ on:
         description: 'Version to stamp on the archives, e.g. v0.1.8. Leave empty to use the newest tag.'
         required: false
         default: ''
+      # THE WALLET, AND WHY IT IS A SWITCH RATHER THAN ALWAYS ON.
+      #
+      # Building the GUI means depends must cross-build Qt first, and that is
+      # an hour or more before a line of WAM code is reached. The node, the
+      # seed and the miner need none of it, and most runs of this workflow are
+      # about them.
+      #
+      # It is here at all because this project owns no Mac. The wallet was
+      # built and opened on Linux and Windows on 2026-09-26 and 09-27; macOS
+      # is the one platform where nobody can run it, and GitHub's runners are
+      # real Macs. So the only honest proof of a macOS wallet comes from here.
+      with_gui:
+        description: 'Also build the graphical wallet (adds an hour or more: Qt is cross-built first)'
+        required: false
+        type: boolean
+        default: false
   push:
     branches:
       - 'platform/**'
@@ -155,6 +171,8 @@ jobs:
         run: bash scripts/fetch-upstream.sh
 
       - name: Cross-compile for Windows
+        env:
+          WAM_WITH_GUI: ${{ inputs.with_gui && '1' || '0' }}
         run: |
           set -o pipefail
           bash scripts/build_windows.sh 2>&1 | tee build-step.log
@@ -438,9 +456,69 @@ jobs:
         run: bash scripts/fetch-upstream.sh
 
       - name: Build for macOS
+        env:
+          WAM_WITH_GUI: ${{ inputs.with_gui && '1' || '0' }}
         run: |
           set -o pipefail
           bash scripts/build_macos.sh 2>&1 | tee build-step.log
+
+      # DOES THE WALLET ACTUALLY OPEN ON A MAC?
+      #
+      # This project owns no Mac, so this runner is the only place the
+      # question can be asked. Compiling proves the toolchain; it does not
+      # prove the program starts, and the Linux and Windows wallets were both
+      # believed only after somebody looked at a window.
+      #
+      # So: the file is a Mach-O for this architecture, it answers --version,
+      # and it starts against a throwaway regtest chain with the offscreen
+      # platform plugin and writes its own log. A GUI that cannot reach a
+      # window server still initialises everything behind it, which is where a
+      # missing Qt plugin or a bad bundle shows up.
+      #
+      # Nothing is mined here. The node produces no blocks and the miner is
+      # not run: mining on a hosted runner is what cost this project its
+      # code-hosting account on 2026-09-24.
+      - name: Does the wallet open?
+        if: inputs.with_gui
+        run: |
+          set -euo pipefail
+          QT="$(ls -d out/macos-*/wam-qt 2>/dev/null | head -1)"
+          if [ -z "$QT" ]; then echo "::error::no wam-qt was produced"; exit 1; fi
+
+          file -bL "$QT"
+          if ! file -bL "$QT" | grep -q "Mach-O"; then
+            echo "::error::wam-qt is not a Mach-O binary"; exit 1
+          fi
+
+          "$QT" --version | head -3
+          if ! "$QT" --version | grep -q "WAM Coin"; then
+            echo "::error::the wallet does not name this project"; exit 1
+          fi
+
+          D="$(mktemp -d)"
+          {
+            echo "regtest=1"
+            echo "[regtest]"
+            echo "rpcport=29854"
+            echo "port=29855"
+            echo "listen=0"
+          } > "$D/wam.conf"
+
+          QT_QPA_PLATFORM=offscreen "$QT" -datadir="$D" -regtest &
+          QTPID=$!
+          for _ in $(seq 1 90); do
+            if grep -q "init message: Done loading" "$D/regtest/debug.log" 2>/dev/null; then break; fi
+            sleep 1
+          done
+          kill "$QTPID" 2>/dev/null || true
+
+          if ! grep -q "init message: Done loading" "$D/regtest/debug.log" 2>/dev/null; then
+            echo "::error::the wallet did not finish starting"
+            tail -30 "$D/regtest/debug.log" 2>/dev/null || true
+            exit 1
+          fi
+          echo "the macOS wallet started, loaded, and initialised its GUI layer"
+          grep -c "GUI:" "$D/regtest/debug.log" || true
 
       - name: Say why it failed, where it can be read without a token
         if: failure()
