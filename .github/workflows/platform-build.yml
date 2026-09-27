@@ -508,10 +508,10 @@ jobs:
       # believed only after somebody looked at a window.
       #
       # So: the file is a Mach-O for this architecture, it answers --version,
-      # and it starts against a throwaway regtest chain with the offscreen
-      # platform plugin and writes its own log. A GUI that cannot reach a
-      # window server still initialises everything behind it, which is where a
-      # missing Qt plugin or a bad bundle shows up.
+      # and it starts against a throwaway regtest chain and writes its own
+      # log. Reaching "Done loading" means the Qt layer came up, the node
+      # behind it initialised, and the bundle is whole -- which is where a
+      # missing plugin or a broken link shows itself.
       #
       # Nothing is mined here. The node produces no blocks and the miner is
       # not run: mining on a hosted runner is what cost this project its
@@ -549,7 +549,23 @@ jobs:
           # find a platform plugin says so on stderr and never writes a
           # debug.log at all, and that is precisely the case the log cannot
           # describe because it does not exist.
-          QT_QPA_PLATFORM=offscreen "$QT" -datadir="$D" -regtest > wallet-start.log 2>&1 &
+          # COCOA, NOT OFFSCREEN -- BECAUSE OFFSCREEN IS NOT THERE.
+          #
+          # The first attempt asked for the offscreen platform plugin, on the
+          # reasoning that a runner has no screen. The runner answered:
+          #
+          #     Could not find the Qt platform plugin "offscreen" in ""
+          #     Available platform plugins are: cocoa.
+          #
+          # Upstream's depends builds Qt for macOS with the one plugin a Mac
+          # user needs, and offscreen is not it. That was knowable and was not
+          # known, because the first version of this step threw the answer into
+          # a log nobody without a token can read.
+          #
+          # Cocoa is the better test anyway: it is the plugin every real user
+          # runs, and a hosted Mac has a window session. If it cannot reach
+          # one, that failure is now legible too.
+          "$QT" -datadir="$D" -regtest > wallet-start.log 2>&1 &
           QTPID=$!
           for _ in $(seq 1 90); do
             if grep -q "init message: Done loading" "$D/regtest/debug.log" 2>/dev/null; then break; fi
