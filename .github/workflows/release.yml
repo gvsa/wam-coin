@@ -87,6 +87,29 @@ jobs:
           # the release tarball.
           bash install.sh --build-only --node-only --network testnet --jobs "$(nproc)"
 
+      # THE WALLET, WHICH THIS WORKFLOW HAS NEVER BUILT.
+      #
+      # install.sh configures with --without-gui, written into the line and not
+      # optional, because the node, the seed, the pool and the miner need
+      # nothing from Qt and it roughly doubles the build. Every Linux release
+      # so far inherited that: package_release.sh looked for src/qt/wam-qt,
+      # never found one, and wrote "no GUI in this build" into a log nobody
+      # read. Its whole wallet path -- the separate archive, its README, its
+      # line in SHA256SUMS -- has therefore never run once since it was
+      # written.
+      #
+      # Windows and macOS grew a graphical wallet on 2026-09-26 and 09-27.
+      # Shipping v0.1.11 without this step would put a wallet on the two
+      # platforms this project owns no machine of, and none on the one every
+      # server here runs.
+      - name: The graphical wallet
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+              qtbase5-dev qttools5-dev qttools5-dev-tools libqrencode-dev
+          bash scripts/build_qt.sh
+
       - name: Package
         run: bash scripts/package_release.sh --version "${{ steps.v.outputs.version }}"
 

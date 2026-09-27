@@ -217,10 +217,44 @@ The graphical wallet is a separate download, so that a node is not four times
 larger for people who never open a window:
   wam-qt-$VERSION-$PLATFORM.tar.gz"
     cp "$REPO/COPYING" "$WALLET_DIR/" 2>/dev/null || true
+
+    # WHAT IT NEEDS, READ OUT OF THE BINARY RATHER THAN REMEMBERED.
+    #
+    # The node and the miner are self-contained: the portability gate below
+    # holds them to a bare glibc and that is the whole of their requirement.
+    # The wallet is not. It is linked against the system's Qt 5, so it needs
+    # Qt installed -- and a user whose machine has none gets a loader error
+    # naming a file, which is the least helpful failure a program can have.
+    #
+    # The list is taken from the binary with ldd, so it cannot drift away from
+    # what was actually built. If Qt is ever linked statically this produces
+    # nothing and the sentence disappears with it.
+    QT_SONAMES="$(ldd "$WALLET_DIR/bin/wam-qt" 2>/dev/null \
+                  | grep -oE 'libQt5[A-Za-z]+\.so\.[0-9]+' | sort -u | tr '\n' ' ')"
+    if [ -n "$QT_SONAMES" ]; then
+        NEEDS="
+WHAT THIS NEEDS ON YOUR MACHINE
+-------------------------------
+The node and the miner need nothing but a working glibc. The wallet is
+different: it uses the Qt libraries your distribution ships, and will not
+start without them.
+
+  Debian, Ubuntu:  sudo apt install libqt5gui5 libqt5widgets5 libqt5network5 libqrencode4
+  Fedora:          sudo dnf install qt5-qtbase-gui qrencode-libs
+  Arch:            sudo pacman -S qt5-base qrencode
+
+Read out of this build, it loads: $QT_SONAMES
+If it starts and says a library is missing, that is the line to install.
+"
+    else
+        NEEDS=""
+    fi
+
     cat > "$WALLET_DIR/README.txt" <<WALLETEOF
 WAM Coin graphical wallet $VERSION -- $PLATFORM
 
   bin/wam-qt       the wallet, with a window
+$NEEDS
 
 It is the same node underneath: the wallet starts one, keeps the chain in the
 same data directory, and can be used instead of wamd, not beside it. Do not
