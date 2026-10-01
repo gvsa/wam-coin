@@ -118,11 +118,25 @@ function rpc(method, params = []) {
 
     const listLen = await redis.llen(key('blocks:confirmed'));
     const orphanLen = await redis.llen(key('blocks:orphaned'));
+    const maturing = await redis.llen(key('blocks:maturing'));
+    const pending = Object.keys(await redis.hgetall(key('blocks:pending'))).length;
     const existing = parseInt(await redis.get(key('blocks:confirmed:count')) || '0', 10);
 
     process.stdout.write(
-        `  redis: list holds ${listLen}, counter is ${existing}, ` +
-        `orphan list holds ${orphanLen}\n`);
+        `  redis: confirmed list ${listLen}, counter ${existing}, ` +
+        `orphans ${orphanLen}, maturing ${maturing}, pending ${pending}\n`);
+
+    // CONFIRMED IS NOT THE SAME QUESTION AS FOUND.
+    //
+    // The chain count is every block this pool ever found that is on the
+    // chain. blocks:confirmed:count is the narrower thing the dashboard calls
+    // BLOCKS FOUND: the ones that reached maturity and were paid out. The
+    // blocks still maturing are on the chain and not yet confirmed, and
+    // shareProcessor will increment the counter for each of them when it
+    // does confirm -- so seeding with the chain total would count those twice
+    // and leave the number permanently high by however many were in flight on
+    // the day this ran.
+    const confirmedSeed = found - maturing - pending;
 
     // The chain count is authoritative, with one exception: it cannot be
     // lower than what the list still holds, and if it is, something is wrong
@@ -137,6 +151,11 @@ function rpc(method, params = []) {
         await redis.quit();
         process.exit(1);
     }
+
+    process.stdout.write(
+        `  confirmed seed = ${found} - ${maturing} maturing - ${pending} ` +
+        `pending = ${confirmedSeed}
+`);
 
     if (dryRun) {
         process.stdout.write(`\n  --dry-run: nothing was written\n`);
