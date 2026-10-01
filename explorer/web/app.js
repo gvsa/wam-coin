@@ -401,13 +401,36 @@ async function renderConcentration() {
          + `${distinct} distinct \u2014 ${rule}`;
   };
 
-  text($('concSeven'), sd && sd.blocksRead
-    ? line(sd.complete ? 'last seven days' : 'the whole chain so far',
-           `${sd.blocksRead} blocks`, sd.topPercent, sd.distinct)
-    : 'last seven days: reading…');
+  // THE SPAN IS MEASURED NOW, NOT MULTIPLIED OUT.
+  //
+  // This said "about ${blocksRead * 2 / 60}h" -- the target interval times
+  // the number of blocks. That is an assumption printed as a fact, and on a
+  // chain running slower or faster than two minutes it names a stretch of
+  // time that never happened. The same assumption sat behind calling the long
+  // window "last seven days": 5040 blocks IS seven days only if every one of
+  // them took exactly the target.
+  //
+  // Both now read the first and last timestamps of the blocks actually in the
+  // window, and say "reading…" rather than guess when they cannot.
+  const span = (secs) => {
+    if (!secs || secs <= 0) return null;
+    const h = secs / 3600;
+    if (h < 1) return `${Math.round(secs / 60)} min`;
+    if (h < 48) return `${h < 10 ? h.toFixed(1) : Math.round(h)}h`;
+    return `${(h / 24).toFixed(1)} days`;
+  };
 
+  const sevenSpan = sd && span(sd.spanSeconds);
+  text($('concSeven'), sd && sd.blocksRead
+    ? line(sd.complete ? 'the long window' : 'the whole chain so far',
+           sevenSpan ? `${sd.blocksRead} blocks, ${sevenSpan}` : `${sd.blocksRead} blocks`,
+           sd.topPercent, sd.distinct)
+    : 'the long window: reading…');
+
+  const nowSpan = span(c.spanSeconds);
   text($('concSummary'),
-    line('right now', `${c.blocksRead} blocks, about ${Math.round(c.blocksRead * 2 / 60)}h`,
+    line('right now',
+         nowSpan ? `${c.blocksRead} blocks, ${nowSpan}` : `${c.blocksRead} blocks`,
          pc, c.distinct));
 
   const t = $('concTable');

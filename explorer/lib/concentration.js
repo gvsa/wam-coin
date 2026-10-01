@@ -95,7 +95,15 @@ class Concentration {
                 if (!outs.length) continue;
                 const biggest = outs.reduce((a, b) => (b.value > a.value ? b : a));
                 const addr = (biggest.scriptPubKey || {}).address;
-                if (addr) this.finders.set(h, addr);
+                // THE TIME IS KEPT BECAUSE THE PAGE WAS ASSUMING IT.
+                //
+                // The summary read "47 blocks, about 2h", and the hours were
+                // blocksRead x 2 / 60 -- the target interval, multiplied out.
+                // It is not a measurement, and on a chain running slower or
+                // faster than target it states a span that never happened. The
+                // block already carries its own timestamp and it is already
+                // fetched here, so the honest number costs nothing.
+                if (addr) this.finders.set(h, { addr, time: block.time || null });
                 fetched++;
             } catch (err) {
                 // A height we cannot read is left out of the denominator, not
@@ -124,15 +132,25 @@ class Concentration {
     _tally(depth) {
         const tally = new Map();
         let total = 0;
-        for (const [h, addr] of this.finders) {
+        let first = null, last = null;
+        for (const [h, rec] of this.finders) {
             if (h <= this.tip - depth) continue;
+            const addr = rec.addr;
             tally.set(addr, (tally.get(addr) || 0) + 1);
             total++;
+            if (rec.time) {
+                if (first === null || rec.time < first) first = rec.time;
+                if (last === null || rec.time > last) last = rec.time;
+            }
         }
         const ranked = [...tally.entries()].sort((a, b) => b[1] - a[1]);
         return {
             window: depth,
             blocksRead: total,
+            // Measured from the oldest and newest block in the window, in
+            // seconds, or null when fewer than two blocks carry a time.
+            spanSeconds: (first !== null && last !== null && last > first)
+                ? last - first : null,
             distinct: ranked.length,
             topPercent: total ? (100 * ranked[0][1]) / total : null,
             top: ranked.slice(0, 5).map(([addr, n]) => ({
