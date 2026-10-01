@@ -55,6 +55,24 @@ every release this project published was announced mid-sentence — twice
 mid-word. It now stops at a paragraph and says when it left some behind, but
 the first paragraphs are still the whole message most people will read.
 
+**Then check that those paragraphs name everything new, which is a different
+question from whether they read well:**
+
+```
+python3 scripts/test/test_announcement_covers_release.py posts/v0.1.12/TAG_MESSAGE.txt
+```
+
+v0.1.11 shipped the first graphical wallet this project ever built. The tag
+message described it, with its three file names — below the twelve lines the
+bot sends. So the channels were told about a mining fix and nothing else, and
+a community member filled the silence by building a wallet of his own and
+posting a download link in the chat, which had to be stopped and publicly
+disowned.
+
+The render above was run before that tag, and read for shape: whole
+paragraphs, no sentence cut in half. It was not read for coverage. That is why
+the coverage question is a command and not a sentence in this document.
+
 **If the release changes a consensus rule, the tag message must contain a
 line beginning `MANDATORY:`.** The workflow copies it to the top of the
 notes, where the announcer finds it and posts the release as UPDATE REQUIRED

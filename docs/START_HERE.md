@@ -100,6 +100,30 @@ it. It runs quietly in the background. You do not need one to own WAM, but
 running one means you verify the rules yourself instead of trusting somebody
 else's answer.
 
+### If you would rather have a window than a terminal
+
+From v0.1.11 there is a wallet with a window, `wam-qt`, for Linux, Windows and
+macOS. It syncs, creates and encrypts a wallet, and sends and receives, and
+everything below can be done in it instead of at a prompt.
+
+It is **the same node underneath**, so use it *instead of* `wamd` and not
+beside it — never run both against one data directory at the same time.
+
+    wam-qt-v0.1.11-x86_64-linux-gnu.tar.gz
+    wam-qt-v0.1.11-x86_64-w64-mingw32.zip
+    wam-qt-v0.1.11-arm64-apple-darwin.tar.gz
+
+It is a separate download so that a node is not several times larger for the
+people who never open a window. On Linux it needs your distribution's Qt 5
+installed and the archive's README carries the one line for apt, dnf and
+pacman; on Windows and macOS it needs nothing.
+
+Said plainly, because it is four days old: it has been opened by hand on Linux
+and Windows, and on macOS it has been built, started and synced from genesis by
+the build machine, with no person yet sitting in front of it.
+
+The rest of this page is the terminal. Everything in it still applies.
+
 ### Download it
 
 ```bash
@@ -373,6 +397,7 @@ end.
 |---|---|
 | `wam-coin-v0.1.11-…` | `wamd`, `wam-cli` — the node |
 | `wam-miner-v0.1.11-…` | `wam-miner` — the miner, and nothing else |
+| `wam-qt-v0.1.11-…` | `wam-qt` — the wallet, with a window |
 
 ```bash
 curl -LO https://wamcoin.org/downloads/v0.1.11/wam-miner-v0.1.11-x86_64-linux-gnu.tar.gz
