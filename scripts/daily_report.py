@@ -249,7 +249,24 @@ def build(n):
         for u, (active, enabled) in (f.get("services") or {}).items():
             if enabled == "not-found" or "mainnet" in u:
                 continue
-            if active != "active":
+            if active == "active":
+                continue
+            # DISABLED IS A DECISION, NOT A FAULT.
+            #
+            # systemd already records whether a person meant a unit to run
+            # here, and this read only "is it running". So Singapore's testnet
+            # ElectrumX -- deliberately off on a 1.9 GB seed, with US-east
+            # serving both networks and answering on the published port --
+            # was named a problem every morning. A problem list that carries
+            # a decision somebody made on purpose is how a person learns to
+            # skip the list, which is how a real problem goes unseen.
+            #
+            # Enabled and not running is still a problem. That is the case
+            # where the machine disagrees with the intent.
+            if enabled == "disabled":
+                notes.append(f"{name}: {u} is switched off here on purpose "
+                             f"(disabled), so it is not running")
+            else:
                 problems.append(f"{name}: {u} is {active}")
         if f.get("swapTotal") in ("0", None):
             notes.append(f"{name} has no swap")

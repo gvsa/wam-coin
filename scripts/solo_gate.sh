@@ -119,7 +119,23 @@ fetch_release() {
         export GNUPGHOME="$tmp/gnupg"; mkdir -p "$GNUPGHOME"; chmod 700 "$GNUPGHOME"
         gpg --batch --quiet --import SIGNING-KEY.asc || exit 1
         gpg --batch --verify SHA256SUMS.asc SHA256SUMS >/dev/null 2>&1 || exit 1
-        grep -E "x86_64-linux-gnu" SHA256SUMS > wanted.txt || exit 1
+        # The two files this gate downloaded, named, and not "everything on
+        # this platform".
+        #
+        # The filter used to be the platform triplet, which worked while a
+        # platform meant a node and a miner. v0.1.11 added a third archive --
+        # the graphical wallet -- so the grep began selecting three lines
+        # while the loop above still fetched two, and sha256sum -c failed on
+        # a file that was never asked for. The gate has reported FAILED every
+        # night since the release, about a release that is perfectly good.
+        #
+        # --ignore-missing would have silenced it and been wrong: it would
+        # also silence a file that vanished. So the list is exact, and the
+        # count is checked -- a rename makes this fail loudly rather than
+        # verifying nothing and calling that a pass.
+        grep -E "(wam-coin|wam-miner)-$ver-x86_64-linux-gnu\.tar\.gz\$" \
+             SHA256SUMS > wanted.txt || exit 1
+        [ "$(wc -l < wanted.txt)" -eq 2 ] || exit 1
         sha256sum -c wanted.txt >/dev/null 2>&1 || exit 1
 
         for t in wam-coin-*.tar.gz wam-miner-*.tar.gz; do tar xzf "$t" || exit 1; done
