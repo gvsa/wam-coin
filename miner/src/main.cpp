@@ -102,22 +102,23 @@ void Job(const std::string& m)   { LogLine(CLR_BOLD,   "job",    m); }
 struct SharedState {
     std::mutex  jobMutex;
     StratumJob  job;
-    std::atomic<uint64_t> jobEpoch{0};       // bumped on every new job
+    // std::atomic<uint64_t> jobEpoch{0};       // bumped on every new job
+    alignas(64) std::atomic<uint64_t> jobEpoch{0}; // bumped on every new job
     // Set once a job yields a block, which idles the workers until the next
     // job arrives. Zero means "nothing solved": job epochs start at 1, so the
     // value is free to carry that meaning, and a rejected block restores it
     // rather than leaving every worker asleep on a chain that never moved.
-    std::atomic<uint64_t> solvedEpoch{0};
-    std::atomic<uint64_t> difficultyBits{0}; // double, bit-cast, for lock-free reads
+    alignas(64) std::atomic<uint64_t> solvedEpoch{0};
+    alignas(64) std::atomic<uint64_t> difficultyBits{0}; // double, bit-cast, for lock-free reads
 
-    std::atomic<bool>     running{true};
-    std::atomic<bool>     connected{false};
+    alignas(64) std::atomic<bool>     running{true};
+    alignas(64) std::atomic<bool>     connected{false};
 
-    std::atomic<uint64_t> hashes{0};
-    std::atomic<uint64_t> submitted{0};
-    std::atomic<uint64_t> accepted{0};
-    std::atomic<uint64_t> rejected{0};
-    std::atomic<uint64_t> blocksFound{0};
+    alignas(64) std::atomic<uint64_t> hashes{0};
+    alignas(64) std::atomic<uint64_t> submitted{0};
+    alignas(64) std::atomic<uint64_t> accepted{0};
+    alignas(64) std::atomic<uint64_t> rejected{0};
+    alignas(64) std::atomic<uint64_t> blocksFound{0};
 
     // A BLOCK THE NODE REFUSED AND A BLOCK WE NEVER MANAGED TO SEND ARE NOT
     // THE SAME EVENT, AND WERE COUNTED AS ONE.
@@ -133,7 +134,7 @@ struct SharedState {
     // underneath said `rejected`, which is the node's word for something it
     // never saw. Counted apart now, and loud at the end of the run, because a
     // lost block is the only outcome here that costs somebody money.
-    std::atomic<uint64_t> lost{0};
+    alignas(64) std::atomic<uint64_t> lost{0};
 
     // WHERE A SOLUTION GOES, decided once at startup.
     //
