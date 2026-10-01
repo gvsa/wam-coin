@@ -44,13 +44,44 @@ launch, on BitcoinTalk and in the channels:
 
 | | |
 |---|---|
-| Consensus split, inflation beyond the 22,000,000 cap, or theft of pool funds | 50,000 WAM |
-| Remote crash, or a way to steal another miner's shares | 10,000 WAM |
-| Everything else accepted | 1,000 WAM |
+| Inflation beyond the 22,000,000 cap, or a way past the treasury rule | 50,000 WAM |
+| A consensus split, or a remote crash of nodes | 15,000 WAM |
+| Theft of funds held by software in this project | 12,500 WAM |
+| Credit without entitlement — paying out coins nobody earned | 10,000 WAM |
+| Bulk deanonymisation of miners or users | 2,500 WAM |
+| Denial of service against the pool, the explorer or a seed | 1,000 WAM |
+| Hardening, a misconfiguration, or a document that misleads | 250 WAM |
 
 They are a floor and not a ceiling: a finding that matters more than its rung
 can be paid more than its rung, and if that happens it will be said plainly
 that it was a judgement and not a tier.
+
+**What changed on 1 October 2026, and what did not.** The table above was
+three rows, and its top row held three different things at one price:
+a consensus split, inflation past the cap, and theft of pool funds. They are
+not one thing. Coins created out of nothing cannot be taken back without a
+reorganisation nobody would accept; pool funds are bounded and can be
+replaced. So the top rung now names only the one that cannot be undone, and
+keeps its number. **No published amount was reduced.** The middle rung rose
+from 10,000 to 15,000, deanonymisation rose from 1,000 to 2,500, and the
+classes that previously had no rung of their own now have one — which tells a
+reviewer where to look, and that brings more reports rather than fewer.
+
+**Findings already accepted keep the classification they were given.** The
+10,000 and the 1,000 below were judged under the three-row table and are not
+re-read against this one.
+
+**One payment per root cause, not per symptom.** Three reports that are three
+faces of one state machine are one finding, which is how the 10,000 below was
+handled. And the amount follows the impact, not the effort: one line that
+reveals an inflation bug is worth the top rung, and a month of reading that
+finds nothing is worth thanks.
+
+**What does not qualify**, said rather than left to be discovered: a
+theoretical bug with no demonstrated path; anything that needs the operator's
+own key or physical access; software this project did not write; social
+engineering; and denial of service by raw volume, which anybody can do to
+anything.
 
 This file said the opposite of all of it until 2026-09-14 — "there is no bug
 bounty" — while three other places in the repository said "there is a bounty"
@@ -100,9 +131,21 @@ Until 17 September this file said the new source "has not yet been decided"
 while the project was telling a reviewer by email that it was the treasury. He
 found the contradiction and asked for the public reference. He was right to.
 
-**The ceiling.** The treasury is 750,000 WAM over its entire life and then
-nothing. That is the hard limit of what this programme can ever pay from this
-source: one 50,000 finding is payable, several of them quickly are not.
+**The ceiling, and it is a number rather than a feeling.** The treasury is
+750,000 WAM over its entire life — 2.5 WAM a block to height 200,000 and 1.25
+to height 400,000 — and then nothing, ever. It also has to keep this network
+running, which comes first, because a chain with no nodes has nothing worth
+securing.
+
+**This programme's share of it is one eighth: 93,750 WAM, for the whole life
+of the programme.** 11,000 of that is already committed to the two findings
+below. One of every class in the table above comes to 91,250, so the table is
+payable even if every class is found — which is the test a promise has to
+pass before it is made.
+
+**When the eighth is spent, the programme closes and this file says so.** It
+is not left open and unfunded. The ceiling can be raised later by announcement
+and will never be lowered for a finding already accepted.
 
 **Priority is the order of validation** — first validated, first paid. A rule
 rather than a judgement, because the alternative is a queue whose order the
