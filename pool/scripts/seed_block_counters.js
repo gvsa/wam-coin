@@ -44,7 +44,12 @@ const cfgPath = cfgIdx >= 0 ? args[cfgIdx + 1]
 
 const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
 const poolAddress = cfg.poolAddress;
-const d = cfg.daemon || {};
+// The config names it `daemons`, an array, and the prefix is a
+// top-level `redisPrefix` -- read from a running pool's own file
+// rather than assumed. The first version guessed `daemon` and
+// `redis.prefix` and failed with "socket hang up", which is what
+// guessing a shape looks like from the outside.
+const d = (cfg.daemons && cfg.daemons[0]) || cfg.daemon || {};
 
 function rpc(method, params = []) {
     return new Promise((resolve, reject) => {
@@ -107,8 +112,8 @@ function rpc(method, params = []) {
         `\n  ${found} block(s) on this chain pay the pool address\n` +
         `  first ${firstHeight}   last ${lastHeight}\n`);
 
-    const prefix = cfg.redis && cfg.redis.prefix ? cfg.redis.prefix : '';
-    const key = (k) => `${prefix}${k}`;
+    const prefix = cfg.redisPrefix || (cfg.redis && cfg.redis.prefix) || '';
+    const key = (k) => (prefix ? `${prefix}:${k}` : k);
     const redis = new Redis(cfg.redis || {});
 
     const listLen = await redis.llen(key('blocks:confirmed'));
