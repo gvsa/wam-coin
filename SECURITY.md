@@ -153,7 +153,7 @@ payer decides.
 
 ## Accepted findings
 
-**10,000 WAM — pool accounting, accepted 16 September 2026, unpaid.**
+**10,000 WAM — pool accounting, accepted 16 September 2026, PAID 1–2 October 2026.**
 
 Three related reports: the same pending block could mature more than once,
 crediting miner balances twice out of the pool operator's own wallet, plus two
@@ -172,6 +172,17 @@ difference. Nor is it the base rung: three reports in the money path, before
 launch, which would have drained the operator's wallet with nothing in the logs
 looking wrong. 10,000 is a judgement on severity rather than a reading of the
 rung's wording, and is recorded as such.
+
+Paid in nine transactions, and the reason is arithmetic rather than caution:
+consensus pays the treasury 2.5 WAM per block, so its balance is thousands of
+small outputs. 10,000 WAM in one transaction is about 4,000 inputs and 590 KB
+— six times the standard size limit, which no node would relay. It would have
+been signed and broadcast and simply never arrived. The first of the nine was
+10 WAM, sent and confirmed received before the rest moved.
+
+Every transaction id is in `docs/TREASURY_LEDGER.md`, and the total on the
+chain is 10000.00000000 WAM to `WcQCFiCzwikQTTmPeafn73e3asC32ofyLr`, which
+anybody can add up without asking us.
 
 **1,000 WAM — the pool API leak, accepted 13 September 2026, unpaid.** Three of
 four `/api/*` endpoints returned every miner's full payout address while the
