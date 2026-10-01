@@ -143,27 +143,28 @@ function rpc(method, params = []) {
     // with the address or the chain being asked -- so it stops rather than
     // writing a number that would make the dashboard lie in the other
     // direction.
-    if (found < listLen) {
+    if (confirmedSeed < listLen) {
         process.stdout.write(
-            `\n  REFUSING: the chain says ${found} and redis still holds ` +
-            `${listLen} confirmed records.\n  That cannot both be true. ` +
-            `Check poolAddress and which network this node is on.\n`);
+            `\n  REFUSING: the chain gives ${confirmedSeed} confirmed ` +
+            `(${found} on chain, minus ${maturing} maturing and ${pending} ` +
+            `pending)\n  while redis still holds ${listLen} confirmed ` +
+            `records. That cannot both be true.\n  Check poolAddress and ` +
+            `which network this node is on.\n`);
         await redis.quit();
         process.exit(1);
     }
 
     process.stdout.write(
         `  confirmed seed = ${found} - ${maturing} maturing - ${pending} ` +
-        `pending = ${confirmedSeed}
-`);
+        `pending = ${confirmedSeed}\n`);
 
     if (dryRun) {
         process.stdout.write(`\n  --dry-run: nothing was written\n`);
     } else {
-        await redis.set(key('blocks:confirmed:count'), String(found));
+        await redis.set(key('blocks:confirmed:count'), String(confirmedSeed));
         await redis.set(key('blocks:orphaned:count'), String(orphanLen));
         process.stdout.write(
-            `\n  wrote blocks:confirmed:count = ${found}\n` +
+            `\n  wrote blocks:confirmed:count = ${confirmedSeed}\n` +
             `  wrote blocks:orphaned:count  = ${orphanLen}\n`);
     }
     await redis.quit();
