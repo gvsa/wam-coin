@@ -26,12 +26,29 @@
 > atomic swap cannot. Do not let the two numbers be "unified" by anybody
 > tidying up.
 >
-> **Still wrong in the live entry:** its `links.github` points at
-> `wam-coin-official`, which is locked. One line, and it is the smallest
-> honest reason to go back to that repository.
+> **The link is fixed.** The live entry's `links.github` pointed at
+> `wam-coin-official`, which is locked. It now reads
+> `wamcoin-core-dev/wam-coin`, checked against the raw file on 2026-10-01.
+> Nothing in the live entry is outstanding.
 
-A pull request to [`KomodoPlatform/coins`](https://github.com/KomodoPlatform/coins),
-not a web form. Four things go in, and all four are ready.
+**`KomodoPlatform/coins` is not a second platform, and nothing should be sent
+there.** It is a copy of `GLEECBTC/coins`, kept only so that older builds of
+the wallet — which look for a repository at that name — keep working. cipig
+said so on the pull request on 2026-09-27, and he maintains both.
+
+This file previously treated it as the destination, and a pull request was
+opened there on that reading: [#23](https://github.com/KomodoPlatform/coins/pull/23).
+It asks an obsolete mirror to carry a change its source already has, so it is
+to be closed rather than chased. The work is not lost — it is merged, in the
+repository that is read.
+
+Written down because the mistake is invisible from outside: both repositories
+are public, both hold a `coins` file, both look maintained, and only one of
+them is.
+
+What a submission needs, kept for the next coin or the next field change — a
+pull request to [`GLEECBTC/coins`](https://github.com/GLEECBTC/coins), not a
+web form, and not the mirror above. Four things go in.
 
 Only one thing still blocks the submission, and it is not one of them: these
 files describe mainnet, and mainnet opens on 15 September 2026. Everything
