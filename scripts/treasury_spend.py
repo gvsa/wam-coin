@@ -130,6 +130,40 @@ def cmd_plan(args):
     mature = [u for u in utxos if tip - u["height"] + 1 > COINBASE_MATURITY]
     young = len(utxos) - len(mature)
 
+    # AND NOT THE ONES AN UNCONFIRMED TRANSACTION HAS ALREADY SPENT.
+    #
+    # scantxoutset reads the UTXO SET, which is the chain and nothing else. A
+    # transaction sitting in the mempool has spent its inputs as far as the
+    # network is concerned and not at all as far as this scan is concerned.
+    #
+    # On 2026-10-02 the bounty was being paid in eight parts. Part one was
+    # broadcast and was still unconfirmed when part two was planned, so the
+    # scan offered the same 501 outputs again, the planner took them in the
+    # same order, and the result was byte-identical to part one -- the same
+    # txid. The founder signed it on the offline machine before anything
+    # noticed, and the node refused it at broadcast. No money moved and none
+    # could have, but the key had been used for nothing.
+    #
+    # So the mempool is read and its spent outpoints are removed. Waiting two
+    # minutes for a confirmation would also have worked and is the wrong fix:
+    # it makes correctness depend on somebody being patient.
+    spent = set()
+    for txid in rpc.call("getrawmempool") or []:
+        try:
+            entry = rpc.call("getrawtransaction", [txid, True])
+        except Exception:
+            continue
+        for vin in (entry or {}).get("vin", []):
+            if "txid" in vin:
+                spent.add((vin["txid"], vin["vout"]))
+    if spent:
+        before = len(mature)
+        mature = [u for u in mature if (u["txid"], u["vout"]) not in spent]
+        held = before - len(mature)
+        if held:
+            print("  in the mempool      %d output(s) already spent by an "
+                  "unconfirmed transaction, left out" % held)
+
     print("  height              %d" % tip)
     print("  outputs             %d, totalling %s WAM" %
           (len(utxos), wam(float(scan["total_amount"]))))
