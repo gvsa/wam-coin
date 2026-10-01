@@ -31,10 +31,22 @@ async function test(name, fn) {
     catch (e) { fail.push(name); console.log(`  \x1b[31mFAIL\x1b[0m  ${name}\n        ${e.message}`); }
 }
 
-/** Enough redis to answer getPoolStats, with lrange and llen behaving as redis does. */
+// THE TRIM IS PART OF REDIS, SO IT IS PART OF THE FAKE.
+//
+// This fake used to hold every block it was given and report llen over all of
+// them. Real redis does not: shareProcessor ltrims blocks:confirmed to 5000
+// entries on every confirmation, so llen can never answer more than 5000.
+//
+// The fake was therefore modelling a state the system cannot reach, and the
+// test that depended on it passed while the dashboard sat at 5000 for two
+// days. A fake that is kinder than the real thing hides exactly the bug it
+// was written to catch.
+const TRIM = 5000;
+
+/** Enough redis to answer getPoolStats, trimming as redis trims. */
 function fakeRedis(confirmedCount, pendingCount, devFeePerBlock = 250000000) {
     const confirmed = [];
-    for (let i = 0; i < confirmedCount; i++) {
+    for (let i = 0; i < Math.min(confirmedCount, TRIM); i++) {
         confirmed.push(JSON.stringify({ height: 1000 + i, devFeeAmount: devFeePerBlock,
                                         minerPot: 4750000000, payouts: {} }));
     }
@@ -54,7 +66,13 @@ function fakeRedis(confirmedCount, pendingCount, devFeePerBlock = 250000000) {
         async hgetall(key) {
             return key.endsWith('blocks:pending') ? pending : {};
         },
-        async get() { return '0'; },
+        // The counters shareProcessor keeps, which nothing trims. This is
+        // where the true total lives once the list has been cut.
+        async get(key) {
+            if (key.endsWith('blocks:confirmed:count')) return String(confirmedCount);
+            if (key.endsWith('blocks:orphaned:count')) return '0';
+            return '0';
+        },
         async zrangebyscore() { return []; }
     };
 }

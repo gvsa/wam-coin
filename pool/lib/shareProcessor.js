@@ -398,6 +398,10 @@ class ShareProcessor extends EventEmitter {
         pipe.hdel(this.k('blocks:pending'), hash);
         pipe.lpush(this.k('blocks:orphaned'), JSON.stringify(record));
         pipe.ltrim(this.k('blocks:orphaned'), 0, 999);
+        // Same reason as blocks:confirmed:count below. This list is capped at
+        // 1000, so the orphan total would freeze there too -- later, quieter,
+        // and in the number that tells a miner how often his work was wasted.
+        pipe.incr(this.k('blocks:orphaned:count'));
         pipe.decrby(this.k('poolfees'), record.poolFee);
         await pipe.exec();
 
@@ -443,6 +447,28 @@ class ShareProcessor extends EventEmitter {
 
         pipe.lpush(this.k('blocks:confirmed'), evidence);
         pipe.ltrim(this.k('blocks:confirmed'), 0, 4999);
+        // A COUNT CANNOT COME OUT OF A LIST THAT IS TRIMMED.
+        //
+        // This is the third time this project has published a block count
+        // that stopped moving, and each time the count was the size of a
+        // bounded thing:
+        //
+        //   lrange(blocks:confirmed, 0, 49).length   froze at 50
+        //   llen(blocks:confirmed)                   froze at 5000, here
+        //
+        // llen was the right answer to the first bug and the wrong answer in
+        // general: it reports the length of a list that the line above
+        // deliberately caps. On 1 October the dashboard had read BLOCKS FOUND
+        // 5000 for two days while blocks kept arriving, and the founder saw it
+        // the same way he saw the first one -- by watching a number that
+        // should have moved.
+        //
+        // Raising the cap would put the same bug further away, which is the
+        // shape of fix this project does not accept. A counter is not a
+        // collection: it is incremented once per event and nothing trims it.
+        // The list stays, because the page also wants the recent blocks to
+        // show, and a sample and a count are two different questions.
+        pipe.incr(this.k('blocks:confirmed:count'));
         pipe.lrem(this.k('blocks:maturing'), 0, evidence);
 
         await pipe.exec();
@@ -687,9 +713,9 @@ class ShareProcessor extends EventEmitter {
                payments, balances, paid, fees, pendingRaw, postponedRaw] =
             await Promise.all([
                 this.redis.lrange(this.k('blocks:confirmed'), 0, 4999),
-                this.redis.llen(this.k('blocks:confirmed')),
+                this.redis.get(this.k('blocks:confirmed:count')),
                 this.redis.lrange(this.k('blocks:orphaned'), 0, 999),
-                this.redis.llen(this.k('blocks:orphaned')),
+                this.redis.get(this.k('blocks:orphaned:count')),
                 this.redis.lrange(this.k('payments'), 0, 24),
                 this.redis.hgetall(this.k('balances')),
                 this.redis.hgetall(this.k('paid')),
@@ -704,6 +730,21 @@ class ShareProcessor extends EventEmitter {
         const confirmedBlocks = parse(confirmed);
         const pendingBlocks = parse(Object.values(pendingRaw));
 
+        // The counters, with the list length as the floor rather than as the
+        // answer.
+        //
+        // A pool that has been running since before the counters existed has
+        // no key to read, and a pool whose counter was seeded from a trimmed
+        // list cannot be below what the list still holds. Taking the larger
+        // of the two is right in both cases and wrong in neither: the counter
+        // wins once it is ahead, which is from the first block after this
+        // ships, and until then the old number is shown rather than a zero
+        // that would read as "this pool has never found a block".
+        const confirmedCount = Math.max(parseInt(confirmedTotal || '0', 10),
+                                        confirmedBlocks.length);
+        const orphanedCount = Math.max(parseInt(orphanedTotal || '0', 10),
+                                       parse(orphaned).length);
+
         const totalPaid = Object.values(paid).reduce((a, b) => a + parseInt(b, 10), 0);
         const totalOwed = Object.values(balances).reduce((a, b) => a + parseInt(b, 10), 0);
         // Summed over every confirmed block the list still holds, plus every
@@ -713,15 +754,15 @@ class ShareProcessor extends EventEmitter {
         // complete rather than leaving a reader to assume.
         const treasuryPaid = [...confirmedBlocks, ...pendingBlocks]
             .reduce((a, b) => a + (b.devFeeAmount || 0), 0);
-        const treasuryPaidComplete = confirmedTotal <= confirmedBlocks.length;
+        const treasuryPaidComplete = confirmedCount <= confirmedBlocks.length;
 
         return {
             rewardMode: this.mode,
             poolFeePercent: this.poolFeePercent,
             chainDevFeePercent: 5,
-            blocksConfirmed: confirmedTotal,
+            blocksConfirmed: confirmedCount,
             blocksPending: pendingBlocks.length,
-            blocksOrphaned: orphanedTotal,
+            blocksOrphaned: orphanedCount,
             totalPaid,
             totalOwed,
             poolFeesCollected: parseInt(fees || '0', 10),
