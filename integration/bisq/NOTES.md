@@ -1,5 +1,33 @@
 # Bisq — what a submission needs
 
+> **MEASURED 2026-10-01: the asset list has not taken a new coin since June
+> 2021.** The repository is not abandoned -- it was pushed to the same day
+> this was written -- and saying it is would be wrong and easy to disprove.
+> What is closed is the listing path, which is a different thing and the one
+> that matters to us.
+>
+> Commits touching `assets/src/main/java/bisq/asset/coins`, newest first:
+>
+> | date | what |
+> |---|---|
+> | 2026-07-10 | round altcoin trade amounts to coin precision (maintenance) |
+> | 2022-02-10 | optimize imports |
+> | 2021-11-10 | changes required for GRIN **re**-listing |
+> | 2021-07-27 | allow LTC accounts to use segwit |
+> | 2021-06-20 | **list RSK Smart Bitcoin — the last new coin** |
+>
+> **And Bisq 2 is not an alternative route: it has no asset registry at all.**
+> Its top-level directories include `bisq-easy`, which trades bitcoin and
+> nothing else. There is no file to add a coin to.
+>
+> So [#8083](https://github.com/bisq-network/bisq/pull/8083) is unlikely to be
+> merged, and not for any reason that is about WAM or about the ticker
+> confusion that closed #8030. Nothing here is wrong and nothing needs
+> redoing. The open question is only whether they will say so, and asking is
+> cheaper than waiting -- see the end of this file.
+>
+> Kept, not deleted: if the list reopens, the work below is done and correct.
+
 Bisq replied to the enquiry sent 2026-08-18 and pointed at their repository, so
 this is a pull request to [`bisq-network/bisq`](https://github.com/bisq-network/bisq),
 not a form.
@@ -74,3 +102,14 @@ something to guess at from the outside.
 The code above costs nothing to prepare and is correct whatever the answers
 are. The fee and the maintainer commitment are decisions with a price, and they
 belong to the founder, not to a guess made here.
+
+
+## Asking rather than waiting
+
+An open pull request with no answer is indistinguishable from one nobody has
+read yet, and after five years of no new coins the difference matters. One
+question on the pull request, asked once and not repeated, turns an indefinite
+wait into an answer either way -- including an answer we can act on by closing
+it ourselves.
+
+It is asked as a question about their project, not as a request about ours.
