@@ -44,6 +44,7 @@ function fakeRedis() {
     const hash = (k) => { if (!h.has(k)) h.set(k, new Map()); return h.get(k); };
     const list = (k) => { if (!l.has(k)) l.set(k, []); return l.get(k); };
 
+    const counters = new Map();
     const ops = {
         async hgetall(k) { return Object.fromEntries(hash(k)); },
         async hdel(k, f) { return hash(k).delete(f) ? 1 : 0; },
@@ -57,10 +58,22 @@ function fakeRedis() {
         async ltrim() { return 'OK'; },
         async lrem() { return 1; },
         async decrby() { return 0; },
+        async incr(k) {
+            const cur = Number(counters.get(k) || 0) + 1;
+            counters.set(k, cur);
+            return cur;
+        },
         pipeline() {
             const queued = [];
             const api = {};
-            for (const n of ['hincrby', 'hdel', 'hset', 'lpush', 'ltrim', 'lrem', 'decrby']) {
+            // 'incr' is here because shareProcessor keeps blocks:confirmed:count
+            // and blocks:orphaned:count, which nothing trims -- the dashboard's
+            // block total used to be the length of a list that is cut at 5000
+            // and so stopped moving at 5000. A fake that does not know a command
+            // the code under test calls does not fail that command; it fails the
+            // test, with "pipe.incr is not a function", and these two are payout
+            // tests.
+            for (const n of ['hincrby', 'hdel', 'hset', 'lpush', 'ltrim', 'lrem', 'decrby', 'incr']) {
                 api[n] = (...args) => { queued.push([n, args]); return api; };
             }
             api.exec = async () => {
