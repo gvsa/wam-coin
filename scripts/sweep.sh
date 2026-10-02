@@ -236,10 +236,14 @@ run "treasury claims match the ledger" "$PY" scripts/check_treasury_claims.py
 # And the other half of that question, which had no detector until mainnet's
 # second day: the repository can be right while the WEBSITE is wrong. Two
 # corrections were committed, pushed and reported as published on 15
-# September and neither reached wamcoin.org, because the site is served from
-# the generated gh-pages branch and publish_site.sh was never run. The false
-# one stood for two days and was found by an outside researcher asking for a
-# transaction id.
+# September and neither reached wamcoin.org. The false one stood for two days
+# and was found by an outside researcher asking for a transaction id.
+#
+# The site was on GitHub Pages then, published from a generated branch by a
+# script nobody ran. Since 2026-09-24 nginx serves it from the deployed
+# checkout on our own machines, so ship.sh publishes it and that script is
+# gone -- see check_site_published.py, which went on naming it for eight days
+# and sent today's operator to push a branch that serves nothing.
 run "the live site is this repository" "$PY" scripts/check_site_published.py
 
 # The same failure, one layer out: not "is what we publish true" but "does
