@@ -41,6 +41,8 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts" / "lib"))
+import quoted  # noqa: E402  -- needs the path above
 GRN, RED, YLW, BLD, OFF = "\033[32m", "\033[31m", "\033[33m", "\033[1m", "\033[0m"
 
 for _s in (sys.stdout, sys.stderr):
@@ -98,10 +100,21 @@ def main() -> int:
     bad = 0
     for note in notes:
         version = note.parent.name
-        sent = bot_text(note).lower()
+        # TEXT THAT MENTIONS A THING IS NOT THE THING.
+        #
+        # This scans prose for words, which is the blind spot scripts/lib/
+        # quoted.py exists for: a note that QUOTES an old file name, or
+        # explains in passing what the word "wallet" means, would be read as
+        # announcing one. Both directions are wrong -- a quoted file name
+        # would make the check demand an announcement for something that does
+        # not ship, and a quoted word would let something unannounced pass.
+        #
+        # So the marked quotations come out before anything is matched, the
+        # same way every other text-scanning check in this repository does it.
+        sent = quoted.strip_quoted(bot_text(note)).lower()
         # The whole note, to know what the release actually contains. The file
         # names are the evidence; the prose around them is not.
-        whole = note.read_text(encoding="utf-8").lower()
+        whole = quoted.strip_quoted(note.read_text(encoding="utf-8")).lower()
 
         print(f"\n{BLD}{version}{OFF}  what the bot sends is "
               f"{len(sent.splitlines())} lines")
