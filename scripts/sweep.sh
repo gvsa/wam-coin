@@ -223,6 +223,16 @@ run "units report their own failure"  bash scripts/test/test_onfailure.sh
 # did anything else here. This one reads what we publish.
 run "published claims match consensus"  "$PY" scripts/check_published_claims.py
 
+# That one reads wam-params.h, which is consensus, and consensus has no opinion
+# about what has been SPENT. On 2 October the founder found "No fee was asked
+# and none was paid" on the front page about the venue we had sent 500 WAM to
+# on the day it merged us -- true, and it reads as a lie to anybody who opens
+# the ledger we tell him to open. The same sentence had been caught in a draft
+# six days earlier and written down as a mistake, and then appeared on the
+# front page anyway, because nothing compared a claim about money to
+# docs/TREASURY_LEDGER.md.
+run "treasury claims match the ledger" "$PY" scripts/check_treasury_claims.py
+
 # And the other half of that question, which had no detector until mainnet's
 # second day: the repository can be right while the WEBSITE is wrong. Two
 # corrections were committed, pushed and reported as published on 15
