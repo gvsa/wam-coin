@@ -378,7 +378,7 @@ MINER_EXE="$OUT_DIR/wam-miner.exe"
 #     Same rule as everywhere else in this project: a published binary must
 #     run on a 2012 laptop. check_isa_baseline.sh enforces it afterwards.
 if CXX="$HOST_TRIPLET-g++" \
-   CXXFLAGS="-O3 -mtune=generic" \
+   CXXFLAGS="-O3 -march=native -flto -fno-semantic-interposition" \
    LDFLAGS="-static -static-libgcc -static-libstdc++" \
    LDLIBS="-lws2_32 -lpthread" \
    RANDOMX_INCLUDE="$RANDOMX_DIR/src" \
