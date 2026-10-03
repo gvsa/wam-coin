@@ -119,6 +119,21 @@ struct SharedState {
     std::atomic<uint64_t> rejected{0};
     std::atomic<uint64_t> blocksFound{0};
 
+    // A BLOCK THAT LOST A RACE IS NOT A BLOCK THAT WENT MISSING.
+    //
+    // Two miners solving the same height within seconds of each other is not
+    // a fault in anything; it is what proof of work is. One chain wins and
+    // the other block is a side branch. Every solo miner with real hash rate
+    // meets it, and at 7% of a network with two-minute blocks, often.
+    //
+    // It was counted as `rejected`, which fed the alarm below, which told the
+    // operator in as many words not to leave the miner running. On 2026-10-03
+    // a solo miner running 6 kH/s did exactly that: lost a race, read the
+    // alarm repeating every thirty seconds, and shut down a miner that was
+    // working perfectly. He was following our instruction. The instruction
+    // was wrong.
+    std::atomic<uint64_t> stale{0};
+
     // A BLOCK THE NODE REFUSED AND A BLOCK WE NEVER MANAGED TO SEND ARE NOT
     // THE SAME EVENT, AND WERE COUNTED AS ONE.
     //
@@ -947,6 +962,28 @@ int RunSolo(const Options& opt, RandomXEngine& engine, SharedState& state, int c
                 return true;
             }
 
+            // The node's own vocabulary for "somebody else got there first".
+            // `duplicate-invalid` is deliberately absent: that one means the
+            // block is known AND bad, which is a real fault and must alarm.
+            const bool lostRace = reason == "duplicate" ||
+                                  reason == "inconclusive" ||
+                                  reason == "duplicate-inconclusive";
+
+            if (lostRace) {
+                state.stale.fetch_add(1);
+                Info("block " + std::to_string(job.height) +
+                     " lost the race (" + reason + ") -- another miner reached "
+                     "this height first. Nothing is wrong; keep mining.");
+                // true, not false. False means "the tip has not moved, the
+                // block is still there to be won" -- which is right for a
+                // node that refused us for its own reasons, and wrong here:
+                // somebody else's block holds this height now, so every
+                // further solution for this job is a side branch nobody will
+                // ever build on. Idle until the next template instead, which
+                // arrives within one poll.
+                return true;
+            }
+
             state.rejected.fetch_add(1);
             Fail("the node rejected block " + std::to_string(job.height) +
                  ": " + reason);
@@ -1013,6 +1050,7 @@ int RunSolo(const Options& opt, RandomXEngine& engine, SharedState& state, int c
     int64_t nextStats = NowMs() + 30000;
     uint64_t lastHashes = 0;
     int64_t  lastStatsAt = NowMs();
+    int      alarms = 0;        // how many times the missing-block alarm has fired
 
     while (state.running.load()) {
         const int64_t now = NowMs();
@@ -1050,24 +1088,66 @@ int RunSolo(const Options& opt, RandomXEngine& engine, SharedState& state, int c
             const uint64_t acc   = state.accepted.load();
             const uint64_t lst   = state.lost.load();
             const uint64_t rej   = state.rejected.load();
+            const uint64_t stl   = state.stale.load();
 
-            char line[320];
-            std::snprintf(line, sizeof(line),
-                          "%.0f H/s  height %" PRId64 "  blocks found %llu  accepted %llu",
-                          rate, solo.Current().job.height,
-                          (unsigned long long)found, (unsigned long long)acc);
+            char line[400];
+            if (stl > 0) {
+                // Shown only once there is one, so an ordinary run keeps the
+                // line it has always had.
+                std::snprintf(line, sizeof(line),
+                              "%.0f H/s  height %" PRId64 "  blocks found %llu  "
+                              "accepted %llu  (%llu lost a race)",
+                              rate, solo.Current().job.height,
+                              (unsigned long long)found, (unsigned long long)acc,
+                              (unsigned long long)stl);
+            } else {
+                std::snprintf(line, sizeof(line),
+                              "%.0f H/s  height %" PRId64 "  blocks found %llu  accepted %llu",
+                              rate, solo.Current().job.height,
+                              (unsigned long long)found, (unsigned long long)acc);
+            }
             Info(line);
 
-            if (found > acc) {
-                char warn[320];
+            // THE ALARM SHOUTS UNTIL IT IS HEARD, THEN STOPS SHOUTING.
+            //
+            // It used to fire every thirty seconds for the life of the
+            // process, at full volume, ending with "do not leave it running".
+            // Two things were wrong with that and both cost blocks.
+            //
+            // The advice was wrong. Stopping the miner does not recover a
+            // block that was already missed, and it guarantees missing every
+            // block that would have come after. What the operator must do is
+            // keep the evidence file, which is written at the moment of the
+            // failure and is the only thing that cannot be reconstructed.
+            //
+            // And repetition at full volume is not emphasis. After the first
+            // few it carries no new information, and a line that screams
+            // forever gets obeyed or ignored -- both wrong. On 2026-10-03 a
+            // solo miner read it and shut down a miner that was working.
+            //
+            // `stale` is excluded entirely: a lost race is not a missing
+            // block and never belonged in this sum.
+            const uint64_t missing = (found > acc + stl) ? found - acc - stl : 0;
+            if (missing > 0) {
+                char warn[400];
                 std::snprintf(warn, sizeof(warn),
                               "%llu block(s) found have NOT been accepted: "
                               "%llu not sent, %llu refused by the node. "
-                              "That is real money; do not leave it running.",
-                              (unsigned long long)(found - acc),
+                              "That is real money. Keep the wam-miner-lost-* "
+                              "and wam-miner-rejected-* files beside this "
+                              "program -- they cannot be rebuilt later.",
+                              (unsigned long long)missing,
                               (unsigned long long)lst,
                               (unsigned long long)rej);
-                Warn(warn);
+                // Loud while it is news, then carried quietly on the status
+                // line above, which already shows found and accepted.
+                if (alarms < 5) { Warn(warn); alarms++; }
+                else if (alarms == 5) {
+                    Warn(warn);
+                    Warn("this will not be repeated; the counts above carry it "
+                         "from here. Do not stop the miner over it.");
+                    alarms++;
+                }
             }
         }
 
