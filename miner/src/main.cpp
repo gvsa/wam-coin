@@ -133,7 +133,7 @@ struct SharedState {
     // alarm repeating every thirty seconds, and shut down a miner that was
     // working perfectly. He was following our instruction. The instruction
     // was wrong.
-    std::atomic<uint64_t> stale{0};
+    alignas(64) std::atomic<uint64_t> stale{0};
 
     // A BLOCK THE NODE REFUSED AND A BLOCK WE NEVER MANAGED TO SEND ARE NOT
     // THE SAME EVENT, AND WERE COUNTED AS ONE.
