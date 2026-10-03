@@ -234,7 +234,7 @@ public:
         {
             // Yield to a pending re-key before taking the lock, not after.
             while (e.m_writerWaiting.load(std::memory_order_acquire)) {
-                std::this_thread::sleep_for(std::chrono::microseconds(200));
+                std::this_thread::sleep_for(std::chrono::microseconds(50));
             }
             m_lock = std::shared_lock<std::shared_mutex>(e.m_mutex);
             m_gen  = e.m_generation.load();

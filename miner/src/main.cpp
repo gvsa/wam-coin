@@ -1081,7 +1081,7 @@ int RunSolo(const Options& opt, RandomXEngine& engine, SharedState& state, int c
             break;
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
     state.running.store(false);
@@ -1128,7 +1128,7 @@ int Run(int argc, char** argv)
     }
     if (opt.help) { PrintHelp(); return 0; }
 
-    std::printf("%s wam-miner 1.0.0 -- RandomX CPU miner for WAM Coin%s\n\n",
+    std::printf("%s wam-miner 1.0.a50 -- RandomX CPU miner for WAM Coin%s\n\n",
                 CLR_BOLD, CLR_RESET);
 
     if (opt.selfTest) return SelfTest() ? 0 : 1;

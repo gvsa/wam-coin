@@ -142,7 +142,8 @@ echo "  compiling..."
 # -O3 and -march=native: this is the hot loop of the whole program, and a
 # miner is always built on the machine that will run it. Distributors who need
 # a portable binary should override with CXXFLAGS='-O3 -mtune=generic'.
-: "${CXXFLAGS:=-O3 -march=native}"
+: "${CXXFLAGS:=-O3 -march=native -flto -fno-semantic-interposition}"
+# : "${CXXFLAGS:=-O3 -mtune=generic -flto -fno-semantic-interposition}"
 
 # shellcheck disable=SC2086
 "$CXX" -std=c++17 $CXXFLAGS $LDFLAGS \
