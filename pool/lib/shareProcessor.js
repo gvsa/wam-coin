@@ -107,7 +107,13 @@ class ShareProcessor extends EventEmitter {
      */
     async startupReconcile() {
         const raw = await this.redis.get(this.k('payment:inflight'));
-        if (!raw) return true;
+        if (!raw) {
+            // The only path that releases payments. start() pauses them before
+            // calling this, so reaching here is the single proof that the last
+            // run finished cleanly.
+            this.paused = false;
+            return true;
+        }
 
         let intent;
         try {
@@ -154,9 +160,27 @@ class ShareProcessor extends EventEmitter {
         this.log.info('the chain\'s 5% treasury output is paid by the coinbase itself and is ' +
                       'never part of the miner pot');
 
-        // Before any timer fires: did the last run leave money in the air?
+        // Did the last run leave money in the air?
+        //
+        // This used to say "before any timer fires", and it was not true. The
+        // call is not awaited, and its rejection was only logged -- so a Redis
+        // hiccup on that one GET left `paused` unset, the payment timer
+        // installed, and the single check that stops a duplicate payment after
+        // a crash silently skipped. The check failed open, which is the one
+        // direction it must never fail.
+        //
+        // Fixed by construction rather than by awaiting: payments start PAUSED
+        // and only a reconcile that completed and found nothing may release
+        // them. Then an exception, a hang, or a caller that forgets to await
+        // all land on "do not pay" without anybody having to remember.
+        //
+        // Reported by dang150296 (Urriki1502) on 2026-10-03 as a startup
+        // reconciliation fail-open. He placed it inside startupReconcile(),
+        // which actually fails closed correctly; it was one level up, here.
+        this.paused = true;
         this.startupReconcile().catch((e) =>
-            this.log.error(`could not check for an unfinished payment: ${e.message}`));
+            this.log.error(`could not check for an unfinished payment, so payments ` +
+                           `stay paused: ${e.message}`));
 
         const blockCheck = (this.config.blockCheckIntervalSec || 60) * 1000;
         const payoutCheck = (this.config.paymentIntervalSec || 600) * 1000;
@@ -616,11 +640,45 @@ class ShareProcessor extends EventEmitter {
         try {
             txid = await this.daemon.cmd('sendmany', ['', sendMany]);
         } catch (err) {
-            // The call failed, so nothing was spent and the intent is stale.
+            // THIS BLOCK USED TO ASSUME. Its comment read "the call failed, so
+            // nothing was spent and the intent is stale", and it deleted the
+            // intent on every error -- including a timeout, which is the one
+            // case where the node may be signing and broadcasting at that very
+            // moment. The marker written eight lines above exists for exactly
+            // that case, and the error path threw it away.
+            //
+            // So the question is no longer "did it throw" but "do we know".
+            // daemon.js answers it at the point where the evidence is.
+            //
+            // `!== false` and not `=== true`: only an error that has been
+            // positively classified as a refusal may clear the intent. An
+            // error from somewhere that does not classify -- a future call
+            // site, a wrapper, a bug -- is unknown by default, because the
+            // default has to be the direction that cannot lose money.
+            if (err.ambiguous !== false) {
+                this.paused = true;
+                this.log.error('=========================================================');
+                this.log.error('PAYMENT OUTCOME UNKNOWN. PAYMENTS ARE PAUSED.');
+                this.log.error(`  ${err.message}`);
+                this.log.error('');
+                this.log.error('  The node may have broadcast this payment before the');
+                this.log.error('  connection failed. Balances have NOT been cleared, so');
+                this.log.error('  paying again would pay these miners twice.');
+                this.log.error('');
+                this.log.error('    wam-cli listtransactions "*" 20');
+                this.log.error('');
+                this.log.error(`  The intent is kept at ${this.k('payment:inflight')}.`);
+                this.log.error('  startupReconcile() prints what to do with it.');
+                this.log.error('=========================================================');
+                return;
+            }
+
+            // A refusal from the node itself: it parsed the request and said
+            // no, so no transaction exists and the intent really is stale.
             // Clearing it here is safe; leaving it would halt payments over a
             // transient RPC error.
             await this.redis.del(this.k('payment:inflight'));
-            this.log.error(`sendmany failed, balances left untouched: ${err.message}`);
+            this.log.error(`sendmany refused, balances left untouched: ${err.message}`);
             return;
         }
 
@@ -628,7 +686,15 @@ class ShareProcessor extends EventEmitter {
         // returned would lose every miner's money if the call failed.
         // Deduct exactly what was sent, not what was owed. For a balance that
         // hit the cap those differ, and the difference is the miner's money.
-        const pipe = this.redis.pipeline();
+        // multi(), not pipeline(). ioredis pipelines are a batch, not a
+        // transaction: the commands go out together and redis applies them one
+        // by one, so a connection lost halfway leaves the first few applied and
+        // the rest not. The comment on the del below used to claim that its
+        // survival implied the deduction survived, and with a pipeline that is
+        // simply untrue -- the deduction and the del could be split. MULTI/EXEC
+        // is applied as one unit, which is what the claim needs to be worth
+        // making.
+        const pipe = this.redis.multi();
         for (const [address, amount] of batch) {
             pipe.hincrby(this.k('balances'), address, -amount);
             pipe.hincrby(this.k('paid'), address, amount);

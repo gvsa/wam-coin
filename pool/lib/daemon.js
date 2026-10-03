@@ -15,6 +15,30 @@ const http = require('http');
 const https = require('https');
 const EventEmitter = require('events');
 
+// ---------------------------------------------------------------------------
+//  Did the call happen, or do we not know?
+// ---------------------------------------------------------------------------
+//
+//  Every RPC failure is one of two things, and treating them alike is how a
+//  pool pays twice. `err.ambiguous` is the distinction, set at the point where
+//  the evidence is, and nowhere else: a caller cannot recover it later from an
+//  error message.
+//
+//    definite  the request provably did not execute -- the node refused it,
+//              or the connection was never made
+//    unknown   it may have executed and the answer was lost
+//
+//  Socket errors that prove nothing reached the node. ECONNREFUSED and
+//  EHOSTUNREACH mean no TCP session existed; ENOTFOUND and EAI_AGAIN mean the
+//  name never resolved; ECONNRESET is deliberately NOT here, because a reset
+//  can arrive after the request was delivered and acted on.
+const NEVER_REACHED_THE_NODE = new Set([
+    'ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH', 'ENOTFOUND', 'EAI_AGAIN'
+]);
+
+function definite(err) { err.ambiguous = false; return err; }
+function unknown(err)  { err.ambiguous = true;  return err; }
+
 class DaemonInterface extends EventEmitter {
     /**
      * @param {Array<{host,port,user,password,ssl?}>} daemons
@@ -92,11 +116,32 @@ class DaemonInterface extends EventEmitter {
         }
     }
 
-    /** Call the first online daemon, failing over on error. */
+    /**
+     * Call the first online daemon, failing over on error.
+     *
+     * MONEY RPCs DO NOT GET GENERIC FAILOVER. A call that creates a new spend
+     * is not safe to repeat anywhere, and "the first daemon threw" does not
+     * mean "the first daemon did nothing": a node that receives sendmany,
+     * signs, broadcasts, and then loses the connection before answering looks
+     * from here exactly like a node that never got the request. Retrying that
+     * on the next daemon is a second payment out of the operator's wallet,
+     * caused by a dropped TCP connection and nothing else.
+     *
+     * So for the methods in MONEY_RPCS this fails over only on an error that
+     * proves the request was never executed -- the connection was refused, the
+     * host did not resolve, authentication was rejected -- and stops dead on
+     * anything that leaves the outcome unknown. Delayed pay is the safe
+     * failure here; paying twice is the unsafe one.
+     *
+     * Reported by dang150296 (Urriki1502) on 2026-10-03 as "generic daemon
+     * failover for money-moving RPCs", and confirmed against this function.
+     */
     async cmd(method, params = []) {
         const ordered = [...this.daemons.filter((d) => d.online),
                          ...this.daemons.filter((d) => !d.online)];
+        const guarded = DaemonInterface.MONEY_RPCS.has(method);
         let lastError;
+        let anyAmbiguous = false;
         for (const d of ordered) {
             try {
                 const result = await this._request(d, method, params);
@@ -107,13 +152,29 @@ class DaemonInterface extends EventEmitter {
                 return result;
             } catch (err) {
                 lastError = err;
+                anyAmbiguous = anyAmbiguous || Boolean(err.ambiguous);
                 if (d.online) {
                     d.online = false;
                     this.log.warn(`daemon ${d.host}:${d.port} failed on ${method}: ${err.message}`);
                 }
+                if (guarded && err.ambiguous) {
+                    this.log.error(
+                        `${method} on ${d.host}:${d.port} ended with an unknown outcome ` +
+                        `(${err.message}). NOT retrying on another daemon: the call may ` +
+                        'already have moved coins.');
+                    throw err;
+                }
             }
         }
-        throw new Error(`all daemons failed for ${method}: ${lastError && lastError.message}`);
+        const e = new Error(
+            `all daemons failed for ${method}: ${lastError && lastError.message}`);
+        // The caller decides what to do about uncertainty, so it has to survive
+        // this wrapper. Unknown beats definite when the attempts disagree: one
+        // daemon that might have executed the call is enough to make the whole
+        // outcome unknown, so this is any-of and not the last one's flag.
+        e.ambiguous = anyAmbiguous;
+        e.code = lastError && lastError.code;
+        throw e;
     }
 
     /** Broadcast to every daemon and return each outcome. */
@@ -169,30 +230,48 @@ class DaemonInterface extends EventEmitter {
                     const text = Buffer.concat(chunks).toString('utf8');
 
                     if (res.statusCode === 401) {
-                        return reject(new Error('RPC authentication failed (401) -- ' +
-                            'rpcuser/rpcpassword in config.json do not match wam.conf'));
+                        // Rejected before the method ran. Definite.
+                        return reject(definite(new Error(
+                            'RPC authentication failed (401) -- ' +
+                            'rpcuser/rpcpassword in config.json do not match wam.conf')));
                     }
 
                     let parsed;
                     try {
                         parsed = JSON.parse(text);
                     } catch {
-                        return reject(new Error(
-                            `non-JSON reply (HTTP ${res.statusCode}): ${text.slice(0, 200)}`));
+                        // Something answered and it was not wamd's JSON-RPC --
+                        // a proxy, a load balancer, an error page. Whether the
+                        // node behind it ran the method is not knowable here.
+                        return reject(unknown(new Error(
+                            `non-JSON reply (HTTP ${res.statusCode}): ${text.slice(0, 200)}`)));
                     }
 
                     if (parsed.error) {
+                        // The node parsed the request and refused it. For a
+                        // spend that means no transaction exists. Definite.
                         const e = new Error(parsed.error.message || JSON.stringify(parsed.error));
                         e.code = parsed.error.code;
-                        return reject(e);
+                        return reject(definite(e));
                     }
                     resolve(parsed.result);
                 });
             });
 
-            req.on('error', reject);
+            req.on('error', (err) => {
+                // NEVER_REACHED_THE_NODE are failures of the connection
+                // itself, before any byte of the request could be processed:
+                // nothing ran, so a spend did not happen. Everything else --
+                // a reset or a broken pipe mid-flight above all -- means the
+                // request may have arrived and been executed, and only the
+                // answer was lost.
+                reject(NEVER_REACHED_THE_NODE.has(err.code)
+                    ? definite(err) : unknown(err));
+            });
             req.on('timeout', () => {
-                req.destroy(new Error(`RPC timeout calling ${method}`));
+                // The worst case and the whole reason for this distinction.
+                // The node may be signing and broadcasting at this instant.
+                req.destroy(unknown(new Error(`RPC timeout calling ${method}`)));
             });
             req.end(body);
         });
@@ -229,5 +308,17 @@ class DaemonInterface extends EventEmitter {
         };
     }
 }
+
+// Calls that create a NEW spend, and so must never be repeated blindly. Not a
+// list of wallet RPCs: `getbalance` and `listtransactions` are wallet calls
+// and are perfectly safe to retry anywhere. The test is whether running it
+// twice can move coins twice.
+//
+// `sendrawtransaction` is deliberately absent. Rebroadcasting the same signed
+// transaction is idempotent by construction -- same txid, same outputs -- and
+// is exactly what a recovery path is supposed to do.
+DaemonInterface.MONEY_RPCS = new Set([
+    'sendmany', 'sendtoaddress', 'sendfrom', 'send', 'sendall'
+]);
 
 module.exports = DaemonInterface;

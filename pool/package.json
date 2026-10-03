@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node server.js",
-    "test": "node test/rewards.test.js",
+    "test": "node test/run-all.js",
     "build:native": "cd native && node-gyp rebuild",
     "postinstall": "echo 'Next: build the RandomX addon with npm run build:native'"
   },
