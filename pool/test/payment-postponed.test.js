@@ -48,6 +48,10 @@ function fakeRedis(balances = {}) {
         async del(k) { delete strings[k]; },
         async lrange(k, a, b) { return (lists[k] || []).slice(a, b + 1); },
         async llen(k) { return (lists[k] || []).length; },
+        // The money commit is a MULTI, not a pipeline -- see
+        // daemon-money-failover.test.js and payment-safety.test.js. Same work
+        // in a fake; the difference it stands for only exists in redis.
+        multi() { return r.pipeline(); },
         pipeline() {
             const ops = [];
             const p = {

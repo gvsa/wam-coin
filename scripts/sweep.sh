@@ -223,13 +223,27 @@ run "units report their own failure"  bash scripts/test/test_onfailure.sh
 # did anything else here. This one reads what we publish.
 run "published claims match consensus"  "$PY" scripts/check_published_claims.py
 
+# That one reads wam-params.h, which is consensus, and consensus has no opinion
+# about what has been SPENT. On 2 October the founder found "No fee was asked
+# and none was paid" on the front page about the venue we had sent 500 WAM to
+# on the day it merged us -- true, and it reads as a lie to anybody who opens
+# the ledger we tell him to open. The same sentence had been caught in a draft
+# six days earlier and written down as a mistake, and then appeared on the
+# front page anyway, because nothing compared a claim about money to
+# docs/TREASURY_LEDGER.md.
+run "treasury claims match the ledger" "$PY" scripts/check_treasury_claims.py
+
 # And the other half of that question, which had no detector until mainnet's
 # second day: the repository can be right while the WEBSITE is wrong. Two
 # corrections were committed, pushed and reported as published on 15
-# September and neither reached wamcoin.org, because the site is served from
-# the generated gh-pages branch and publish_site.sh was never run. The false
-# one stood for two days and was found by an outside researcher asking for a
-# transaction id.
+# September and neither reached wamcoin.org. The false one stood for two days
+# and was found by an outside researcher asking for a transaction id.
+#
+# The site was on GitHub Pages then, published from a generated branch by a
+# script nobody ran. Since 2026-09-24 nginx serves it from the deployed
+# checkout on our own machines, so ship.sh publishes it and that script is
+# gone -- see check_site_published.py, which went on naming it for eight days
+# and sent today's operator to push a branch that serves nothing.
 run "the live site is this repository" "$PY" scripts/check_site_published.py
 
 # The same failure, one layer out: not "is what we publish true" but "does

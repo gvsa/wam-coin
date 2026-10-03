@@ -1,0 +1,89 @@
+DESTINATION: Discord DM to dang150296 (Urriki1502)
+SENT: 2026-10-03
+WHY PRIVATE: he reported privately and asked to keep money-safety detail off
+the public repository. Two of the four findings below are unfixed at the time
+of sending, so the detail goes nowhere public until the patch is out.
+
+WHAT HE SENT: an independent assurance repository, github.com/Urriki1502/
+wam-security, auditing WAM Core commit 012f3d3 -- the current main head on the
+day he wrote it. Four claims against the pool payout path, plus a RandomX
+header pre-sync anti-DoS issue he himself classified as review-required rather
+than confirmed.
+
+WHAT WE CHECKED, AND WHAT HELD
+
+All four payout claims confirmed against pool/lib/shareProcessor.js and
+pool/lib/daemon.js. They are one root cause with four faces, which is how the
+10,000 WAM finding was handled in September:
+
+  * daemon.cmd() retries the same call on the next daemon when one throws, and
+    sendmany is not exempt. A node that broadcasts and then loses the
+    connection before answering is indistinguishable from one that never got
+    the call.
+  * the payout catch block deletes payment:inflight on any error, asserting in
+    its comment that nothing was spent. A timeout is not a refusal, and that
+    record is the only evidence the next run would have had.
+  * startupReconcile() fails closed correctly, but start() calls it without
+    await and only logs a rejection, so a failed first Redis read leaves the
+    pause unset and the payment timer installed. His fail-open is real, one
+    level above where he placed it.
+  * the commit is a pipeline(), not a multi(). ioredis pipelines are batched,
+    not atomic, so the comment claiming the del surviving implies the
+    deduction survived does not hold.
+
+His disclosure is scoped correctly: the public repository carries invariants,
+formal models and mutation tests, no exploitation paths, and his own
+SECURITY.md routes unresolved findings to wam.coin.official@proton.me.
+
+NOT IN THIS REPLY, DELIBERATELY: the bounty. The published tiers apply to this
+finding whether or not he asks, and he has asked for nothing -- the founder's
+reading is that he sees himself as part of the project rather than as a
+supplier, and that putting money in front of him now would change what he is
+doing here. It is raised when the fix ships and the finding is published,
+which is where SECURITY.md puts it anyway.
+
+--------------------------------------------------------------- sent, unchanged
+
+We went through the repository, then through our own pool code against it.
+You were read properly, so here is what we found rather than a thank-you.
+
+Confirmed -- and they are one fault with four faces, not four findings.
+
+daemon.cmd() walks every configured daemon and retries the same call on the
+next one when the first throws. sendmany is not exempt. A node that receives
+the call, broadcasts, and then loses the connection before answering looks
+identical to a node that never got it, so the batch can go out twice with no
+attacker involved.
+
+The payout catch block then makes it worse. On any error it deletes
+payment:inflight, with a comment saying the call failed so nothing was spent.
+That is an assumption the code cannot make -- a timeout is not a refusal -- and
+it removes the one record that would have told the next run something
+happened, exactly when it is needed.
+
+startupReconcile() itself fails closed and its operator instructions are good.
+But start() calls it without await and only logs a rejection, so if that first
+Redis read fails the pause is never set and the payment timer is installed
+anyway. Your fail-open is real; it is one level above where you placed it.
+
+And the commit is a pipeline(), not a multi(). ioredis pipelines are batched,
+not atomic, so the comment claiming that the del surviving implies the
+deduction survived does not hold.
+
+One sentence for the root cause: the payout path treats "I do not know" as
+"it did not happen".
+
+This is money that moves today, so we are fixing it ourselves now rather than
+waiting -- the first two as one patch. The fix separates a definite refusal, a
+JSON-RPC error response from the node, from an unknown outcome: timeout,
+socket reset, no response at all. The first may clear the intent; the second
+must keep it and stop. Money RPCs will not inherit the failover loop, and the
+commit becomes a multi().
+
+When it is in, review our fix. You built tests for exactly this behaviour --
+exactly-once payout recovery and atomic Redis accounting -- and they are worth
+more pointed at our patch than at our old code.
+
+Your repository is scoped correctly: invariants and models, no exploitation
+paths, and your SECURITY.md says the right thing. Keep the detail of the two
+payout findings out of it until the fix is released.

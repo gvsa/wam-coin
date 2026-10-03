@@ -130,6 +130,40 @@ def cmd_plan(args):
     mature = [u for u in utxos if tip - u["height"] + 1 > COINBASE_MATURITY]
     young = len(utxos) - len(mature)
 
+    # AND NOT THE ONES AN UNCONFIRMED TRANSACTION HAS ALREADY SPENT.
+    #
+    # scantxoutset reads the UTXO SET, which is the chain and nothing else. A
+    # transaction sitting in the mempool has spent its inputs as far as the
+    # network is concerned and not at all as far as this scan is concerned.
+    #
+    # On 2026-10-02 the bounty was being paid in eight parts. Part one was
+    # broadcast and was still unconfirmed when part two was planned, so the
+    # scan offered the same 501 outputs again, the planner took them in the
+    # same order, and the result was byte-identical to part one -- the same
+    # txid. The founder signed it on the offline machine before anything
+    # noticed, and the node refused it at broadcast. No money moved and none
+    # could have, but the key had been used for nothing.
+    #
+    # So the mempool is read and its spent outpoints are removed. Waiting two
+    # minutes for a confirmation would also have worked and is the wrong fix:
+    # it makes correctness depend on somebody being patient.
+    spent = set()
+    for txid in rpc.call("getrawmempool") or []:
+        try:
+            entry = rpc.call("getrawtransaction", [txid, True])
+        except Exception:
+            continue
+        for vin in (entry or {}).get("vin", []):
+            if "txid" in vin:
+                spent.add((vin["txid"], vin["vout"]))
+    if spent:
+        before = len(mature)
+        mature = [u for u in mature if (u["txid"], u["vout"]) not in spent]
+        held = before - len(mature)
+        if held:
+            print("  in the mempool      %d output(s) already spent by an "
+                  "unconfirmed transaction, left out" % held)
+
     print("  height              %d" % tip)
     print("  outputs             %d, totalling %s WAM" %
           (len(utxos), wam(float(scan["total_amount"]))))
@@ -219,6 +253,29 @@ def cmd_plan(args):
 # sign -- runs where the key is, with no network
 # ---------------------------------------------------------------------------
 
+_B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+
+
+def _wif_looks_whole(s):
+    """Does this decode as base58check? A mistyped character says no.
+
+    Pure arithmetic and one hash. No node, no network, and the string does
+    not leave this function.
+    """
+    import hashlib
+    if any(c not in _B58 for c in s):
+        return False
+    n = 0
+    for c in s:
+        n = n * 58 + _B58.index(c)
+    raw = n.to_bytes((n.bit_length() + 7) // 8, "big")
+    raw = bytes(len(s) - len(s.lstrip("1"))) + raw
+    if len(raw) < 5:
+        return False
+    body, check = raw[:-4], raw[-4:]
+    return hashlib.sha256(hashlib.sha256(body).digest()).digest()[:4] == check
+
+
 def cmd_sign(args):
     plan = json.load(open(args.infile, encoding="utf-8"))
 
@@ -237,9 +294,35 @@ def cmd_sign(args):
 
     # The key is read from the terminal, used once, and never written down.
     # getpass keeps it off the screen and out of the shell's history.
-    wif = getpass.getpass("  treasury private key (WIF, not echoed): ").strip()
-    if not wif:
-        die("no key was given")
+    # A TYPO IS CAUGHT HERE, NOT BY THE NODE, AND IT COSTS ONE RETRY.
+    #
+    # The key is typed by hand, from somewhere that is not on this machine,
+    # into a prompt that shows nothing. Fifty-two characters, and one wrong
+    # one used to end the run with "Invalid private key" from the node -- so
+    # the whole command had to be started again, the address retyped, for a
+    # single letter.
+    #
+    # A WIF carries its own base58check checksum, so a typo is detectable
+    # right here with no node, no network and no key ever leaving this
+    # function. Three tries, then it gives up rather than looping for ever.
+    #
+    # It does not prove the key is the TREASURY's -- that needs secp256k1 and
+    # is the node's job. It proves the key is a key, which is what a typo
+    # breaks.
+    wif = ""
+    for attempt in range(3):
+        wif = getpass.getpass("  treasury private key (WIF, not echoed): ").strip()
+        if not wif:
+            die("no key was given")
+        if _wif_looks_whole(wif):
+            break
+        left = 2 - attempt
+        if left:
+            print("  that is not a whole key -- its own checksum does not "
+                  "match, which means a mistyped or missing character. "
+                  "%d try/tries left." % left)
+        else:
+            die("three mistyped keys; nothing was signed")
 
     # EVERYTHING GOES DOWN STDIN, NOTHING ON THE COMMAND LINE.
     #

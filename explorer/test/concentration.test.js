@@ -34,6 +34,13 @@ function fakeRpc(finders, opts = {}) {
                 if (opts.broken && opts.broken.includes(h)) throw new Error('no such block');
                 return {
                     height: h,
+                    // A real node sends `time`, and the page now measures the
+                    // window from it. opts.secondsPerBlock lets a test say the
+                    // chain ran slower or faster than the two-minute target,
+                    // which is the case the old summary got wrong.
+                    time: opts.t0
+                        ? opts.t0 + h * (opts.secondsPerBlock || 120)
+                        : undefined,
                     tx: [{
                         vout: [
                             { value: 2.5, scriptPubKey: { address: 'TREASURY' } },
@@ -165,6 +172,34 @@ async function fill(c, rpc, tip) {
         // invent their own threshold, which is what happened in the channel.
         assert.strictEqual(s.sevenDay.noApplicationAbove, 50);
         assert.strictEqual(s.sevenDay.targetBelow, 35);
+    });
+
+    await test('the window span is measured from the blocks, not assumed', async () => {
+        // A chain running at five minutes a block, not the two-minute target.
+        // 47 blocks of it is about four hours. The summary used to compute
+        // blocksRead x 2 / 60 and would say "about 2h" for the same window --
+        // an assumption printed as a measurement, and wrong by half.
+        const finders = {};
+        for (let h = 1; h <= 60; h++) finders[h] = 'ADDR';
+        const c = new Concentration(log);
+        await c.update(fakeRpc(finders, { t0: 1700000000, secondsPerBlock: 300 }), 60);
+        const s = c.snapshot();
+
+        assert.ok(s.spanSeconds > 0, 'no span was measured at all');
+        const expected = (s.blocksRead - 1) * 300;
+        assert.strictEqual(s.spanSeconds, expected,
+            `span ${s.spanSeconds}s, but these blocks really span ${expected}s`);
+        assert.notStrictEqual(s.spanSeconds, (s.blocksRead - 1) * 120,
+            'the span is still the target interval multiplied out');
+    });
+
+    await test('a window with no timestamps says nothing rather than guessing', async () => {
+        const finders = {};
+        for (let h = 1; h <= 60; h++) finders[h] = 'ADDR';
+        const c = new Concentration(log);
+        await c.update(fakeRpc(finders), 60);          // no t0: no block times
+        assert.strictEqual(c.snapshot().spanSeconds, null,
+            'a span was invented for blocks that carry no time');
     });
 
     console.log(fail.length

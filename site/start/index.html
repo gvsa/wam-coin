@@ -95,6 +95,13 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.2rem 0}
 <hr>
 <h2 id="3-run-a-node">3. Run a node</h2>
 <p>A node is a program that keeps a copy of the list and checks every payment on it. It runs quietly in the background. You do not need one to own WAM, but running one means you verify the rules yourself instead of trusting somebody else's answer.</p>
+<h3 id="if-you-would-rather-have-a-window-than-a-terminal">If you would rather have a window than a terminal</h3>
+<p>From v0.1.11 there is a wallet with a window, <code>wam-qt</code>, for Linux, Windows and macOS. It syncs, creates and encrypts a wallet, and sends and receives, and everything below can be done in it instead of at a prompt.</p>
+<p>It is <strong>the same node underneath</strong>, so use it <em>instead of</em> <code>wamd</code> and not beside it — never run both against one data directory at the same time.</p>
+<p>    wam-qt-v0.1.11-x86_64-linux-gnu.tar.gz     wam-qt-v0.1.11-x86_64-w64-mingw32.zip     wam-qt-v0.1.11-arm64-apple-darwin.tar.gz</p>
+<p>It is a separate download so that a node is not several times larger for the people who never open a window. On Linux it needs your distribution's Qt 5 installed and the archive's README carries the one line for apt, dnf and pacman; on Windows and macOS it needs nothing.</p>
+<p>Said plainly, because it is four days old: it has been opened by hand on Linux and Windows, and on macOS it has been built, started and synced from genesis by the build machine, with no person yet sitting in front of it.</p>
+<p>The rest of this page is the terminal. Everything in it still applies.</p>
 <h3 id="download-it">Download it</h3>
 <pre><code>curl -LO https://wamcoin.org/downloads/v0.1.11/wam-coin-v0.1.11-x86_64-linux-gnu.tar.gz
 curl -LO https://wamcoin.org/downloads/v0.1.11/SHA256SUMS</code></pre>
@@ -169,7 +176,7 @@ cp /path/to/your/backup.dat ~/.wam/wallets/mine/wallet.dat
 <p>A single computer wins rarely, so miners join a <strong>pool</strong>: everybody works together and the reward is split by how much work each contributed. Small, steady payments instead of a lottery.</p>
 <h3 id="first-get-the-miner-it-is-a-separate-download">First, get the miner — it is a separate download</h3>
 <p><strong>The miner is not in the archive you already unpacked.</strong> The node and the miner ship as two files, and until 10 September this page told you to run <code>./wam-miner</code> without ever telling you where to get it. Somebody mining under WSL found that, after first trying <code>./wam-cli</code> inside the miner's folder and being told there was no such file — which is the same confusion from the other end.</p>
-<table><tr><th>archive</th><th>what is in it</th></tr><tr><td><code>wam-coin-v0.1.11-…</code></td><td><code>wamd</code>, <code>wam-cli</code> — the node</td></tr><tr><td><code>wam-miner-v0.1.11-…</code></td><td><code>wam-miner</code> — the miner, and nothing else</td></tr></table>
+<table><tr><th>archive</th><th>what is in it</th></tr><tr><td><code>wam-coin-v0.1.11-…</code></td><td><code>wamd</code>, <code>wam-cli</code> — the node</td></tr><tr><td><code>wam-miner-v0.1.11-…</code></td><td><code>wam-miner</code> — the miner, and nothing else</td></tr><tr><td><code>wam-qt-v0.1.11-…</code></td><td><code>wam-qt</code> — the wallet, with a window</td></tr></table>
 <pre><code>curl -LO https://wamcoin.org/downloads/v0.1.11/wam-miner-v0.1.11-x86_64-linux-gnu.tar.gz
 tar -xzf wam-miner-v0.1.11-x86_64-linux-gnu.tar.gz
 cd wam-miner-v0.1.11

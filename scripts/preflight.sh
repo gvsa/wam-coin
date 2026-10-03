@@ -312,6 +312,20 @@ for t in pool/test/*.test.js; do
         || bad "$(basename "$t") FAILS -- this is payout code"
 done
 
+# AND THE EXPLORER'S, WHICH NOTHING RAN.
+#
+# explorer/test/ has held tests since mainnet opened and no script in this
+# repository executed them, so they passed or failed to nobody. They cover the
+# published concentration share -- the number a reader uses to decide whether
+# this chain can be rewritten -- which is not a smaller thing than payout code.
+for t in explorer/test/*.test.js; do
+    [ -f "$t" ] || continue
+    command -v node >/dev/null 2>&1 || continue
+    node "$t" >/dev/null 2>&1 \
+        && ok "$(basename "$t") passes" \
+        || bad "$(basename "$t") FAILS -- this is the published share"
+done
+
 # ---------------------------------------------------------------------------
 if [ -n "$HOST" ]; then
     sect "The running network"

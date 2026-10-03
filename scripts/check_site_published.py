@@ -17,15 +17,31 @@
 #    - the mining guide sent miners to port 13333, which had stopped existing
 #      at 00:00 UTC when the testnet pool was converted.
 #
-#  Neither reached wamcoin.org. GitHub Pages serves the gh-pages branch, which
-#  is generated from site/ by scripts/publish_site.sh, and that script was
-#  never run. So for two days the live site told the world a payment had been
-#  made that had not, and told miners to connect to a dead port -- while the
-#  repository, every commit message, and everything said to the founder were
-#  correct.
+#  Neither reached wamcoin.org. At the time GitHub Pages served the gh-pages
+#  branch, generated from site/ by a script that was never run. So for two
+#  days the live site told the world a payment had been made that had not, and
+#  told miners to connect to a dead port -- while the repository, every commit
+#  message, and everything said to the founder were correct.
 #
 #  It was found by an outside security researcher asking, by email, for the
 #  transaction id of the payment the page claimed.
+#
+#  WHAT PUBLISHES THE SITE NOW, because this file told the wrong story for
+#  eight days after it stopped being true
+#
+#  On 2026-09-24 GitHub suspended the account and wamcoin.org returned 404 to
+#  everybody. The domain was moved onto machines this project owns, and nginx
+#  serves /opt/wam/site straight from the deployed checkout -- see
+#  deploy/nginx/wamcoin.org.conf. Deploying is therefore publishing, and
+#  `bash scripts/ship.sh` is the whole act.
+#
+#  This header, and the advice printed when a page differs, still named the
+#  gh-pages branch and the script that generated it. On 2026-10-02 that advice
+#  was followed: the script pushed a gh-pages branch to GitLab, which serves
+#  nothing, while the live page had already been published by the deploy. The
+#  script is gone. A check whose failure message names a command that cannot
+#  fix the failure is worse than one that says nothing, because it sends the
+#  reader away satisfied.
 #
 #  check_published_claims.py compares documents to consensus. audit_repo.sh
 #  compares files to each other. check_deployed_code.sh compares the servers
@@ -108,9 +124,10 @@ def main():
     print()
     if differ:
         print(f"  {RED}{len(differ)} live page(s) are not what this repository says{OFF}")
-        print("  The site is served from the gh-pages branch, which is generated.")
-        print("  Publish it:  bash scripts/publish_site.sh")
-        print("  A correction that is committed but not published is worse than")
+        print("  nginx serves site/ from the deployed checkout, so a page that")
+        print("  differs means the hosts are not on this commit:")
+        print("      bash scripts/ship.sh        # push and deploy, then verify")
+        print("  A correction that is committed but not deployed is worse than")
         print("  none: everyone reading the commit believes it is fixed.\n")
         return 1
     if unreadable and same == 0:

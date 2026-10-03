@@ -1,0 +1,28 @@
+WAM Coin — official channels
+
+Website        https://wamcoin.org
+Reserve name   https://wamcoin.net
+Downloads      https://wamcoin.org/downloads/
+
+Source         https://gitlab.com/WAMCoin/wam-coin
+Source         https://github.com/wamcoin-core-dev/wam-coin
+Source         https://gitea.com/WAMCoin/wam-coin
+
+BitcoinTalk    https://bitcointalk.org/index.php?topic=5591218.0
+Telegram       https://t.me/wam_coin_updates
+Discord        https://discord.gg/Gxvmrjy9Qb
+X              https://x.com/WAMCoinCore
+Bluesky        https://bsky.app/profile/wamcoin.org
+YouTube        https://www.youtube.com/@WAMcoin-l1z
+TikTok         https://www.tiktok.com/@wamcoin
+Twitch         https://www.twitch.tv/wamcoin
+Reddit         https://www.reddit.com/user/WAMCoinCore/
+
+Explorer       https://explorer.wamcoin.org
+Mining pool    https://pool.wamcoin.org
+Electrum       electrum.wamcoin.org:50002 (SSL)
+
+Email          wam.coin.official@proton.me
+Email          wamcoin.core@gmail.com
+
+The signed list is https://wamcoin.org/CHANNELS.txt — there are no others.

@@ -4,7 +4,20 @@
 
 **`GLEECBTC/coins`.** Komodo's own documentation points at
 `KomodoPlatform/coins`, and [#21](https://github.com/KomodoPlatform/coins/pull/21)
-was sent there on 2026-08-29. That repository is a dead mirror:
+was sent there on 2026-08-29.
+
+The table below is how that was worked out, from the outside, by reading
+commit dates. On 2026-09-27 cipig -- who maintains both -- said it plainly,
+and his sentence is worth more than the inference: that repository is a copy
+of this one, not another platform, obsolete, and created during the migration
+only so that older versions of the app, which expect a repository at that
+name, keep working.
+
+So nothing is sent there. [#23](https://github.com/KomodoPlatform/coins/pull/23)
+was opened on it before he said this, and asks a mirror to carry a change its
+source already has; it is closed rather than chased.
+
+The evidence that pointed the same way:
 
 | | KomodoPlatform/coins | GLEECBTC/coins |
 |---|---|---|

@@ -52,6 +52,13 @@ function fakeRedis(initial = {}) {
         async set(k, v) { strings[k] = v; r.calls.push(['set', k]); },
         async del(k) { delete strings[k]; r.calls.push(['del', k]); },
         _strings: strings,
+        // multi() and pipeline() do the same work here, and the difference is
+        // recorded rather than simulated: a fake cannot lose a connection
+        // halfway, so it cannot show that a pipeline applies some commands and
+        // drops the rest. What it CAN hold down is that the money commit asks
+        // redis for a transaction and not a batch, which is the whole of the
+        // fix. The real guarantee lives in redis, not here.
+        multi() { r.calls.push(['multi']); return r.pipeline(); },
         pipeline() {
             const ops = [];
             const p = {
@@ -172,13 +179,94 @@ function make(redis, daemon, cfg = {}) {
             'a completed run left a marker that will pause the next start-up');
     });
 
-    await test('a failed sendmany clears it, so one RPC error does not halt the pool', async () => {
+    await test('a REFUSED sendmany clears it, so one RPC error does not halt the pool', async () => {
         const redis = fakeRedis({ addr1: '500000000' });
-        const daemon = fakeDaemon(() => { throw new Error('connection refused'); });
+        // As daemon.js now classifies it: the node parsed the request and said
+        // no, so no transaction exists.
+        const daemon = fakeDaemon(() => {
+            const e = new Error('Insufficient funds');
+            e.ambiguous = false;
+            throw e;
+        });
         const sp = make(redis, daemon);
         await sp.processPayments();
         assert.strictEqual(await redis.get('wam:payment:inflight'), null,
-            'a transient failure left the pool paused');
+            'a definite refusal left the pool paused');
+        assert.notStrictEqual(sp.paused, true,
+            'a definite refusal must not pause the pool');
+    });
+
+    // ---- the four findings, each failing on the code as it was -------------
+    //
+    // Reported by dang150296 (Urriki1502), 2026-10-03. Every one of these
+    // passes trivially against the old shareProcessor if you remove the fix,
+    // except that it does not: each was run against the old code first and
+    // each failed. That is the only reason to believe they test anything.
+
+    await test('an UNKNOWN sendmany outcome keeps the intent and pauses', async () => {
+        const redis = fakeRedis({ addr1: '500000000' });
+        const daemon = fakeDaemon(() => {
+            const e = new Error('RPC timeout calling sendmany');
+            e.ambiguous = true;
+            throw e;
+        });
+        const sp = make(redis, daemon);
+        await sp.processPayments();
+        assert.ok(await redis.get('wam:payment:inflight'),
+            'a timeout deleted the only evidence that the money may have moved');
+        assert.strictEqual(sp.paused, true,
+            'the pool kept paying after an outcome it could not determine');
+    });
+
+    await test('an unclassified error is treated as unknown, not as a refusal', async () => {
+        const redis = fakeRedis({ addr1: '500000000' });
+        const daemon = fakeDaemon(() => { throw new Error('something nobody classified'); });
+        const sp = make(redis, daemon);
+        await sp.processPayments();
+        assert.ok(await redis.get('wam:payment:inflight'),
+            'an error of unknown provenance was assumed harmless');
+        assert.strictEqual(sp.paused, true, 'uncertainty did not stop the pool');
+    });
+
+    await test('the money commit is a transaction, not a batch', async () => {
+        const redis = fakeRedis({ addr1: '500000000' });
+        const sp = make(redis, fakeDaemon());
+        await sp.processPayments();
+        assert.ok(redis.calls.some(([op]) => op === 'multi'),
+            'balances, journal and intent were committed as a pipeline, which ' +
+            'redis may apply only in part');
+    });
+
+    await test('payments are paused until the start-up check has finished', async () => {
+        const redis = fakeRedis({ addr1: '500000000' });
+        let release;
+        const held = new Promise((r) => { release = r; });
+        // A redis that hangs on the one GET startupReconcile makes.
+        const slow = { ...redis, async get(k) { await held; return redis.get(k); } };
+        const daemon = fakeDaemon();
+        const sp = make(slow, daemon);
+        sp.start();
+        assert.strictEqual(sp.paused, true,
+            'the payment timer was armed before the unfinished-run check answered');
+        await sp.processPayments();
+        assert.strictEqual(daemon.sent.length, 0,
+            'the pool paid while the check that prevents double payment was still running');
+        sp.stop();
+        release();
+    });
+
+    await test('a start-up check that throws leaves payments paused', async () => {
+        const redis = fakeRedis({ addr1: '500000000' });
+        const broken = { ...redis, async get() { throw new Error('redis is down'); } };
+        const daemon = fakeDaemon();
+        const sp = make(broken, daemon);
+        sp.start();
+        await new Promise((r) => setImmediate(r));
+        assert.strictEqual(sp.paused, true,
+            'a failed check released payments instead of holding them');
+        await sp.processPayments();
+        assert.strictEqual(daemon.sent.length, 0, 'the pool paid anyway');
+        sp.stop();
     });
 
     await test('a surviving record pauses payments until a human clears it', async () => {

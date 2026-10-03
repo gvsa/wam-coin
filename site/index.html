@@ -325,6 +325,14 @@ promise that any wallet will add support.</p>
 The Bluesky handle is <span class="mono">@wamcoin.org</span> — that is this domain, bound by a
 DNS record you can query yourself, so it proves itself without trusting us or Bluesky.</p>
 
+<p class="dim"><span class="mono">wamcoin.net</span> is ours as well, and forwards here. It
+is a reserve name at a different registrar, on a different account, with a different payment
+method, so that no single company's decision can take both. It was written into
+<a href="/CHANNELS.txt">CHANNELS.txt</a> and signed before it was needed, because a name that
+first appears during an outage cannot be told apart from an impostor's. Neither name carries
+the chain: the seed addresses are compiled into the software rather than looked up by name,
+and a download proves itself by the signature on SHA256SUMS wherever it is served from.</p>
+
 <p class="dim">Those are the only accounts. Nobody speaking for WAM will message you first,
 offer you an allocation, or ask you for a key or a payment — there is nothing to buy and no
 reason anyone would need to reach you. <a href="/CHANNELS.txt">CHANNELS.txt</a> is the plain-text
@@ -358,16 +366,23 @@ meant to fall; it will be published so you can watch it fall rather than take hi
 it.</p>
 
 <h2 class="sec">Trading</h2>
-<p><strong>WAM is not listed anywhere, and there is no price.</strong> It cannot be bought.</p>
-<p class="dim">Enquiries have been sent to six decentralised venues — Komodo Wallet,
-BasicSwap DEX, Bisq, Maya Protocol, Haveno and Block DX — asking what they require in order
-to list a chain like this. <strong>None of them has agreed to anything.</strong> They are
-requests for requirements, sent before launch because reviews at venues of this kind take
-weeks, and this line will say something different only when one of them says yes.</p>
+<p><strong>WAM trades by atomic swap, and there is no price.</strong> It cannot be
+bought with money on an exchange.</p>
+<p class="dim">Enquiries were sent to six decentralised venues before launch — Komodo
+Wallet, BasicSwap DEX, Bisq, Maya Protocol, Haveno and Block DX — asking what each requires
+to list a chain like this. <strong>One has merged it:</strong> WAM entered the Komodo /
+GLEEC coins registry on 22 September 2026. That repository's maintainer opened the pull
+request himself, ran a test swap, and merged it. No listing fee was asked for and none was
+paid; he asked for coin to test a swap with, since nobody can swap a coin he holds none of,
+so 500 WAM went to him from the treasury — in the
+<a href="https://gitlab.com/WAMCoin/wam-coin/blob/main/docs/TREASURY_LEDGER.md">treasury
+ledger</a> with its transaction id — and he swapped 249.68 WAM against Litecoin. The other
+five are still requests for requirements, with nothing agreed.</p>
 <p class="dim">WAM is its own layer 1 rather than a token on someone else's chain, so it
-settles by atomic swap or a peer-to-peer order book. It cannot appear on an automated market
-maker such as Uniswap without a bridge and a wrapped representation, which is the same
-reason Monero does not.</p>
+settles by atomic swap or a peer-to-peer order book — you swap another coin for it,
+directly, with no custodian in between. It cannot appear on an automated market maker such
+as Uniswap without a bridge and a wrapped representation, which is the same reason Monero
+does not.</p>
 
 </div><!-- /en -->
 
@@ -474,6 +489,13 @@ reason Monero does not.</p>
 ومعرّفنا على Bluesky هو <span class="mono" dir="ltr">@wamcoin.org</span> — وهو نطاقنا هذا نفسه،
 مربوط بسجل DNS تستطيع أن تستعلم عنه بنفسك، فيثبت نفسه دون أن تصدّقنا ودون أن تصدّق Bluesky.</p>
 
+<p class="dim"><span class="mono" dir="ltr">wamcoin.net</span> لنا أيضاً، ويحوّل إلى هنا. وهو
+اسم احتياطي عند شركة أخرى، في حساب آخر، بوسيلة دفع أخرى، كي لا يأخذ الاسمين قرارٌ واحد من
+شركة واحدة. وكُتب في <a href="/CHANNELS.txt">CHANNELS.txt</a> ووُقّع قبل أن يُحتاج إليه، لأن
+اسماً يظهر أول مرة يوم العطل لا يُفرَّق عن اسم منتحل. ولا يحمل أيٌّ من الاسمين السلسلة:
+عناوين البذور مخبوزة في البرنامج لا تُطلب بالاسم، والتنزيل يثبت نفسه بتوقيع SHA256SUMS
+أينما وُضع.</p>
+
 <p class="dim">هذه هي الحسابات الوحيدة. لن يراسلك أحد باسم WAM أولاً، ولن يعرض عليك حصة،
 ولن يطلب منك مفتاحاً ولا مبلغاً — لا يوجد شيء يُشترى، ولا سبب يجعل أحداً يحتاج الوصول إليك.
 <a href="/CHANNELS.txt">CHANNELS.txt</a> نسخة نصية صِرفة من هذه القائمة، محفوظة بهذا الشكل
@@ -505,14 +527,21 @@ reason Monero does not.</p>
 الشبكة سيكون كبيراً يوم الإطلاق ومقصودٌ أن ينزل؛ وسيُنشر لتراه ينزل بنفسك بدل أن تُصدّقه.</p>
 
 <h2 class="sec">التداول</h2>
-<p><strong>WAM غير مُدرجة في أي منصّة، ولا سعر لها.</strong> ولا يمكن شراؤها.</p>
-<p class="dim">أُرسلت استفسارات إلى ستّ منصّات لا مركزية — Komodo Wallet وBasicSwap DEX
-وBisq وMaya Protocol وHaveno وBlock DX — سؤالاً عمّا تشترطه لإدراج سلسلة كهذه.
-<strong>ولم يوافق أيٌّ منها على شيء.</strong> هي طلب متطلّبات، أُرسل قبل الإطلاق لأن المراجعة
-في مثل هذه المنصّات تستغرق أسابيع، ولن يتغيّر هذا السطر إلّا يوم يقول أحدها نعم.</p>
+<p><strong>تُتداول WAM بالمبادلة الذرّية، ولا سعر لها.</strong> ولا تُشترى بالمال
+في منصّة.</p>
+<p class="dim">أُرسلت استفسارات إلى ستّ منصّات لا مركزية قبل الإطلاق — Komodo Wallet
+وBasicSwap DEX وBisq وMaya Protocol وHaveno وBlock DX — سؤالاً عمّا تشترطه لإدراج سلسلة
+كهذه. <strong>وواحدة منها أدرجتها:</strong> دخلت WAM سجلّ عملات Komodo / GLEEC في
+22 سبتمبر 2026. مشرف ذلك المستودع هو من فتح طلب الدمج بنفسه، وأجرى مبادلة اختبارية،
+ثم دمجه. ولم يُطلب رسم إدراج ولم يُدفع؛ طلب عملةً يختبر بها المبادلة، إذ لا يبادل أحدٌ
+عملةً لا يملك منها شيئاً، فخرجت إليه 500 WAM من الخزينة — مكتوبةً في
+<a href="https://gitlab.com/WAMCoin/wam-coin/blob/main/docs/TREASURY_LEDGER.md">دفتر
+الخزينة</a> برقم معاملتها — وبادل 249.68 WAM بلايتكوين. والخمس الباقية ما زالت طلب
+متطلّبات لم يُوافَق على شيء فيها.</p>
 <p class="dim">WAM سلسلة مستقلّة بذاتها لا عملة رمزية على سلسلة غيرها، فتداولها يكون بمبادلة
-ذرّية أو بدفتر أوامر بين الأطراف. ولا يمكن إدراجها في منصّة صانع سوق آلي مثل Uniswap بلا
-جسر ونسخة ملفوفة — وهو نفس سبب غياب مونيرو عنها.</p>
+ذرّية أو بدفتر أوامر بين الأطراف — تبادل عملة أخرى بها مباشرةً بلا وسيط يحتفظ بمالك. ولا
+يمكن إدراجها في منصّة صانع سوق آلي مثل Uniswap بلا جسر ونسخة ملفوفة — وهو نفس سبب غياب
+مونيرو عنها.</p>
 
 </div><!-- /ar -->
 
