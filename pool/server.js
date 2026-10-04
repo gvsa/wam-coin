@@ -314,14 +314,22 @@ async function main() {
     // Correctness in the money path is worth more than the concurrency.
     let accounting = Promise.resolve();
     const inOrder = (what, fn) => {
-        accounting = accounting
-            .then(fn)
-            .catch((err) => log.error(`failed to record ${what}: ${err.message}`));
+        // The caller gets the real outcome; the chain gets a version that
+        // cannot reject, so one failure never stops everything after it.
+        const run = accounting.then(fn);
+        accounting = run.catch((err) =>
+            log.error(`failed to record ${what}: ${err.message}`));
+        return run;
     };
 
-    jobManager.on('share', (share) => {
-        inOrder('a share', () => shareProcessor.recordShare(share));
-    });
+    // The share is written down BEFORE the miner is told it counted.
+    //
+    // processShare awaits this, so a Redis failure reaches the miner as
+    // "resubmit" instead of becoming a logged line about work he believes he
+    // was paid for. A hook and not a listener, because an event cannot be
+    // waited on.
+    jobManager._record = (share) => inOrder('a share',
+        () => shareProcessor.recordShare(share));
 
     jobManager.on('block', (share) => {
         inOrder(`block ${share.height}`, () => shareProcessor.recordBlock(share));

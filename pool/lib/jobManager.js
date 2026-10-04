@@ -25,7 +25,11 @@ const REJECT = {
     NOT_SUBSCRIBED:  [25, 'not subscribed'],
     BAD_NTIME:       [26, 'ntime out of range'],
     BAD_NONCE_SIZE:  [27, 'malformed nonce or extranonce2'],
-    INTERNAL:        [20, 'internal error']
+    INTERNAL:        [20, 'internal error'],
+    // The share was good and we could not write it down. Told apart from
+    // INTERNAL on purpose: this one means "send it again", and the miner's
+    // claim on it has been released so that he can.
+    UNAVAILABLE:     [20, 'share not recorded, please resubmit']
 };
 
 class JobManager extends EventEmitter {
@@ -34,6 +38,16 @@ class JobManager extends EventEmitter {
         this.daemon = daemon;
         this.config = config;
         this.log = logger;
+
+        // How a share is made durable before the miner is told it counted.
+        //
+        // An event cannot be awaited, so this is a hook rather than another
+        // emit: server.js sets it to the ordered accounting chain, and
+        // processShare waits for it. Left as a resolved promise so a pool
+        // assembled without one still runs -- the tests do exactly that -- and
+        // so that forgetting to set it degrades to the old behaviour loudly in
+        // review rather than silently at runtime.
+        this._record = async () => {};
 
         this.currentJob = null;
         this.validJobs = new Map();          // jobId -> BlockTemplate
@@ -327,11 +341,46 @@ class JobManager extends EventEmitter {
             // that a throw inside _submitBlock cannot release a claim for work
             // that has already been paid -- which would be the double-credit
             // the claim exists to prevent.
+            // A BLOCK GOES TO THE NODE FIRST, BECAUSE SECONDS DECIDE IT.
+            //
+            // Nothing is recorded or acknowledged before this. A block is
+            // worth 47.5 WAM and is lost to whoever is a second quicker, so
+            // no accounting may stand in front of it. _submitBlock no longer
+            // emits anything -- it submits, records on the share whether the
+            // node took it, and returns.
+            if (isBlockCandidate) {
+                await this._submitBlock(job, header, coinbase, share);
+            }
+
+            // THEN THE SHARE IS MADE DURABLE, AND ONLY THEN IS IT CREDITED.
+            //
+            // The miner used to be told "accepted" while the Redis write was
+            // still a promise nobody waited for, with .catch(log) behind it.
+            // If that write failed the share was gone: the miner had been
+            // told it counted, the pool had no record of it, and the only
+            // trace was a line in a log nobody reads.
+            //
+            // `credited` is set after the record succeeds, so a failure
+            // releases the claim through the finally below and the miner can
+            // submit the same share again -- which is the whole point of
+            // telling him it failed rather than lying and dropping it.
+            //
+            // Reported by dang150296 (Urriki1502), 2026-10-04.
+            try {
+                await this._record(share);
+            } catch (err) {
+                this.log.error(`could not record a share from ${workerName}: ` +
+                               `${err.message}`);
+                return this._reject(REJECT.UNAVAILABLE, workerName);
+            }
+
             credited = true;
             this.emit('share', share);
 
-            if (isBlockCandidate) {
-                await this._submitBlock(job, header, coinbase, share);
+            // And the block's payout accounting last of all, so the snapshot
+            // it takes of the round already contains the share that found it.
+            if (isBlockCandidate && share.blockAccepted) {
+                this.emit('block', share);
             }
             return { valid: true, share };
         } finally {
@@ -394,8 +443,11 @@ class JobManager extends EventEmitter {
                           `reward ${(job.coinbaseValue / 1e8).toFixed(8)} WAM, ` +
                           `${(job.distributableValue / 1e8).toFixed(8)} WAM to miners, ` +
                           `${(job.devFeeAmount / 1e8).toFixed(8)} WAM to treasury`);
-            this.emit('block', share);
-            // Get everyone onto the new tip immediately.
+            // The payout accounting for this block is NOT emitted here any
+            // more. processShare emits it after the winning share has been
+            // recorded, because the listener snapshots the round and the
+            // winner has to be in it. What stays here is the only thing that
+            // is urgent: getting every miner onto the new tip.
             this.refreshTemplate(true).catch(() => {});
         } else {
             share.blockAccepted = false;

@@ -154,6 +154,51 @@ function fakeProcessor(shareDelayMs = 0) {
             'one rejected promise poisoned the chain and stopped all accounting');
     });
 
+    console.log(`\n${BLD}a miner is not told "accepted" for a share nobody wrote down${OFF}`);
+
+    // The chain server.js builds, exactly as processShare receives it.
+    function recordHook(processor, log) {
+        let accounting = Promise.resolve();
+        return (share) => {
+            const run = accounting.then(() => processor.recordShare(share));
+            accounting = run.catch((err) => log.push(err.message));
+            return run;
+        };
+    }
+
+    await test('a failed write reaches the caller instead of a log line', async () => {
+        const log = [];
+        const p = fakeProcessor();
+        p.recordShare = async () => { throw new Error('redis went away'); };
+        const record = recordHook(p, log);
+
+        let told = null;
+        try { await record({ id: 's1' }); told = 'accepted'; }
+        catch { told = 'resubmit'; }
+
+        assert.strictEqual(told, 'resubmit',
+            'the miner was told his share counted while the write was failing');
+    });
+
+    await test('and the next share is still recorded after that failure', async () => {
+        const log = [];
+        const p = fakeProcessor();
+        const good = p.recordShare.bind(p);
+        let first = true;
+        p.recordShare = async function (s) {
+            if (first) { first = false; throw new Error('redis went away'); }
+            return good(s);
+        };
+        const record = recordHook(p, log);
+
+        await record({ id: 'lost' }).catch(() => {});
+        await record({ id: 'next' });
+
+        assert.deepStrictEqual(p.window, ['next'],
+            'one failure stopped every share after it from being recorded');
+        assert.strictEqual(log.length, 1, 'the failure was not reported');
+    });
+
     console.log();
     if (!fail.length) {
         console.log(`${GRN}${BLD}${pass} passed${OFF}`);

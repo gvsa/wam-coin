@@ -179,8 +179,25 @@ function claimSet() {
         assert.ok(/}\s*finally\s*\{[^}]*releaseSubmit/.test(tail),
             'the release is not in a finally block; a rejection path added later '
             + 'will leak claims again');
-        assert.ok(/credited\s*=\s*true;[\s\S]{0,200}return \{ valid: true/.test(tail),
-            'the credited flag is not set immediately before the success return');
+        // This measured the characters between `credited = true` and the
+        // success return, which said "nothing much happens in between" and
+        // stopped being true the moment something had to. What it was
+        // protecting is an ORDER, so the order is what is asserted now:
+        //
+        //    record the share durably -> credit it -> return success
+        //
+        // Setting the flag before the record would keep the claim for a share
+        // that was never written down, so the miner could not resubmit it and
+        // nobody would ever pay him for it.
+        const recordAt = tail.indexOf('await this._record');
+        const creditAt = tail.indexOf('credited = true');
+        const returnAt = tail.indexOf('return { valid: true');
+        assert.ok(recordAt > -1,
+            'processShare no longer waits for the share to be recorded before '
+            + 'crediting it; the miner is being told it counted on a promise');
+        assert.ok(recordAt < creditAt && creditAt < returnAt,
+            'the order must be record, then credit, then return -- crediting '
+            + 'before the record keeps the claim for a share nobody wrote down');
 
         const claimAt = tail.indexOf('registerSubmit');
         const tryAt = tail.indexOf('try {', claimAt);
@@ -200,14 +217,31 @@ function claimSet() {
         // than reading the two line numbers.
         //
         // Reported by dang150296 (Urriki1502), 2026-10-04.
+        // The order that matters is between the two ACCOUNTING events, not
+        // between the share and the submission.
+        //
+        // Submitting to the node comes first on purpose: a block is worth
+        // 47.5 WAM and goes to whoever is a second quicker, so nothing may be
+        // written down or acknowledged in front of it. An earlier version of
+        // this assertion required the share to be emitted before the submit,
+        // which fixed the payout ordering by slowing down the one thing that
+        // must not be slowed down.
+        //
+        // What has to hold is that 'block' -- whose listener snapshots the
+        // round and resets it -- is emitted after the winning share has been
+        // recorded and emitted.
         const emitShareAt = tail.indexOf("this.emit('share'");
+        const emitBlockAt = tail.indexOf("this.emit('block'");
         const submitAt = tail.indexOf('this._submitBlock');
-        assert.ok(emitShareAt > -1 && submitAt > -1,
-            'processShare no longer emits a share or submits a block; this '
-            + 'assertion has lost its subject and must be rewritten');
-        assert.ok(emitShareAt < submitAt,
-            'the block is submitted before the share is emitted, so the share '
-            + 'that found it is not in that block\'s payout');
+        assert.ok(emitShareAt > -1 && emitBlockAt > -1 && submitAt > -1,
+            'processShare no longer emits both events and submits the block; '
+            + 'this assertion has lost its subject and must be rewritten');
+        assert.ok(submitAt < emitShareAt,
+            'something is recorded or emitted before the block reaches the '
+            + 'node, which costs blocks to whoever is quicker');
+        assert.ok(emitShareAt < emitBlockAt,
+            'the block payout is emitted before the share that found it, so '
+            + 'that share is not in the snapshot of its own block');
     });
 
     console.log('\n' + '='.repeat(66));
