@@ -88,15 +88,38 @@ function fakeRedis(initial = {}) {
     return r;
 }
 
-function fakeDaemon(onSendMany) {
+function fakeDaemon(onBroadcast) {
+    // The real sequence since 2026-10-04: the transaction is built and signed
+    // so that it HAS a txid before it is broadcast, and only the broadcast can
+    // leave the outcome unknown. A fake that still answers `sendmany` would be
+    // testing a protocol the pool no longer speaks.
     return {
         sent: [],
+        calls: [],
         async getBalance() { return 1000000; },
         async cmd(method, params) {
-            if (method !== 'sendmany') return null;
-            this.sent.push(params[1]);
-            if (onSendMany) await onSendMany(params[1]);
-            return `txid-${this.sent.length}`;
+            this.calls.push(method);
+            switch (method) {
+                case 'createrawtransaction':
+                    this.sent.push(params[1]);          // the outputs, as before
+                    return 'raw' + this.sent.length;
+                case 'fundrawtransaction':
+                    return { hex: 'funded' + this.sent.length };
+                case 'signrawtransactionwithwallet':
+                    return { complete: true, hex: 'signed' + this.sent.length };
+                case 'decoderawtransaction':
+                    return { txid: `txid-${this.sent.length}` };
+                case 'sendrawtransaction':
+                    if (onBroadcast) await onBroadcast(this.sent[this.sent.length - 1]);
+                    return `txid-${this.sent.length}`;
+                case 'getrawtransaction': {
+                    const e = new Error('No such mempool or blockchain transaction');
+                    e.ambiguous = false;
+                    throw e;
+                }
+                default:
+                    return null;
+            }
         }
     };
 }
@@ -166,7 +189,7 @@ function make(redis, daemon, cfg = {}) {
         });
         const sp = make(redis, daemon);
         await sp.processPayments();
-        assert.ok(atSendTime, 'nothing recorded the intent before sendmany');
+        assert.ok(atSendTime, 'nothing recorded the intent before the money moved');
         const rec = JSON.parse(atSendTime);
         assert.ok(rec.payouts.addr1, 'the record does not name who was being paid');
     });
@@ -179,7 +202,7 @@ function make(redis, daemon, cfg = {}) {
             'a completed run left a marker that will pause the next start-up');
     });
 
-    await test('a REFUSED sendmany clears it, so one RPC error does not halt the pool', async () => {
+    await test('a REFUSED payment clears it, so one RPC error does not halt the pool', async () => {
         const redis = fakeRedis({ addr1: '500000000' });
         // As daemon.js now classifies it: the node parsed the request and said
         // no, so no transaction exists.
@@ -203,7 +226,7 @@ function make(redis, daemon, cfg = {}) {
     // except that it does not: each was run against the old code first and
     // each failed. That is the only reason to believe they test anything.
 
-    await test('an UNKNOWN sendmany outcome keeps the intent and pauses', async () => {
+    await test('an UNKNOWN broadcast outcome keeps the intent and pauses', async () => {
         const redis = fakeRedis({ addr1: '500000000' });
         const daemon = fakeDaemon(() => {
             const e = new Error('RPC timeout calling sendmany');
@@ -267,6 +290,101 @@ function make(redis, daemon, cfg = {}) {
         await sp.processPayments();
         assert.strictEqual(daemon.sent.length, 0, 'the pool paid anyway');
         sp.stop();
+    });
+
+    // ---- the payment has a name before it has a fate ----------------------
+    //
+    // sendmany created and broadcast in one call, so a lost reply left nothing
+    // to ask about: no txid, no bytes, nothing to look up and nothing to send
+    // again. The only safe answer was to stop and fetch a human.
+    //
+    // Building and signing first gives the transaction an identity before
+    // anybody could have seen it, which turns an unknown outcome into a
+    // question with an answer.
+    //
+    // Reported by dang150296 (Urriki1502), 2026-10-04.
+
+    await test('the txid and the signed bytes are stored BEFORE the broadcast', async () => {
+        const redis = fakeRedis({ addr1: '500000000' });
+        let atBroadcast = null;
+        const daemon = fakeDaemon(async () => {
+            atBroadcast = await redis.get('wam:payment:inflight');
+        });
+        const sp = make(redis, daemon);
+        await sp.processPayments();
+
+        assert.ok(atBroadcast, 'no intent existed when the money moved');
+        const rec = JSON.parse(atBroadcast);
+        assert.ok(rec.txid, 'the intent has no txid, so a lost answer is unanswerable');
+        assert.ok(rec.hex, 'the intent has no signed bytes, so it cannot be re-sent');
+    });
+
+    await test('a lost answer is settled by finding the txid on the node', async () => {
+        const redis = fakeRedis({ addr1: '500000000' });
+        const daemon = fakeDaemon();
+        // The broadcast's reply is lost, and the node turns out to have it.
+        const cmd = daemon.cmd.bind(daemon);
+        daemon.cmd = async function (m, p) {
+            if (m === 'sendrawtransaction') {
+                const e = new Error('socket hang up'); e.ambiguous = true; throw e;
+            }
+            if (m === 'getrawtransaction') return { txid: p[0] };
+            return cmd(m, p);
+        };
+        const sp = make(redis, daemon);
+        await sp.processPayments();
+
+        assert.notStrictEqual(sp.paused, true,
+            'the pool stopped over a payment it could have confirmed was sent');
+        assert.strictEqual(await redis.get('wam:payment:inflight'), null,
+            'the run completed but left a marker that will pause the next start');
+    });
+
+    await test('a lost answer with no transaction re-sends the same bytes', async () => {
+        const redis = fakeRedis({ addr1: '500000000' });
+        const daemon = fakeDaemon();
+        const cmd = daemon.cmd.bind(daemon);
+        let broadcasts = 0;
+        let resentHex = null;
+        daemon.cmd = async function (m, p) {
+            if (m === 'sendrawtransaction') {
+                broadcasts++;
+                if (broadcasts === 1) {
+                    const e = new Error('RPC timeout'); e.ambiguous = true; throw e;
+                }
+                resentHex = p[0];
+                return 'txid-1';
+            }
+            return cmd(m, p);     // getrawtransaction says it does not have it
+        };
+        const sp = make(redis, daemon);
+        await sp.processPayments();
+
+        assert.strictEqual(broadcasts, 2, 'the payment was never re-sent');
+        assert.ok(resentHex && resentHex.startsWith('signed'),
+            're-broadcast something other than the exact signed bytes, which is '
+            + 'the one thing that makes a retry safe');
+        assert.notStrictEqual(sp.paused, true, 'it paused after a successful retry');
+    });
+
+    await test('and if the retry fails too, it stops and says so', async () => {
+        const redis = fakeRedis({ addr1: '500000000' });
+        const daemon = fakeDaemon();
+        const cmd = daemon.cmd.bind(daemon);
+        daemon.cmd = async function (m, p) {
+            if (m === 'sendrawtransaction') {
+                const e = new Error('still unreachable'); e.ambiguous = true; throw e;
+            }
+            return cmd(m, p);
+        };
+        const sp = make(redis, daemon);
+        await sp.processPayments();
+
+        assert.strictEqual(sp.paused, true,
+            'it carried on without knowing whether the miners were paid');
+        const left = await redis.get('wam:payment:inflight');
+        assert.ok(left && JSON.parse(left).hex,
+            'the signed bytes were not kept, so nobody can send them by hand');
     });
 
     await test('a surviving record pauses payments until a human clears it', async () => {
