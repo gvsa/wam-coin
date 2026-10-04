@@ -29,7 +29,12 @@ const REJECT = {
     // The share was good and we could not write it down. Told apart from
     // INTERNAL on purpose: this one means "send it again", and the miner's
     // claim on it has been released so that he can.
-    UNAVAILABLE:     [20, 'share not recorded, please resubmit']
+    UNAVAILABLE:     [20, 'share not recorded, please resubmit'],
+    // The verification queue is full. Also "send it again", and also with the
+    // claim released -- but told apart from UNAVAILABLE so an operator reading
+    // the counters can see the difference between redis failing and the pool
+    // being saturated. They need opposite responses.
+    BUSY:            [20, 'verification queue full, please resubmit']
 };
 
 class JobManager extends EventEmitter {
@@ -49,6 +54,17 @@ class JobManager extends EventEmitter {
         // review rather than silently at runtime.
         this._record = async () => {};
 
+        // How many share verifications may be in flight at once.
+        //
+        // Sized from the VM count, because that is what actually limits the
+        // work: beyond a few per VM the surplus only waits somewhere worse --
+        // on a libuv threadpool thread, inside a condition variable, holding a
+        // thread the rest of the process needs. The floor of 32 keeps a small
+        // pool responsive when vmCount is 1 or 2.
+        const vms = config.randomxVmCount || 4;
+        this._maxVerifying = config.maxPendingVerifications || Math.max(32, vms * 4);
+        this._verifying = 0;
+
         this.currentJob = null;
         this.validJobs = new Map();          // jobId -> BlockTemplate
         this.maxJobHistory = config.maxJobHistory || 4;
@@ -61,7 +77,12 @@ class JobManager extends EventEmitter {
             templates: 0,
             blocksFound: 0,
             seedRotations: 0,
-            lastSeedHeight: null
+            lastSeedHeight: null,
+            // Shares refused because the verification queue was full. A number
+            // that is not zero means either a flood or a pool too small for
+            // the hash rate pointed at it, and an operator needs to be able to
+            // tell those from redis failing.
+            verifyRejected: 0
         };
     }
 
@@ -282,12 +303,43 @@ class JobManager extends EventEmitter {
             }
 
             // ---- the expensive part, off the event loop -------------------
+            //
+            // AND BOUNDED, BECAUSE "OFF THE EVENT LOOP" IS NOT "FREE".
+            //
+            // randomx.hash queues a Napi::AsyncWorker on the libuv threadpool,
+            // and that worker's first act is to wait on a condition variable
+            // until one of vmCount RandomX VMs is free. A waiting worker is a
+            // BLOCKED THREADPOOL THREAD, and the default pool is four threads
+            // for the whole process -- shared with dns, fs and crypto.
+            //
+            // So an unbounded queue here is not merely memory. Anyone who can
+            // open a socket and send syntactically valid submissions can park
+            // every threadpool thread in cv.wait and stall everything else the
+            // pool does, having spent nothing: sending a share is bytes, and
+            // verifying one is milliseconds of a scarce VM.
+            //
+            // Queueing more than a few per VM buys nothing anyway -- they only
+            // wait in a different place -- so the queue is capped and the
+            // surplus is refused at the door, with a code that tells the miner
+            // to send it again rather than leaving him guessing. The claim is
+            // released by the finally below, so he can.
+            //
+            // Reported by dang150296 (Urriki1502) on 2026-10-04 as a RandomX
+            // verification queue with no explicit in-flight bound.
+            if (this._verifying >= this._maxVerifying) {
+                this.stats.verifyRejected++;
+                return this._reject(REJECT.BUSY, workerName);
+            }
+
             let powHash;
+            this._verifying++;
             try {
                 powHash = await randomx.hash(job.seedHash, header);
             } catch (err) {
                 this.log.error(`RandomX hashing failed: ${err.message}`);
                 return this._reject(REJECT.INTERNAL, workerName);
+            } finally {
+                this._verifying--;
             }
 
             const hashValue = hashToBigIntLE(powHash);
