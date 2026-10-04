@@ -331,6 +331,53 @@ async function main() {
     jobManager._record = (share) => inOrder('a share',
         () => shareProcessor.recordShare(share));
 
+    // Where a solved block waits if the node cannot take it yet.
+    //
+    // A block is 47.5 WAM and used to exist only in a local variable until it
+    // was accepted: a node down longer than the five-second retry, or this
+    // process dying, lost it outright. Redis is already the thing this pool
+    // trusts with miners' balances, so it is where the bytes go.
+    //
+    // A refused block is moved rather than deleted. The node read it and said
+    // no, so it will never be worth anything -- but it is the only copy of
+    // something a miner's electricity produced, and the reason it was refused
+    // is worth more beside it than in a log that rotates.
+    const spoolKey = `${config.redisPrefix || 'wam'}:blocks:unsent`;
+    const refusedKey = `${config.redisPrefix || 'wam'}:blocks:refused`;
+    jobManager._spoolStore = {
+        async put(hash, entry) {
+            await redis.hset(spoolKey, hash, JSON.stringify(entry));
+        },
+        async remove(hash, refusedReason) {
+            if (refusedReason) {
+                const raw = await redis.hget(spoolKey, hash);
+                if (raw) {
+                    await redis.hset(refusedKey, hash,
+                        JSON.stringify({ ...JSON.parse(raw), refusedReason,
+                                         refusedAt: Date.now() }));
+                }
+            }
+            await redis.hdel(spoolKey, hash);
+        },
+        async all() {
+            const map = await redis.hgetall(spoolKey);
+            return Object.values(map || {}).map((v) => JSON.parse(v));
+        }
+    };
+
+    // Before anything else, and then on a timer: offer whatever is still
+    // sitting there. The start-up pass is the one that matters -- it is the
+    // case where this process died holding a block.
+    jobManager.drainSpool()
+        .then((r) => { if (r.offered) log.warn(`block spool: ${r.offered} waiting, ${r.settled} settled`); })
+        .catch((err) => log.error(`block spool drain failed: ${err.message}`));
+    const drainEvery = (config.blockSpoolDrainSec || 60) * 1000;
+    const spoolTimer = setInterval(() => {
+        jobManager.drainSpool().catch((err) =>
+            log.error(`block spool drain failed: ${err.message}`));
+    }, drainEvery);
+    spoolTimer.unref?.();
+
     jobManager.on('block', (share) => {
         inOrder(`block ${share.height}`, () => shareProcessor.recordBlock(share));
     });

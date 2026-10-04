@@ -442,6 +442,93 @@ class JobManager extends EventEmitter {
         }
     }
 
+    // -----------------------------------------------------------------------
+    //  The spool: a solved block that outlives this process
+    // -----------------------------------------------------------------------
+    //
+    //  Where it is kept is injected rather than built here. jobManager has no
+    //  redis of its own and should not grow one -- server.js passes a pair of
+    //  functions, and the tests pass a Map. A jobManager assembled without one
+    //  keeps the old behaviour and says so once, loudly, rather than silently
+    //  dropping the protection.
+
+    async _spool(entry) {
+        if (!this._spoolStore) {
+            if (!this._warnedNoSpool) {
+                this._warnedNoSpool = true;
+                this.log.warn('no block spool is configured: a solved block only ' +
+                              'exists in memory until the node accepts it');
+            }
+            return;
+        }
+        await this._spoolStore.put(entry.hash, entry);
+    }
+
+    async _unspool(hash, refusedReason) {
+        if (!this._spoolStore) return;
+        await this._spoolStore.remove(hash, refusedReason);
+    }
+
+    /**
+     * Offer every spooled block to the node again.
+     *
+     * Called at start-up and on a timer. The expensive case -- a block sitting
+     * here for an hour while a node is down -- is exactly the case the spool
+     * exists for, so this does not give up on age: a block is only removed
+     * when a node has LOOKED at it and answered, which includes "duplicate",
+     * the answer meaning it was already accepted.
+     */
+    async drainSpool() {
+        if (!this._spoolStore) return { offered: 0, settled: 0 };
+        let entries;
+        try {
+            entries = await this._spoolStore.all();
+        } catch (err) {
+            this.log.error(`could not read the block spool: ${err.message}`);
+            return { offered: 0, settled: 0 };
+        }
+
+        let settled = 0;
+        for (const e of entries) {
+            let result;
+            try {
+                result = await this.daemon.submitBlock(e.hex);
+            } catch (err) {
+                this.log.warn(`spooled block ${e.height} could not be offered: ` +
+                              `${err.message}`);
+                continue;
+            }
+            if (result.accepted) {
+                this.log.info(`*** SPOOLED BLOCK ${e.height} ACCEPTED *** ` +
+                              `found ${Math.round((Date.now() - e.foundAt) / 1000)}s ` +
+                              'ago, by ' + e.worker);
+                this.stats.blocksFound++;
+                await this._unspool(e.hash);
+                settled++;
+                this.emit('block', { height: e.height, blockHash: e.hash,
+                                     worker: e.worker, blockAccepted: true,
+                                     fromSpool: true });
+                continue;
+            }
+            const looked = result.results.some((r) => r.ok || r.error === null);
+            const already = result.reasons.some((r) =>
+                /duplicate|inconclusive/i.test(String(r)));
+            if (already) {
+                this.log.info(`spooled block ${e.height} is already on the node`);
+                await this._unspool(e.hash);
+                settled++;
+            } else if (looked) {
+                this.log.error(`spooled block ${e.height} was read and refused: ` +
+                               `${result.reasons.join(' | ')} -- it will not be ` +
+                               'offered again');
+                await this._unspool(e.hash, result.reasons.join(' | '));
+                settled++;
+            }
+            // Otherwise nothing answered, and it stays for the next drain.
+        }
+        return { offered: entries.length, settled };
+    }
+
     async _submitBlock(job, header, coinbase, share) {
         const blockHex = job.serializeBlock(header, coinbase).toString('hex');
         // Block id is the double-SHA256 of the header, NOT the RandomX hash.
@@ -450,6 +537,34 @@ class JobManager extends EventEmitter {
 
         this.log.info(`*** BLOCK CANDIDATE at height ${job.height} by ${share.worker} ***`);
         this.log.info(`    hash ${blockHash}`);
+
+        // SPOOLED BEFORE IT IS OFFERED, BECAUSE FIVE SECONDS IS A GUESS.
+        //
+        // The retry below covers a node that is restarting, and five seconds
+        // was chosen because that is how long the restart on 5 September took.
+        // A node that takes thirty seconds to load its wallet, or a machine
+        // that reboots, still loses the block -- and a block is 47.5 WAM, the
+        // largest single loss this pool can suffer. The whole of it lives in a
+        // local variable until it is accepted.
+        //
+        // So the bytes go somewhere durable first. If this process dies, if
+        // the node stays down for an hour, if the retries run out -- the block
+        // is still there to be sent, by the spool drain or by hand.
+        //
+        // Reported by dang150296 (Urriki1502) on 2026-10-04: solved-block
+        // retry is memory-only.
+        //
+        // Spooling cannot be allowed to delay the submission, so a failure to
+        // spool is logged and the block is offered anyway. Losing the safety
+        // net is bad; holding the block while writing to it is worse.
+        const spooled = { height: job.height, hash: blockHash, hex: blockHex,
+                          worker: share.worker, foundAt: Date.now() };
+        try {
+            await this._spool(spooled);
+        } catch (err) {
+            this.log.error(`could not spool block ${job.height} before ` +
+                           `submitting it (${err.message}); submitting anyway`);
+        }
 
         let result = await this.daemon.submitBlock(blockHex);
 
@@ -501,11 +616,29 @@ class JobManager extends EventEmitter {
             // winner has to be in it. What stays here is the only thing that
             // is urgent: getting every miner onto the new tip.
             this.refreshTemplate(true).catch(() => {});
+            // It is on the chain; the spool has nothing left to protect.
+            this._unspool(blockHash).catch((e) =>
+                this.log.warn(`block ${job.height} is accepted but could not be ` +
+                              `removed from the spool: ${e.message}`));
         } else {
             share.blockAccepted = false;
             share.rejectReasons = result.reasons;
             this.log.error(`block ${job.height} REJECTED: ${result.reasons.join(' | ')}`);
             this.emit('blockRejected', share);
+
+            // A node that LOOKED and refused has told us something final, and
+            // keeping those bytes forever helps nobody. A node that never
+            // answered has told us nothing, so the block stays spooled and the
+            // drain will offer it again.
+            const looked = result.results.some((r) => r.ok || r.error === null);
+            if (looked) {
+                this.log.error(`    the block is kept for inspection but will not ` +
+                               `be retried: the node read it and refused it`);
+                this._unspool(blockHash, result.reasons.join(' | ')).catch(() => {});
+            } else {
+                this.log.error(`    NOT discarded -- it is spooled and will be ` +
+                               `offered again when a node answers`);
+            }
         }
     }
 
