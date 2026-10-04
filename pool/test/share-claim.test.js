@@ -131,6 +131,41 @@ function claimSet() {
             'the credited share could be submitted and paid a second time');
     });
 
+    await test('the same share in different hex case is one share', () => {
+        // THE EXPLOIT THIS GUARDS, AND IT WAS LIVE.
+        //
+        // jobManager accepts /^[0-9a-fA-F]+$/ because stratum allows either
+        // case, and the duplicate key used to be the submitted string. So
+        // "deadbeef" and "DEADBEEF" were two shares to the pool and one piece
+        // of proof of work to the chain. Every letter doubles the number of
+        // keys one share can be credited under, and a pool payout is your
+        // shares over everyone's -- so the inflation comes out of the other
+        // miners in the round, not out of thin air.
+        //
+        // Reported by dang150296 (Urriki1502), 2026-10-04.
+        const j = claimSet();
+        assert.strictEqual(j.registerSubmit('aa', 'bb', '01', 'deadbeef'), true);
+        assert.strictEqual(j.registerSubmit('aa', 'bb', '01', 'DEADBEEF'), false,
+            'the same share was credited twice by flipping hex case');
+        assert.strictEqual(j.registerSubmit('aa', 'bb', '01', 'DeAdBeEf'), false,
+            'mixed case got through');
+        assert.strictEqual(j.registerSubmit('AA', 'BB', '01', 'deadbeef'), false,
+            'case in extranonce1/2 got through');
+        assert.strictEqual(j.submits.size, 1,
+            'one share, one entry, whatever it was spelled like');
+    });
+
+    await test('a number and the hex that spells it are one share', () => {
+        // The call site parses nTime and nonce before claiming, so the key
+        // must treat 3735928559 and "deadbeef" as the same thing -- otherwise
+        // the guard above holds only for as long as nobody changes what the
+        // caller passes.
+        const j = claimSet();
+        assert.strictEqual(j.registerSubmit('aa', 'bb', 1, 3735928559), true);
+        assert.strictEqual(j.registerSubmit('aa', 'bb', '01', 'deadbeef'), false,
+            'the same share counted twice because one caller passed numbers');
+    });
+
     console.log('\n=== the release is wired into every rejection path ===');
 
     await test('processShare releases on rejection and keeps on credit', () => {

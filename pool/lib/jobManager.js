@@ -242,7 +242,10 @@ class JobManager extends EventEmitter {
 
         // ---- duplicate detection ------------------------------------------
         const e1hex = extranonce1.toString('hex');
-        if (!job.registerSubmit(e1hex, extranonce2Hex, nTimeHex, nonceHex)) {
+        // The PARSED nTime and nonce, not the hex they arrived as: two
+        // spellings of one number must not be two shares. See
+        // submitKey in blockTemplate.js.
+        if (!job.registerSubmit(e1hex, extranonce2Hex, nTime, nonce)) {
             return this._reject(REJECT.DUPLICATE, workerName);
         }
 
@@ -314,7 +317,7 @@ class JobManager extends EventEmitter {
             return { valid: true, share };
         } finally {
             if (!credited) {
-                job.releaseSubmit(e1hex, extranonce2Hex, nTimeHex, nonceHex);
+                job.releaseSubmit(e1hex, extranonce2Hex, nTime, nonce);
             }
         }
     }
