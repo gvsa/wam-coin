@@ -183,6 +183,13 @@ run "line endings are LF"        bash scripts/test/test_line_endings.sh
 # pointed at a stranger's server. It reached the operator chat rather than the
 # public channel, which is the only reason it cost nothing.
 run "no alert looks like a link" "$PY" scripts/test/test_alert_text.py
+# And the other way an alarm does damage: being sent at all when nothing is
+# wrong. On the night of 2026-10-03 the channels were twice told the published
+# release DOES NOT VERIFY, recovering ten minutes later each time -- ten
+# minutes being the watcher's interval, with nobody touching anything. The
+# release was correct throughout; check_release_signed.sh read an nginx error
+# page, found no SHA256SUMS link in it, and said SHA256SUMS is not published.
+run "a check that cannot ask stays quiet" bash scripts/test/test_release_check_silence.sh
 # The release note inside a platform archive was wrong four times in one
 # evening, each time found by downloading the finished artifact. The root was
 # that the packaging is parameterised by platform and only one branch was ever
