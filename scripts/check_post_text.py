@@ -46,6 +46,9 @@ import pathlib
 import re
 import sys
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / "lib"))
+import quoted  # noqa: E402
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 POSTS = ROOT / "posts"
 
@@ -107,11 +110,30 @@ def main():
         print()
         return 0
 
+    # QUOTATIONS ARE HONOURED HERE NOW, AND THE REASON THEY WERE NOT IS THAT
+    # THIS DIRECTORY CHANGED SHAPE UNDER THE CHECK.
+    #
+    # check_mentions.py exempted this one, with a reason that was true when it
+    # was written: posts/ held drafts, and a draft is the text itself -- there
+    # is nothing in it for a quotation to be part of.
+    #
+    # posts/replies/ now holds RECORDS of messages already sent, kept verbatim
+    # under a "sent, unchanged" line so that what we told somebody can be read
+    # later. Those are quotations by nature. Rewriting one to satisfy a check
+    # would make it stop being a record of what was sent, which is the only
+    # thing it is for.
+    #
+    # So the drafts are still checked, exactly as before -- that is the whole
+    # point, and a draft may not hide behind a mark -- and a block the author
+    # has marked as a quotation is skipped. Every mark is one grep away:
+    #
+    #     git grep -n 'wam:quote-'                          # wam:quote-line
     hits = []
     for p in files:
         rel = p.relative_to(ROOT).as_posix()
-        for n, line in enumerate(p.read_text(encoding="utf-8",
-                                             errors="replace").splitlines(), 1):
+        text = quoted.strip_quoted(
+            p.read_text(encoding="utf-8", errors="replace"))
+        for n, line in enumerate(text.splitlines(), 1):
             for m in RX.finditer(line):
                 hits.append((rel, n, m.group(0), line.strip()))
 
