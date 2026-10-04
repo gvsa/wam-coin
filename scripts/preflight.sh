@@ -304,6 +304,18 @@ if ! command -v node >/dev/null 2>&1; then
            and it is not a failure of the payout code."
 fi
 
+# The adversarial one, which needs binaries and takes minutes, so it is here
+# at the release gate rather than in the sweep. Every other solo test mines
+# alone on regtest and always wins -- losing a race was unreachable by any gate
+# we owned, which is why both of the solo miner's shipped faults were found by
+# miners on mainnet rather than here.
+if [ -n "${WAM_RELEASE_BINARIES:-}" ]; then
+    run "a solo miner that loses a race is not told to stop" \
+        bash scripts/test/test_solo_race.sh "$WAM_RELEASE_BINARIES"
+else
+    gate "the solo race is unchecked -- set WAM_RELEASE_BINARIES to the directory holding wamd, wam-cli and wam-miner"
+fi
+
 for t in pool/test/*.test.js; do
     [ -f "$t" ] || continue
     command -v node >/dev/null 2>&1 || continue

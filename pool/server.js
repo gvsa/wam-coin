@@ -294,14 +294,37 @@ async function main() {
     shareProcessor.setNetworkDifficulty(chainInfo.difficulty);
     shareProcessor.start();
 
+    // ACCOUNTING HAPPENS IN THE ORDER IT WAS EMITTED, NOT IN THE ORDER REDIS
+    // HAPPENS TO FINISH.
+    //
+    // These were two independent fire-and-forget calls. jobManager now emits
+    // 'share' before 'block' for a block-finding share, but that only fixes
+    // the order the two were STARTED in -- recordBlock reads the PPLNS window
+    // and the round immediately, and recordShare writes to them, so the read
+    // could still land first and take a snapshot without the winning share in
+    // it. An ordering that holds only when Redis is fast is not an ordering.
+    //
+    // One chain, so each waits for the one before it. A failure is logged and
+    // the chain continues -- an error must not stop every later share from
+    // being recorded, which is what an uncaught rejection in the chain would
+    // do.
+    //
+    // Serial rather than parallel is affordable here and would not be in a
+    // large pool: these are small Redis writes at the rate miners find shares.
+    // Correctness in the money path is worth more than the concurrency.
+    let accounting = Promise.resolve();
+    const inOrder = (what, fn) => {
+        accounting = accounting
+            .then(fn)
+            .catch((err) => log.error(`failed to record ${what}: ${err.message}`));
+    };
+
     jobManager.on('share', (share) => {
-        shareProcessor.recordShare(share)
-            .catch((err) => log.error(`failed to record a share: ${err.message}`));
+        inOrder('a share', () => shareProcessor.recordShare(share));
     });
 
     jobManager.on('block', (share) => {
-        shareProcessor.recordBlock(share)
-            .catch((err) => log.error(`failed to record block ${share.height}: ${err.message}`));
+        inOrder(`block ${share.height}`, () => shareProcessor.recordBlock(share));
     });
 
     // ---- 7. stratum -------------------------------------------------------

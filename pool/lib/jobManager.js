@@ -306,14 +306,33 @@ class JobManager extends EventEmitter {
                 time: Date.now()
             };
 
+            // THE SHARE IS CREDITED BEFORE THE BLOCK IS SUBMITTED, AND THE
+            // ORDER IS THE WHOLE POINT.
+            //
+            // _submitBlock emits 'block', whose listener snapshots the PPLNS
+            // window and the round and then resets the round. This emitted
+            // 'share' afterwards -- so the share that FOUND the block was not
+            // in the snapshot of its own block's payout. It landed in the next
+            // round instead, which pays it at the next block's rate to
+            // whoever is mining then. The miner who found the block is the one
+            // the ordering short-changed.
+            //
+            // Reported by dang150296 (Urriki1502) on 2026-10-04 as winning-
+            // share accounting order.
+            //
+            // Nothing is credited early by this. Every validity check above
+            // has already passed; the share met the share target, which is
+            // what a share is paid for, and that is true whether or not the
+            // block is then accepted by the node. `credited` moves with it so
+            // that a throw inside _submitBlock cannot release a claim for work
+            // that has already been paid -- which would be the double-credit
+            // the claim exists to prevent.
+            credited = true;
+            this.emit('share', share);
+
             if (isBlockCandidate) {
                 await this._submitBlock(job, header, coinbase, share);
             }
-
-            // Past this point the share counts, so its claim is kept: it is the
-            // only thing standing between a resubmission and a second payment.
-            credited = true;
-            this.emit('share', share);
             return { valid: true, share };
         } finally {
             if (!credited) {

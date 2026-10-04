@@ -188,6 +188,26 @@ function claimSet() {
         assert.ok(claimAt > -1 && tryAt > claimAt && hashAt > tryAt,
             'the claim must be taken before the try, and hashing must happen '
             + 'inside it: claiming after the hash reopens the race');
+
+        // THE SHARE IS EMITTED BEFORE THE BLOCK IS SUBMITTED.
+        //
+        // _submitBlock emits 'block', and that listener snapshots the PPLNS
+        // window and resets the round. With the emit after the submit, the
+        // share that found the block was not in the snapshot of its own
+        // block's payout -- it was pushed into the next round and paid at the
+        // next block's rate. Asserted on the source for the same reason as
+        // everything above it: mocking RandomX to reach this line costs more
+        // than reading the two line numbers.
+        //
+        // Reported by dang150296 (Urriki1502), 2026-10-04.
+        const emitShareAt = tail.indexOf("this.emit('share'");
+        const submitAt = tail.indexOf('this._submitBlock');
+        assert.ok(emitShareAt > -1 && submitAt > -1,
+            'processShare no longer emits a share or submits a block; this '
+            + 'assertion has lost its subject and must be rewritten');
+        assert.ok(emitShareAt < submitAt,
+            'the block is submitted before the share is emitted, so the share '
+            + 'that found it is not in that block\'s payout');
     });
 
     console.log('\n' + '='.repeat(66));
