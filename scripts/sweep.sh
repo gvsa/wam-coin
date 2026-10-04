@@ -240,6 +240,15 @@ run "published claims match consensus"  "$PY" scripts/check_published_claims.py
 # docs/TREASURY_LEDGER.md.
 run "treasury claims match the ledger" "$PY" scripts/check_treasury_claims.py
 
+# And the script that actually moves it. On 2026-10-04 treasury_spend.py had
+# no test of any kind: 490 lines, the treasury's key in memory while it signs,
+# a file carried by hand between two machines, and nothing that runs. The pool
+# had fourteen test files. Both of its known faults -- selecting outputs an
+# unconfirmed transaction had already spent, and accepting a mistyped key --
+# were found by a person using it, which is the most expensive way to find
+# anything in a money path.
+run "the treasury spender refuses what it should" "$PY" scripts/test/test_treasury_spend.py
+
 # And the other half of that question, which had no detector until mainnet's
 # second day: the repository can be right while the WEBSITE is wrong. Two
 # corrections were committed, pushed and reported as published on 15
