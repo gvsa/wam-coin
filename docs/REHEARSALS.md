@@ -1,5 +1,17 @@
 # Rehearsals
 
+**This is a record of a fortnight that has ended: the rehearsals run between
+4 and 15 September 2026, before mainnet existed. Present tense in it means
+that date and not today.** Where it says "the two servers", there were two;
+the third arrived on 11 September and the day it arrived is in the table
+below. Nothing here is rewritten to agree with what came afterwards, because
+a log that is edited to stay current is not a log of anything.
+
+Said at the top because somebody asked the founder on 2026-10-04 how many
+machines this project runs and was told three, and had read two — on this
+page, in a sentence that was true when it was written. A reader lands here
+and reads the tense, not the date.
+
 One rehearsal a day until launch, decided on 4 September 2026.
 
 The reasoning is not that something is expected to be wrong. It is that every

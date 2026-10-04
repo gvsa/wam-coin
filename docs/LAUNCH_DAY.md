@@ -2,6 +2,13 @@
 
 **2026-09-15 00:00 UTC.**
 
+**This is a record of that day, written before it and kept as it was. Present
+tense in it means 15 September 2026 and not today** — where it says "both
+servers" or "the two nodes", there were two at the time of writing; the third
+seed arrived on 11 September. Nothing here is edited to agree with what came
+afterwards, because a document rewritten to stay current stops being evidence
+of what was decided and when.
+
 `LAUNCH_CHECKLIST.md` is the list of things that must be *true*. This is the
 list of things that must be *done*, in the order they must be done in, by
 someone who has not slept and should not be deciding anything at midnight.
