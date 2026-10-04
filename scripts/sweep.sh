@@ -230,6 +230,14 @@ run "units report their own failure"  bash scripts/test/test_onfailure.sh
 # did anything else here. This one reads what we publish.
 run "published claims match consensus"  "$PY" scripts/check_published_claims.py
 
+# And the claims nothing can check, because they are about the future. Until
+# 2026-10-04 the front page said the founder's mining addresses "will be
+# published here" and that his share of the hash rate would fall "so you can
+# watch it fall". He has never mined and holds no WAM: it was a plan written
+# before launch, in the future tense, still standing nineteen days after the
+# future arrived. A reader quoted it back at him as a description of today.
+run "no page promises and forgets"  "$PY" scripts/check_promises.py
+
 # That one reads wam-params.h, which is consensus, and consensus has no opinion
 # about what has been SPENT. On 2 October the founder found "No fee was asked
 # and none was paid" on the front page about the venue we had sent 500 WAM to
