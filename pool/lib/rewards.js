@@ -92,6 +92,66 @@ function splitProportionally(weights, amount) {
  * @param {number} windowDifficulty
  * @returns {{weights: Map<string, number>, used: number, covered: number}}
  */
+/**
+ * How much work the PPLNS window covers. ONE definition, used by everyone.
+ *
+ * THE WINDOW AND THE BUFFER THAT FEEDS IT WERE COMPUTED SEPARATELY, AND THEY
+ * DISAGREED BY A FACTOR OF TEN.
+ *
+ * This value decides how far back a block's payout reaches.
+ * shareProcessor._pplnsBufferSize() decides how many shares are read out of
+ * redis to satisfy it. They were two expressions in two files, and only one
+ * of them had the `Math.max(1, ...)` floor -- so on 2026-10-04, with network
+ * difficulty 0.003889 and a multiplier of 2:
+ *
+ *     the window asked for    difficulty 1        (the floor won)
+ *     the buffer was sized for difficulty 0.00778 (the floor was absent)
+ *     shares read             10,000
+ *     shares needed           100,000
+ *
+ * The window was silently truncated to a tenth of what it asked for, and what
+ * fell off the end was the OLDEST work -- so the miners it underpaid were the
+ * ones who had been there longest.
+ *
+ * Reported by dang150296 (Urriki1502) as a PPLNS window mismatch, 2026-10-04.
+ *
+ * Two expressions of one quantity will disagree eventually; that is not a
+ * thing to be careful about, it is a thing to stop doing. Both callers use
+ * this, and pool/test/rewards.test.js holds them to it.
+ *
+ * AND THE FLOOR IS GONE, WHICH IS THE OTHER HALF OF THE SAME FAULT.
+ *
+ * It was `Math.max(1, networkDifficulty * pplnsMultiplier)`. A floor of 1 is
+ * inherited reasoning from chains whose difficulty is in the billions, where
+ * it can never bind. WAM's is 0.0039, so it bound always and was the only
+ * thing deciding the window -- 129 times the rule this project publishes in
+ * docs/POOL_OPERATOR.md and on the pool page:
+ *
+ *     window = multiplier x networkDifficulty
+ *
+ * That rule is what miners are told, and it is also right: multiplier x
+ * network difficulty is "this many blocks' worth of work", which is what
+ * PPLNS means everywhere. The floor was undocumented behaviour overriding
+ * documented behaviour, which is the one thing this project does not do.
+ *
+ * No floor is needed for the degenerate case either. A networkDifficulty of
+ * zero gives a window of zero, selectPplnsWindow then selects nothing, and
+ * computeBlockRewards already falls back to the round's own contributions --
+ * which is the correct answer when there is no difficulty to measure against.
+ *
+ * WHAT THIS CHANGES FOR MINERS, STATED RATHER THAN DISCOVERED: the window was
+ * effectively the last 10,000 shares, because that is where the redis list was
+ * trimmed. It is now about two blocks' worth of pool work. Payouts follow
+ * recent work more closely and are less smoothed across a long tail. That is
+ * what "2x network difficulty" has always said on the pool's own page.
+ */
+function pplnsWindowDifficulty(networkDifficulty, pplnsMultiplier) {
+    const d = Number(networkDifficulty);
+    const m = Number(pplnsMultiplier);
+    if (!Number.isFinite(d) || !Number.isFinite(m) || d <= 0 || m <= 0) return 0;
+    return d * m;
+}
+
 function selectPplnsWindow(shares, windowDifficulty) {
     const weights = new Map();
     let covered = 0;
@@ -181,7 +241,7 @@ function computeBlockRewards(args) {
     if (mode === 'prop') {
         weights = new Map(roundContributions);
     } else {
-        const windowDifficulty = Math.max(1, networkDifficulty * pplnsMultiplier);
+        const windowDifficulty = pplnsWindowDifficulty(networkDifficulty, pplnsMultiplier);
         windowInfo = selectPplnsWindow(shares, windowDifficulty);
         weights = windowInfo.weights;
 
@@ -210,7 +270,7 @@ function computeBlockRewards(args) {
         totalPaid,
         workers: payouts.size,
         window: windowInfo
-            ? { requested: Math.max(1, networkDifficulty * pplnsMultiplier),
+            ? { requested: pplnsWindowDifficulty(networkDifficulty, pplnsMultiplier),
                 covered: windowInfo.covered,
                 sharesUsed: windowInfo.used }
             : null
@@ -245,6 +305,7 @@ function formatWam(baseUnits) {
 
 module.exports = {
     splitProportionally,
+    pplnsWindowDifficulty,
     selectPplnsWindow,
     computeBlockRewards,
     estimateHashrate,

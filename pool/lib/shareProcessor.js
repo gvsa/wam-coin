@@ -35,7 +35,7 @@
 
 const EventEmitter = require('events');
 
-const { computeBlockRewards, estimateHashrate } = require('./rewards');
+const { computeBlockRewards, estimateHashrate, pplnsWindowDifficulty } = require('./rewards');
 const { COIN, COINBASE_MATURITY } = require('./constants');
 
 class ShareProcessor extends EventEmitter {
@@ -242,8 +242,15 @@ class ShareProcessor extends EventEmitter {
     _pplnsBufferSize() {
         const configured = this.config.pplnsMaxShares;
         if (configured) return configured;
+        // THE SAME NUMBER THE PAYOUT ASKS FOR, NOT A SECOND OPINION ON IT.
+        //
+        // This used `networkDifficulty * pplnsMultiplier` while rewards.js
+        // used `Math.max(1, ...)` of the same product. One floor, present in
+        // one file, and the buffer ended up a tenth of the window it feeds --
+        // see pplnsWindowDifficulty, which both now call.
         const avgShareDiff = this.config.startDifficulty || 1000;
-        const needed = (this.networkDifficulty * this.pplnsMultiplier) / avgShareDiff;
+        const needed = pplnsWindowDifficulty(this.networkDifficulty,
+                                             this.pplnsMultiplier) / avgShareDiff;
         return Math.max(10000, Math.min(2000000, Math.ceil(needed * 4)));
     }
 
