@@ -80,13 +80,46 @@ const quiet = { info() {}, warn() {}, error() {}, debug() {} };
 (async () => {
     console.log(`\n${BLD}the verification queue has a bottom${OFF}`);
 
-    await test('the bound is sized from the VM count, with a floor', () => {
+    await test('two bounds: how many may hash, and how many may wait', () => {
+        // The first version had one number and bounded the wrong thing. Queue
+        // growth was capped at 32 while only 4 VMs existed, so 28 native
+        // workers sat in cv.wait holding libuv threadpool threads -- four for
+        // the whole process. Bounded queue, starved threads.
+        //
+        // _vmSlots is how many may be inside the addon, and it is the VM count
+        // exactly, so no worker ever waits on a VM. _maxVerifying bounds the
+        // JavaScript queue in front of it, where waiting costs a closure.
         const a = new JobManager({}, { randomxVmCount: 16 }, quiet);
         const b = new JobManager({}, { randomxVmCount: 1 }, quiet);
         const c = new JobManager({}, { maxPendingVerifications: 7 }, quiet);
-        assert.strictEqual(a._maxVerifying, 64, '16 VMs should allow 64 in flight');
+
+        assert.strictEqual(a._vmSlots, 16,
+            'more workers may enter the addon than there are VMs to serve them');
+        assert.strictEqual(b._vmSlots, 1);
+        assert.strictEqual(a._maxVerifying, 128, '16 VMs should queue 128');
         assert.strictEqual(b._maxVerifying, 32, 'the floor of 32 is gone');
         assert.strictEqual(c._maxVerifying, 7, 'the config override is ignored');
+    });
+
+    await test('never more workers inside the addon than there are VMs', async () => {
+        const jm = new JobManager({}, { randomxVmCount: 2,
+                                        maxPendingVerifications: 50 }, quiet);
+        jm.validJobs.set('j1', fakeJob());
+        gate.slow = true;
+
+        const running = [];
+        for (let i = 0; i < 8; i++) {
+            running.push(jm.processShare(submission(String(i).padStart(8, '0'))));
+        }
+        await new Promise((r) => setImmediate(r));
+
+        assert.strictEqual(jm._inAddon, 2,
+            `${jm._inAddon} workers were admitted to the addon with 2 VMs; the `
+            + 'surplus is waiting in cv.wait on a threadpool thread');
+        assert.ok(jm._verifying > 2,
+            'the rest should be queued in JavaScript, not refused');
+        void running;
+        if (gate.release) gate.release();
     });
 
     // A job with just enough on it for processShare to reach the hash. Writing

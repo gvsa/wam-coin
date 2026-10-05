@@ -61,8 +61,28 @@ class JobManager extends EventEmitter {
         // on a libuv threadpool thread, inside a condition variable, holding a
         // thread the rest of the process needs. The floor of 32 keeps a small
         // pool responsive when vmCount is 1 or 2.
-        const vms = config.randomxVmCount || 4;
-        this._maxVerifying = config.maxPendingVerifications || Math.max(32, vms * 4);
+        // THE BOUND STOPPED THE QUEUE GROWING AND NOT THE THREADS BLOCKING.
+        //
+        // It was max(32, vmCount * 4). With four VMs that admitted 32 workers
+        // to the addon while only four could hash -- so twenty-eight sat in
+        // cv.wait, each holding a libuv threadpool thread, and the pool has
+        // four of those for the whole process. Queue growth was bounded;
+        // worker-thread starvation was not.
+        //
+        // dang150296 (Urriki1502) said exactly that against bb6d521, and he is
+        // right: bounding the wrong thing is not bounding it.
+        //
+        // So there are two numbers now. `_vmSlots` is how many may be inside
+        // the addon at once, and it is the VM count, so no worker ever waits on
+        // a VM and no threadpool thread is ever held by one. Everything else
+        // waits HERE, in JavaScript, where waiting costs a closure and not a
+        // thread -- and `_maxVerifying` bounds that queue so the memory is
+        // finite too.
+        const vms = Math.max(1, config.randomxVmCount || 4);
+        this._vmSlots = vms;
+        this._inAddon = 0;
+        this._waiting = [];
+        this._maxVerifying = config.maxPendingVerifications || Math.max(32, vms * 8);
         this._verifying = 0;
 
         this.currentJob = null;
@@ -334,7 +354,7 @@ class JobManager extends EventEmitter {
             let powHash;
             this._verifying++;
             try {
-                powHash = await randomx.hash(job.seedHash, header);
+                powHash = await this._hashWithOneVm(job.seedHash, header);
             } catch (err) {
                 this.log.error(`RandomX hashing failed: ${err.message}`);
                 return this._reject(REJECT.INTERNAL, workerName);
@@ -452,6 +472,34 @@ class JobManager extends EventEmitter {
     //  keeps the old behaviour and says so once, loudly, rather than silently
     //  dropping the protection.
 
+    /**
+     * Hash, with at most one worker per VM inside the addon at a time.
+     *
+     * The native worker's first act is to wait on a condition variable until a
+     * RandomX VM is free, and a worker waiting there is holding a libuv
+     * threadpool thread -- four for the whole process, shared with dns, fs and
+     * crypto. Admitting more workers than there are VMs therefore converts
+     * surplus submissions into blocked threads, which is the starvation the
+     * in-flight bound alone did not prevent.
+     *
+     * Waiting in JavaScript instead costs a promise and a closure. The queue
+     * is still bounded by _maxVerifying at the call site, so this is a
+     * different place to wait rather than an unbounded one.
+     */
+    async _hashWithOneVm(seedHash, header) {
+        if (this._inAddon >= this._vmSlots) {
+            await new Promise((resolve) => this._waiting.push(resolve));
+        }
+        this._inAddon++;
+        try {
+            return await randomx.hash(seedHash, header);
+        } finally {
+            this._inAddon--;
+            const next = this._waiting.shift();
+            if (next) next();
+        }
+    }
+
     async _spool(entry) {
         if (!this._spoolStore) {
             if (!this._warnedNoSpool) {
@@ -503,18 +551,36 @@ class JobManager extends EventEmitter {
                               `found ${Math.round((Date.now() - e.foundAt) / 1000)}s ` +
                               'ago, by ' + e.worker);
                 this.stats.blocksFound++;
+                this._emitRecovered(e);
                 await this._unspool(e.hash);
                 settled++;
-                this.emit('block', { height: e.height, blockHash: e.hash,
-                                     worker: e.worker, blockAccepted: true,
-                                     fromSpool: true });
                 continue;
             }
             const looked = result.results.some((r) => r.ok || r.error === null);
             const already = result.reasons.some((r) =>
                 /duplicate|inconclusive/i.test(String(r)));
             if (already) {
-                this.log.info(`spooled block ${e.height} is already on the node`);
+                // THE NODE ALREADY HAS IT, AND THAT IS NOT THE SAME AS IT
+                // HAVING BEEN PAID.
+                //
+                // The window this spool exists for includes dying between the
+                // node accepting a block and the payout being recorded. Coming
+                // back, the drain is told "duplicate", and the first version of
+                // this treated that as settled and removed the entry without
+                // emitting anything -- so the block was on the chain and the
+                // miners who earned it were never paid. The one crash the spool
+                // was built for was the one it did not cover.
+                //
+                // Emitting is only safe because recordBlock is idempotent on
+                // the block hash now: if the payout was already made, it is a
+                // no-op. Without that it would re-run `del(round)` and wipe a
+                // live round's contributions, which is worse than the fault.
+                //
+                // Found by dang150296 (Urriki1502) against bb6d521.
+                this.log.info(`spooled block ${e.height} is already on the node; ` +
+                              'offering it for payout in case the crash was ' +
+                              'between acceptance and accounting');
+                this._emitRecovered(e);
                 await this._unspool(e.hash);
                 settled++;
             } else if (looked) {
@@ -527,6 +593,40 @@ class JobManager extends EventEmitter {
             // Otherwise nothing answered, and it stays for the next drain.
         }
         return { offered: entries.length, settled };
+    }
+
+    /**
+     * Hand a recovered block to the payout accounting, whole.
+     *
+     * recordBlock needs the reward values as well as the identity, and the
+     * drain is the one caller that cannot get them from a live job -- the job
+     * is gone, possibly with the process that held it. They come out of the
+     * spool entry, which is why they are written into it.
+     *
+     * The window and round it will be paid from are TODAY'S, not the ones that
+     * existed when the block was found. There is no way back to those: the
+     * round moved on. For a restart measured in seconds that is the same set
+     * of miners; for a block recovered an hour later it is not, and the log
+     * says so rather than leaving it to be worked out from a payout that looks
+     * wrong.
+     */
+    _emitRecovered(e) {
+        const age = Math.round((Date.now() - (e.foundAt || Date.now())) / 1000);
+        if (age > 300) {
+            this.log.warn(`block ${e.height} is being paid ${age}s after it was ` +
+                          'found, so its payout is computed from the round as it ' +
+                          'stands now, not the round that earned it');
+        }
+        this.emit('block', {
+            height: e.height,
+            blockHash: e.hash,
+            worker: e.worker,
+            blockAccepted: true,
+            fromSpool: true,
+            coinbaseValue: e.coinbaseValue,
+            distributableValue: e.distributableValue,
+            devFeeAmount: e.devFeeAmount
+        });
     }
 
     async _submitBlock(job, header, coinbase, share) {
@@ -557,8 +657,23 @@ class JobManager extends EventEmitter {
         // Spooling cannot be allowed to delay the submission, so a failure to
         // spool is logged and the block is offered anyway. Losing the safety
         // net is bad; holding the block while writing to it is worse.
+        // EVERYTHING THE PAYOUT WILL NEED, NOT JUST THE BYTES.
+        //
+        // The first version of this spooled height, hash, hex and worker. The
+        // block came back after a restart and recordBlock threw on
+        // `blockValue must be a non-negative number of base units, got
+        // undefined`, because the reward fields were never written down. The
+        // block was recovered onto the chain, removed from the spool, and
+        // nobody was paid for it -- the same loss the spool exists to prevent,
+        // moved one step later.
+        //
+        // Found by dang150296 (Urriki1502) against bb6d521, the commit that
+        // introduced it, within hours.
         const spooled = { height: job.height, hash: blockHash, hex: blockHex,
-                          worker: share.worker, foundAt: Date.now() };
+                          worker: share.worker, foundAt: Date.now(),
+                          coinbaseValue: job.coinbaseValue,
+                          distributableValue: job.distributableValue,
+                          devFeeAmount: job.devFeeAmount };
         try {
             await this._spool(spooled);
         } catch (err) {

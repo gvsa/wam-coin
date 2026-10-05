@@ -136,6 +136,57 @@ function jm(store, outcome) {
         assert.ok(seen[0].fromSpool, 'the payout cannot tell it arrived late');
     });
 
+    // ---- the two cases dang150296 reproduced against bb6d521 --------------
+    //
+    // The spool recovered the block and lost the payout, which is the same
+    // loss one step later. Both are reproduced here before they are fixed
+    // again by accident.
+
+    await test('a recovered block carries everything the payout needs', async () => {
+        const s = memStore();
+        s.live.set('h1', { height: 10, hash: 'h1', hex: 'deadbeef', worker: 'bob',
+                           foundAt: Date.now(),
+                           coinbaseValue: 5000000000,
+                           distributableValue: 4750000000,
+                           devFeeAmount: 250000000 });
+        const m = jm(s, ACCEPTED);
+        const seen = [];
+        m.on('block', (b) => seen.push(b));
+        await m.drainSpool();
+
+        // recordBlock throws "blockValue must be a non-negative number of base
+        // units, got undefined" without these, and nobody is paid for a block
+        // that is on the chain.
+        assert.strictEqual(seen.length, 1);
+        assert.strictEqual(seen[0].distributableValue, 4750000000,
+            'the recovered block has no distributableValue, so recordBlock will '
+            + 'throw and no payout record will exist');
+        assert.strictEqual(seen[0].coinbaseValue, 5000000000);
+        assert.strictEqual(seen[0].devFeeAmount, 250000000);
+    });
+
+    await test('"duplicate" still offers the block for payout', async () => {
+        // The crash this spool exists for includes dying between the node
+        // accepting a block and the payout being recorded. Coming back, the
+        // drain is told "duplicate" -- and settling silently leaves the block
+        // on the chain with nobody paid for it.
+        const s = memStore();
+        s.live.set('h1', { height: 10, hash: 'h1', hex: 'deadbeef', worker: 'bob',
+                           foundAt: Date.now(), coinbaseValue: 5000000000,
+                           distributableValue: 4750000000, devFeeAmount: 250000000 });
+        const m = jm(s, DUPLICATE);
+        const seen = [];
+        m.on('block', (b) => seen.push(b));
+        const r = await m.drainSpool();
+
+        assert.strictEqual(r.settled, 1);
+        assert.strictEqual(seen.length, 1,
+            'a block already on the node was removed from the spool without ever '
+            + 'being offered for payout');
+        assert.strictEqual(seen[0].worker, 'bob');
+        assert.strictEqual(seen[0].distributableValue, 4750000000);
+    });
+
     await test('a block the node read and refused is settled, not retried forever', async () => {
         const s = memStore();
         s.live.set('h1', { height: 10, hash: 'h1', hex: 'deadbeef', worker: 'w', foundAt: Date.now() });

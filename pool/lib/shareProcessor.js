@@ -345,6 +345,37 @@ class ShareProcessor extends EventEmitter {
      * Freezes the payout table and resets the round.
      */
     async recordBlock(share) {
+        // ONE BLOCK, ONE PAYOUT, HOWEVER MANY TIMES THIS IS CALLED.
+        //
+        // This was not safe to call twice, and nothing stopped it being. The
+        // pending record is keyed on the block hash so a second call merely
+        // overwrites it -- but the same call also runs `del(round)` and
+        // `incrby(poolfees)`, so a repeat WIPES A LIVE ROUND'S CONTRIBUTIONS
+        // and double-counts the fee. Every miner in that round loses the work
+        // they had done since the last block.
+        //
+        // It matters now because the spool drain has to offer a recovered
+        // block for payout without knowing whether the crash happened before
+        // or after the original accounting. The honest answer to "was this
+        // already paid" is to look, and the only safe way to let the drain ask
+        // is for asking twice to cost nothing.
+        //
+        // Both lists are checked, not just the pending one: a block recovered
+        // after it had already matured would otherwise be paid a second time.
+        //
+        // Found by dang150296 (Urriki1502) against bb6d521.
+        if (share.blockHash) {
+            const [pending, confirmed] = await Promise.all([
+                this.redis.hexists(this.k('blocks:pending'), share.blockHash),
+                this.redis.sismember(this.k('blocks:confirmed:hashes'), share.blockHash)
+            ]);
+            if (pending || confirmed) {
+                this.log.info(`block ${share.height} is already accounted for ` +
+                              `(${pending ? 'pending' : 'confirmed'}); nothing to do`);
+                return null;
+            }
+        }
+
         const [shares, roundContributions] = await Promise.all([
             this.mode === 'pplns' ? this.getPplnsShares() : Promise.resolve([]),
             this.getRoundContributions()
@@ -564,6 +595,19 @@ class ShareProcessor extends EventEmitter {
         // The list stays, because the page also wants the recent blocks to
         // show, and a sample and a count are two different questions.
         pipe.incr(this.k('blocks:confirmed:count'));
+        // AND A SET OF THE HASHES, FOR THE QUESTION "WAS THIS ALREADY PAID?"
+        //
+        // The list above is trimmed at 5000 and the counter is a number, so
+        // neither can answer it. recordBlock has to be able to: the spool
+        // drain offers a recovered block for payout without knowing whether
+        // the crash happened before or after the original accounting, and
+        // "already in pending" only covers a block that has not matured yet.
+        // Without this, a block recovered after maturing would be paid twice.
+        //
+        // A set of 32-byte hex strings, one per block ever confirmed. At 720
+        // blocks a day that is about 1.7 MB a year, which is the cheapest
+        // honest answer available.
+        pipe.sadd(this.k('blocks:confirmed:hashes'), record.blockHash);
         pipe.lrem(this.k('blocks:maturing'), 0, evidence);
 
         await pipe.exec();
