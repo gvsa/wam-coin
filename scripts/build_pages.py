@@ -57,7 +57,11 @@
 import html
 import pathlib
 import re
+import subprocess
 import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / "lib"))
+import quoted  # noqa: E402
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 # Where "read the source of this page" points.
@@ -225,10 +229,29 @@ def inline(s, src):
     return re.sub(r"\x00(\d+)\x00", lambda m: spans[int(m.group(1))], s)
 
 
-def convert(md, src):
+def convert(md, src, marked=()):
+    """`md` as HTML. `marked` is the set of line indices the author marked as
+    quotation, and every block built from one of them carries the mark out.
+
+    See the note in build() for why it is carried rather than dropped.
+    """
     out, lines, i = [], md.split("\n"), 0
+    marked = set(marked)
+
+    def mark(start, end, block):
+        """`block`, with the quotation mark on it if its source was marked.
+
+        It goes on the block AFTER conversion, never through inline() or
+        esc() -- which is what turned `<!-- ... -->` into visible text the
+        first time this was attempted.
+        """
+        if any(n in marked for n in range(start, end)):
+            return block + " <!-- wam:quote-line -->"
+        return block
+
     while i < len(lines):
         ln = lines[i]
+        start = i
 
         if ln.startswith("```"):
             i += 1
@@ -236,7 +259,7 @@ def convert(md, src):
             while i < len(lines) and not lines[i].startswith("```"):
                 buf.append(lines[i]); i += 1
             i += 1
-            out.append("<pre><code>" + esc("\n".join(buf)) + "</code></pre>")
+            out.append(mark(start, i, "<pre><code>" + esc("\n".join(buf)) + "</code></pre>"))
             continue
 
         if re.match(r"^\s*(-{3,}|\*{3,})\s*$", ln):
@@ -247,8 +270,8 @@ def convert(md, src):
             lvl = len(m.group(1))
             text = m.group(2).strip()
             slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
-            out.append(f'<h{lvl} id="{slug}">{inline(text, src)}</h{lvl}>')
             i += 1
+            out.append(mark(start, i, f'<h{lvl} id="{slug}">{inline(text, src)}</h{lvl}>'))
             continue
 
         if ln.strip().startswith("|") and i + 1 < len(lines) \
@@ -263,14 +286,66 @@ def convert(md, src):
             t = ["<table><tr>" + "".join(f"<th>{inline(c, src)}</th>" for c in head) + "</tr>"]
             for r in rows:
                 t.append("<tr>" + "".join(f"<td>{inline(c, src)}</td>" for c in r) + "</tr>")
-            out.append("".join(t) + "</table>")
+            out.append(mark(start, i, "".join(t) + "</table>"))
             continue
 
         if re.match(r"^\s*>", ln):
             buf = []
             while i < len(lines) and re.match(r"^\s*>", lines[i]):
                 buf.append(re.sub(r"^\s*>\s?", "", lines[i])); i += 1
-            out.append("<blockquote>" + convert("\n".join(buf), src) + "</blockquote>")
+            # Not marked here: a blockquote is several output lines and a
+            # mark lands on one of them. The recursive call marks whichever
+            # paragraph inside it the author actually marked, which is the
+            # line a check reads.
+            inner = {n - start for n in marked if start <= n < i}
+            out.append("<blockquote>" + convert("\n".join(buf), src, inner)
+                       + "</blockquote>")
+            continue
+
+        # A FOUR-SPACE INDENT IS A CODE BLOCK, NOT A PARAGRAPH.
+        #
+        # This renderer only ever knew the fenced kind, so every indented
+        # block in every document fell through to the paragraph accumulator
+        # below -- which joins the lines with a space and leaves HTML to
+        # collapse the indentation. Ten were live on seven pages, and they are
+        # the worst possible lines to run together, because an indented block
+        # is what a writer uses for the text a reader is meant to COPY:
+        #
+        #   /security/  the operating treasury address, as a sentence
+        #   /security/  the scantxoutset command that checks it
+        #   /start/     three Qt download filenames on one line, space-joined
+        #   /mine/      the miner's own alarm, re-wrapped into prose
+        #
+        # Every one of them renders as code on GitLab, which is where they
+        # were read and proofread. The page was the only place they were
+        # wrong, and nobody reads our pages the way a stranger does.
+        #
+        # `    - item` is deliberately left alone: this renderer has always
+        # read an indented marker as a list, and rewriting those pages would
+        # fix nothing that is wrong.
+        def indented(s):
+            return re.match(r"^ {4,}\S", s) \
+                and not re.match(r"^\s*([-*+]|\d+\.)\s+", s)
+
+        if indented(ln):
+            buf = []
+            while i < len(lines):
+                if re.match(r"^ {4,}", lines[i]):
+                    buf.append(lines[i][4:]); i += 1; continue
+                if not lines[i].strip():
+                    # A blank line stays inside the block only if indented
+                    # text resumes after it. Otherwise the block ended and
+                    # the blank belongs to whatever comes next.
+                    j = i
+                    while j < len(lines) and not lines[j].strip():
+                        j += 1
+                    if j < len(lines) and indented(lines[j]):
+                        buf.extend([""] * (j - i)); i = j; continue
+                break
+            while buf and not buf[-1].strip():
+                buf.pop()
+            out.append(mark(start, i,
+                            "<pre><code>" + esc("\n".join(buf)) + "</code></pre>"))
             continue
 
         m = re.match(r"^\s*([-*+]|\d+\.)\s+", ln)
@@ -302,7 +377,9 @@ def convert(md, src):
                     i += 1
                     continue
                 break
-            out.append(f"<{tag}>" + "".join(f"<li>{inline(x, src)}</li>" for x in items) + f"</{tag}>")
+            out.append(mark(start, i, f"<{tag}>"
+                       + "".join(f"<li>{inline(x, src)}</li>" for x in items)
+                       + f"</{tag}>"))
             continue
 
         if not ln.strip():
@@ -324,7 +401,7 @@ def convert(md, src):
                 and not re.match(r"^\s*([-*+]|\d+\.)\s+", lines[i]) \
                 and not re.match(r"^\s*(-{3,}|\*{3,})\s*$", lines[i]):
             buf.append(lines[i]); i += 1
-        out.append("<p>" + inline(" ".join(buf), src) + "</p>")
+        out.append(mark(start, i, "<p>" + inline(" ".join(buf), src) + "</p>"))
 
     return "\n".join(out)
 
@@ -357,22 +434,36 @@ def nav_links(current, lang):
 def build(src, outdir, lang, direction, title, desc, og_desc):
     md = (REPO / src).read_text(encoding="utf-8")
 
-    # The quotation marks are a note to the checks, not to the reader.
+    # THE QUOTATION MARKS TRAVEL WITH THE TEXT.
     #
-    # This renderer escapes HTML in markdown text, so `<!-- wam:quote-line -->`
-    # came out as `&lt;!-- wam:quote-line --&gt;` -- visible, in the middle of a
-    # sentence, in the whitepaper. Caught by looking at the built page rather
-    # than trusting that an HTML comment is invisible: it is, until something
-    # escapes it.
+    # Twice now. First this renderer escaped HTML in markdown text, so
+    # `<!-- wam:quote-line -->` came out as `&lt;!-- wam:quote-line --&gt;` --
+    # visible, in the middle of a sentence, in the whitepaper. Caught by
+    # looking at the built page rather than trusting that an HTML comment is
+    # invisible: it is, until something escapes it.
     #
-    # A whole-line mark takes its line with it; an end-of-line one leaves the
-    # sentence alone. See scripts/lib/quoted.py.
-    md = "\n".join(
-        line for line in md.splitlines()
-        if not re.search(r"^\s*(<!--\s*)?#?\s*wam:quote-(begin|end)\b", line)
-    )
-    md = re.sub(r"\s*(<!--\s*)?wam:quote-line\s*(-->)?", "", md)
-    body = convert(md, src)
+    # The fix then was to delete the marks here, and that was wrong for a
+    # reason that took a month to show up. docs/MINE.md quotes its own old
+    # wording in a correction -- "this paragraph said ... needs v0.1.11" --
+    # and the mark says so. The mark lived in the document and died in the
+    # generator, so the GENERATED page carried the quotation with nothing to
+    # say it was one, and check_promises.py read the correction as the
+    # promise it was correcting. Every check honours the mark; a page that
+    # loses it is a page no mark can reach.
+    #
+    # So the marks are read here, the mark lines are taken out of the
+    # markdown (a whole-line mark would otherwise split the block it sits
+    # inside), and convert() puts one back on every block built from a marked
+    # line -- after escaping, never through it. See scripts/lib/quoted.py.
+    marked = quoted.quoted_lines(md)
+    kept, flags = [], set()
+    for n, line in enumerate(md.splitlines()):
+        if re.search(r"^\s*(<!--\s*)?#?\s*wam:quote-(begin|end)\b", line):
+            continue
+        if n in marked:
+            flags.add(len(kept))
+        kept.append(re.sub(r"\s*(<!--\s*)?wam:quote-line\s*(-->)?", "", line))
+    body = convert("\n".join(kept), src, flags)
 
     path = "/" + outdir.split("/", 1)[1] + "/"
     nav = "\n  ".join(f'<a href="{h}">{esc(t)}</a>' for h, t in nav_links(path, lang))
@@ -456,6 +547,37 @@ def check_page_links(pages):
     return bad
 
 
+def last_changed(rel, today):
+    """The day the bytes served at this URL last changed, from git.
+
+    `lastmod` used to be today for every URL on every run, which is the one
+    field a crawler uses to decide whether to fetch a page again. So a one
+    line fix to the mining guide told every crawler that all ten pages had
+    changed -- and a sitemap whose dates are not true is a sitemap a crawler
+    learns to ignore, which costs exactly the pages a stranger would have
+    found. It also meant any rebuild dirtied this file, so a diff of the
+    site stopped meaning anything.
+
+    The generated pages are committed, so git already knows the day each
+    one's bytes last changed. A file with uncommitted changes changed today,
+    which is the common case during a build. Without git -- a tarball, a
+    machine with no git -- the honest answer is today.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(REPO), "log", "-1", "--format=%cs", "--", rel],
+            capture_output=True, text=True, timeout=20)
+        dirty = subprocess.run(
+            ["git", "-C", str(REPO), "status", "--porcelain", "--", rel],
+            capture_output=True, text=True, timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        return today
+    if dirty.returncode != 0 or dirty.stdout.strip():
+        return today
+    stamp = out.stdout.strip()
+    return stamp if re.fullmatch(r"\d{4}-\d{2}-\d{2}", stamp) else today
+
+
 def write_sitemap(built):
     """Generated, so it cannot go stale.
 
@@ -464,11 +586,12 @@ def write_sitemap(built):
     """
     from datetime import date
     today = date.today().isoformat()
-    entries = [("https://wamcoin.org/", "1.0", "weekly"),
-               ("https://wamcoin.org/CHANNELS.txt", "0.5", "monthly")]
+    entries = [("https://wamcoin.org/", "1.0", "weekly", "site/index.html"),
+               ("https://wamcoin.org/CHANNELS.txt", "0.5", "monthly",
+                "site/CHANNELS.txt")]
     for _src, outdir, *_r in PAGES:
         entries.append(("https://wamcoin.org/" + outdir.split("/", 1)[1] + "/",
-                        "0.8", "monthly"))
+                        "0.8", "monthly", outdir + "/index.html"))
     xml = ['<?xml version="1.0" encoding="UTF-8"?>',
            "<!--",
            "  Generated by scripts/build_pages.py. Do not edit: the next run",
@@ -476,9 +599,9 @@ def write_sitemap(built):
            "  /start/ and /start-ar/ were live for days and listed nowhere.",
            "-->",
            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
-    for loc, prio, freq in entries:
+    for loc, prio, freq, rel in entries:
         xml += ["  <url>", f"    <loc>{loc}</loc>",
-                f"    <lastmod>{today}</lastmod>",
+                f"    <lastmod>{last_changed(rel, today)}</lastmod>",
                 f"    <changefreq>{freq}</changefreq>",
                 f"    <priority>{prio}</priority>", "  </url>"]
     xml.append("</urlset>")

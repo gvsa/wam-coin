@@ -414,21 +414,45 @@ anyway.
 
 ### How, exactly
 
-> **A defect you should know about before you start.** `--solo` and `--check`
-> are in v0.1.10, which is published and downloadable. But the miner in
-> v0.1.10 can fail to send a block it has solved: it asks the node for work
-> every five seconds, treated every answer as a new job even when nothing had
-> changed, and remembered only the last eight. A worker keeps its job until
-> the chain moves on, about two minutes, so a block solved more than forty
-> seconds after its job was issued could not be rebuilt — and the miner
-> refused to send it rather than send something wrong. Roughly two blocks in
-> three were lost that way.
+> **Use v0.1.11 or newer.** `--solo` and `--check` first appeared in v0.1.10,
+> and the miner in that version could fail to SEND a block it had already
+> solved — roughly two in three were lost. It was reported by a miner on
+> 2026-09-26, found the same morning, and fixed in v0.1.11, which has been
+> published since 2026-09-27. Mining alone on v0.1.10 still loses blocks;
+> mining alone on v0.1.11 does not.
 >
-> It was reported by a miner on 2026-09-26, found the same morning, and fixed
-> in the source that day. **The fix needs v0.1.11 to reach you.** Until that
-> is published: mining to a pool loses nothing, and mining alone with
-> v0.1.10 will lose blocks. This is written here rather than left out because
-> anybody reading this page is deciding where to spend electricity.
+<!-- wam:quote-begin -->
+> This paragraph said "the fix needs v0.1.11 to reach you, and until that is
+> published, mining alone will lose blocks" for nine days after v0.1.11 was
+> published — so this page spent those nine days telling people not to mine
+> alone, which is the opposite of what it is for.
+<!-- wam:quote-end -->
+
+> **If you see "do not leave it running", read this first.**
+>
+> A line that looks like an emergency usually is not one:
+>
+>     1 block(s) found have NOT been accepted: 0 not sent, 1 refused by the
+>     node. That is real money; do not leave it running.
+>
+> **If `not sent` is 0, nothing was lost.** Another miner reached that height
+> a second before you did, the node took his block, and yours became a side
+> branch. That is ordinary proof of work, and it happens to everybody with
+> enough hash rate to win sometimes.
+>
+> The counts are cumulative for as long as the program runs, so one lost race
+> an hour ago repeats that line every thirty seconds for ever. Restarting the
+> miner clears it and costs nothing: the blocks you were paid for are on the
+> chain, not in the counter.
+>
+> **Do not stop mining over it.** Stopping recovers nothing and loses every
+> block you would have found afterwards. The line is wrong and it is ours: the
+> miner counts a lost race and a block it could not send in the same warning,
+> so the warning itself cannot tell you which one happened. The two numbers
+> can, and `not sent` is the one to read.
+>
+> `not sent` above zero is the other case, and that one is worth stopping for:
+> it means a block your machine solved never reached the node at all.
 
 You need two things running: your own node, and the miner pointed at it.
 

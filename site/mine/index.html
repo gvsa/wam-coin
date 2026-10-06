@@ -206,8 +206,16 @@ stratum.cryptopickaxe.co.uk:6040</code></pre>
 <p>Read the live figures yourself at explorer.wamcoin.org rather than trusting this table, because the network moves and the table does not.</p>
 <p><strong>And it helps the chain more than joining us does.</strong> Every solo miner is a separate finder; everybody in one pool is one finder, however many people are behind it. That is not an argument in our favour, and it is written here anyway.</p>
 <h3 id="how-exactly">How, exactly</h3>
-<blockquote><p><strong>A defect you should know about before you start.</strong> <code>--solo</code> and <code>--check</code> are in v0.1.10, which is published and downloadable. But the miner in v0.1.10 can fail to send a block it has solved: it asks the node for work every five seconds, treated every answer as a new job even when nothing had changed, and remembered only the last eight. A worker keeps its job until the chain moves on, about two minutes, so a block solved more than forty seconds after its job was issued could not be rebuilt — and the miner refused to send it rather than send something wrong. Roughly two blocks in three were lost that way.</p>
-<p>It was reported by a miner on 2026-09-26, found the same morning, and fixed in the source that day. <strong>The fix needs v0.1.11 to reach you.</strong> Until that is published: mining to a pool loses nothing, and mining alone with v0.1.10 will lose blocks. This is written here rather than left out because anybody reading this page is deciding where to spend electricity.</p></blockquote>
+<blockquote><p><strong>Use v0.1.11 or newer.</strong> <code>--solo</code> and <code>--check</code> first appeared in v0.1.10, and the miner in that version could fail to SEND a block it had already solved — roughly two in three were lost. It was reported by a miner on 2026-09-26, found the same morning, and fixed in v0.1.11, which has been published since 2026-09-27. Mining alone on v0.1.10 still loses blocks; mining alone on v0.1.11 does not.</p>
+<p>This paragraph said "the fix needs v0.1.11 to reach you, and until that is published, mining alone will lose blocks" for nine days after v0.1.11 was published — so this page spent those nine days telling people not to mine alone, which is the opposite of what it is for.</p> <!-- wam:quote-line --></blockquote>
+<blockquote><p><strong>If you see "do not leave it running", read this first.</strong></p>
+<p>A line that looks like an emergency usually is not one:</p>
+<pre><code>1 block(s) found have NOT been accepted: 0 not sent, 1 refused by the
+node. That is real money; do not leave it running.</code></pre>
+<p><strong>If <code>not sent</code> is 0, nothing was lost.</strong> Another miner reached that height a second before you did, the node took his block, and yours became a side branch. That is ordinary proof of work, and it happens to everybody with enough hash rate to win sometimes.</p>
+<p>The counts are cumulative for as long as the program runs, so one lost race an hour ago repeats that line every thirty seconds for ever. Restarting the miner clears it and costs nothing: the blocks you were paid for are on the chain, not in the counter.</p>
+<p><strong>Do not stop mining over it.</strong> Stopping recovers nothing and loses every block you would have found afterwards. The line is wrong and it is ours: the miner counts a lost race and a block it could not send in the same warning, so the warning itself cannot tell you which one happened. The two numbers can, and <code>not sent</code> is the one to read.</p>
+<p><code>not sent</code> above zero is the other case, and that one is worth stopping for: it means a block your machine solved never reached the node at all.</p></blockquote>
 <p>You need two things running: your own node, and the miner pointed at it.</p>
 <p><strong>One.</strong> Your node must be running, synced, and answering. Add one line to <code>wam.conf</code> if it is not there already:</p>
 <pre><code>server=1</code></pre>
@@ -234,7 +242,7 @@ stratum.cryptopickaxe.co.uk:6040</code></pre>
 0.00000000</code></pre>
 <p>is what you will see for the first while, however hard the machine is working. Nothing is missing and more threads is not the fix — it only raises your share of each block the pool finds.</p>
 <p>Watch the ledger instead of the wallet:</p>
-<p>    https://pool.wamcoin.org</p>
+<pre><code>https://pool.wamcoin.org</code></pre>
 <p>And if you change your payout address, your share history starts again from nothing. Whatever the old address had earned stays owed to that address.</p>
 <p>Written down on 6 September, after somebody mined for an hour, read <code>0.00000000</code>, and reasonably concluded something was broken.</p>
 <h3 id="and-getbalance-will-drop-when-you-send-to-yourself">And <code>getbalance</code> will DROP when you send to yourself</h3>

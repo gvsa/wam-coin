@@ -87,6 +87,33 @@ PROMISES = [
                r"\b(here|below|on this page)\b", re.I),
     re.compile(r"will (appear|be found)[^.<]{0,30}\b(here|below)\b", re.I),
     re.compile(r"(ستُنشر|سيُنشر|ستُذكر|سيُذكر|ستُضاف|سيُضاف)[^.<]{0,30}(هنا|أدناه)", re.I),
+
+    # AND THE OTHER SHAPE, WHICH COST MORE THAN THE FIRST ONE.
+    #
+    # The patterns above catch a page promising to publish something itself.
+    # docs/MINE.md had a different debt and this check walked straight past it:
+    #
+    #     The fix needs v0.1.11 to reach you. Until that is published, mining
+    #     alone will lose blocks.
+    #
+    # v0.1.11 was published on 2026-09-27. The sentence stood for nine days
+    # after that, so the mining page spent nine days telling readers not to
+    # mine alone -- while the founder was asking people to do exactly that,
+    # and a miner was being told by the same project to wait for a release he
+    # could already download.
+    #
+    # A sentence that tells the reader to WAIT for a named version is a debt
+    # with the due date written into it, which makes it the easiest kind to
+    # check and the easiest kind to forget.
+    # `until` is deliberately NOT in this one. "Until v0.1.10 the pool credited
+    # at 100" is history about a version that exists, and flagging it would
+    # make this check noisy about exactly the kind of writing this project
+    # wants more of. What is a debt is a sentence pointing FORWARD at a version
+    # the reader does not have.
+    re.compile(r"\b(needs?|requires?|waits? for)\b[^.<]{0,60}"
+               r"\bv\d+\.\d+\.\d+\b", re.I),
+    re.compile(r"\b(until|before)\b[^.<]{0,40}\b(is|are) (published|released)\b", re.I),
+    re.compile(r"(حتى|إلى أن)[^.<]{0,40}(يُنشر|تُنشر|يصدر|تصدر)", re.I),
 ]
 # wam:quote-end
 

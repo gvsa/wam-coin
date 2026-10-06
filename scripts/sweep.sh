@@ -248,6 +248,16 @@ run "no page promises and forgets"  "$PY" scripts/check_promises.py
 # docs/TREASURY_LEDGER.md.
 run "treasury claims match the ledger" "$PY" scripts/check_treasury_claims.py
 
+# All three of those read the pages. Nothing read the thing that WRITES them.
+# scripts/build_pages.py has put five defects on the live site -- an escaped
+# quotation mark mid-sentence in the whitepaper, numbered rules rendered
+# "1. 1. 1.", a build that hung on one line, three links to pages that never
+# existed, and ten indented blocks turned into prose with their whitespace
+# collapsed, among them the treasury address on /security/ and the Qt
+# filenames on /start/. Every one was found by a person looking at a rendered
+# page. The documents were right each time; only the page was wrong.
+run "the pages say what the documents say" "$PY" scripts/test/test_build_pages.py
+
 # And the script that actually moves it. On 2026-10-04 treasury_spend.py had
 # no test of any kind: 490 lines, the treasury's key in memory while it signs,
 # a file carried by hand between two machines, and nothing that runs. The pool
