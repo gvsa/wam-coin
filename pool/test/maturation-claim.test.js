@@ -56,6 +56,7 @@ function fakeRedis() {
     const counters = new Map();
     const ops = {
         async hgetall(k) { return Object.fromEntries(hash(k)); },
+        async hexists(k, f) { return hash(k).has(f) ? 1 : 0; },
         async hdel(k, f) { return hash(k).delete(f) ? 1 : 0; },
         async hset(k, f, v) { hash(k).set(f, v); return 1; },
         async hincrby(k, f, n) {
@@ -73,6 +74,18 @@ function fakeRedis() {
             return 1;
         },
         async decrby() { return 0; },
+        // blocks:confirmed:hashes -- the set recordBlock asks before
+        // paying, so a recovered block cannot be paid a second time.
+        _sets: new Map(),
+        async sadd(k, v) {
+            if (!ops._sets.has(k)) ops._sets.set(k, new Set());
+            const before = ops._sets.get(k).size;
+            ops._sets.get(k).add(v);
+            return ops._sets.get(k).size > before ? 1 : 0;
+        },
+        async sismember(k, v) {
+            return ops._sets.has(k) && ops._sets.get(k).has(v) ? 1 : 0;
+        },
         async incr(k) {
             const cur = Number(counters.get(k) || 0) + 1;
             counters.set(k, cur);
@@ -88,7 +101,7 @@ function fakeRedis() {
             // the code under test calls does not fail that command; it fails the
             // test, with "pipe.incr is not a function", and these two are payout
             // tests.
-            for (const name of ['hincrby', 'hdel', 'hset', 'lpush', 'ltrim', 'lrem', 'decrby', 'incr']) {
+            for (const name of ['hincrby', 'hdel', 'hset', 'lpush', 'ltrim', 'lrem', 'decrby', 'incr', 'sadd']) {
                 api[name] = (...args) => { queued.push([name, args]); return api; };
             }
             // A pipeline is a batch, not a transaction: it runs the commands in
@@ -127,6 +140,11 @@ function processorWith(redis, confirmations) {
 
 const RECORD = {
     height: 9000,
+    // The hash is what recordBlock keys its idempotence on, and what the
+    // pending hash is keyed by throughout this file. Without it here, a test
+    // asserting "this hash was remembered" asserts that `undefined` was
+    // remembered, and passes while proving nothing.
+    blockHash: 'H',
     minerPot: 4750000000,
     poolFee: 0,
     workers: 2,
@@ -201,6 +219,50 @@ function balances(redis) {
         assert.strictEqual((r._dump.l.get('wam:blocks:confirmed') || []).length, 1);
         assert.strictEqual((r._dump.l.get('wam:blocks:maturing') || []).length, 0,
             'the evidence entry is removed once the credit is through');
+    });
+
+    await test('a matured block hash is remembered, so it cannot be paid again', async () => {
+        // recordBlock asks two questions before paying: is this block already
+        // pending, and has it already been confirmed? The second needs a list
+        // that nothing trims -- blocks:confirmed is cut at 5000 and the counter
+        // is a number -- so the hashes go into a set as blocks mature.
+        //
+        // The spool drain is what made this necessary: it offers a recovered
+        // block for payout without knowing whether the crash happened before
+        // or after the original accounting, and a block recovered after it had
+        // matured would otherwise be paid twice.
+        //
+        // Found by dang150296 (Urriki1502) against bb6d521.
+        const r = fakeRedis();
+        await r.hset('wam:blocks:pending', 'H', JSON.stringify(RECORD));
+        const sp = processorWith(r, 120);
+        await sp._mature('H', { ...RECORD });
+        assert.strictEqual(await r.sismember('wam:blocks:confirmed:hashes', RECORD.blockHash), 1,
+            'a confirmed block leaves no record of its hash, so recordBlock '
+            + 'cannot tell whether it has already been paid');
+    });
+
+    await test('recording the same block twice pays once and wipes no round', async () => {
+        // Emitting a recovered block for payout is only safe if asking twice
+        // costs nothing. recordBlock also runs del(round) and incr(poolfees),
+        // so a second call used to wipe a LIVE round -- every miner losing the
+        // work they had done since the last block -- and double-count the fee.
+        const r = fakeRedis();
+        const sp = processorWith(r, 120);
+        await r.hset('wam:blocks:pending', RECORD.blockHash, JSON.stringify(RECORD));
+        await r.hset('wam:round', 'carol', '500');      // a new round is under way
+
+        const again = await sp.recordBlock({
+            height: RECORD.height, blockHash: RECORD.blockHash, worker: 'bob',
+            coinbaseValue: 5000000000, distributableValue: 4750000000,
+            devFeeAmount: 250000000
+        });
+
+        assert.strictEqual(again, null,
+            'the same block was recorded twice, so it will be paid twice');
+        assert.strictEqual((await r.hgetall('wam:round')).carol, '500',
+            'the second recording wiped a live round; every miner in it lost '
+            + 'the work done since the last block');
     });
 
     console.log(fail.length

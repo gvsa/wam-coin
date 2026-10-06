@@ -131,6 +131,41 @@ function claimSet() {
             'the credited share could be submitted and paid a second time');
     });
 
+    await test('the same share in different hex case is one share', () => {
+        // THE EXPLOIT THIS GUARDS, AND IT WAS LIVE.
+        //
+        // jobManager accepts /^[0-9a-fA-F]+$/ because stratum allows either
+        // case, and the duplicate key used to be the submitted string. So
+        // "deadbeef" and "DEADBEEF" were two shares to the pool and one piece
+        // of proof of work to the chain. Every letter doubles the number of
+        // keys one share can be credited under, and a pool payout is your
+        // shares over everyone's -- so the inflation comes out of the other
+        // miners in the round, not out of thin air.
+        //
+        // Reported by dang150296 (Urriki1502), 2026-10-04.
+        const j = claimSet();
+        assert.strictEqual(j.registerSubmit('aa', 'bb', '01', 'deadbeef'), true);
+        assert.strictEqual(j.registerSubmit('aa', 'bb', '01', 'DEADBEEF'), false,
+            'the same share was credited twice by flipping hex case');
+        assert.strictEqual(j.registerSubmit('aa', 'bb', '01', 'DeAdBeEf'), false,
+            'mixed case got through');
+        assert.strictEqual(j.registerSubmit('AA', 'BB', '01', 'deadbeef'), false,
+            'case in extranonce1/2 got through');
+        assert.strictEqual(j.submits.size, 1,
+            'one share, one entry, whatever it was spelled like');
+    });
+
+    await test('a number and the hex that spells it are one share', () => {
+        // The call site parses nTime and nonce before claiming, so the key
+        // must treat 3735928559 and "deadbeef" as the same thing -- otherwise
+        // the guard above holds only for as long as nobody changes what the
+        // caller passes.
+        const j = claimSet();
+        assert.strictEqual(j.registerSubmit('aa', 'bb', 1, 3735928559), true);
+        assert.strictEqual(j.registerSubmit('aa', 'bb', '01', 'deadbeef'), false,
+            'the same share counted twice because one caller passed numbers');
+    });
+
     console.log('\n=== the release is wired into every rejection path ===');
 
     await test('processShare releases on rejection and keeps on credit', () => {
@@ -144,8 +179,25 @@ function claimSet() {
         assert.ok(/}\s*finally\s*\{[^}]*releaseSubmit/.test(tail),
             'the release is not in a finally block; a rejection path added later '
             + 'will leak claims again');
-        assert.ok(/credited\s*=\s*true;[\s\S]{0,200}return \{ valid: true/.test(tail),
-            'the credited flag is not set immediately before the success return');
+        // This measured the characters between `credited = true` and the
+        // success return, which said "nothing much happens in between" and
+        // stopped being true the moment something had to. What it was
+        // protecting is an ORDER, so the order is what is asserted now:
+        //
+        //    record the share durably -> credit it -> return success
+        //
+        // Setting the flag before the record would keep the claim for a share
+        // that was never written down, so the miner could not resubmit it and
+        // nobody would ever pay him for it.
+        const recordAt = tail.indexOf('await this._record');
+        const creditAt = tail.indexOf('credited = true');
+        const returnAt = tail.indexOf('return { valid: true');
+        assert.ok(recordAt > -1,
+            'processShare no longer waits for the share to be recorded before '
+            + 'crediting it; the miner is being told it counted on a promise');
+        assert.ok(recordAt < creditAt && creditAt < returnAt,
+            'the order must be record, then credit, then return -- crediting '
+            + 'before the record keeps the claim for a share nobody wrote down');
 
         const claimAt = tail.indexOf('registerSubmit');
         const tryAt = tail.indexOf('try {', claimAt);
@@ -153,6 +205,43 @@ function claimSet() {
         assert.ok(claimAt > -1 && tryAt > claimAt && hashAt > tryAt,
             'the claim must be taken before the try, and hashing must happen '
             + 'inside it: claiming after the hash reopens the race');
+
+        // THE SHARE IS EMITTED BEFORE THE BLOCK IS SUBMITTED.
+        //
+        // _submitBlock emits 'block', and that listener snapshots the PPLNS
+        // window and resets the round. With the emit after the submit, the
+        // share that found the block was not in the snapshot of its own
+        // block's payout -- it was pushed into the next round and paid at the
+        // next block's rate. Asserted on the source for the same reason as
+        // everything above it: mocking RandomX to reach this line costs more
+        // than reading the two line numbers.
+        //
+        // Reported by dang150296 (Urriki1502), 2026-10-04.
+        // The order that matters is between the two ACCOUNTING events, not
+        // between the share and the submission.
+        //
+        // Submitting to the node comes first on purpose: a block is worth
+        // 47.5 WAM and goes to whoever is a second quicker, so nothing may be
+        // written down or acknowledged in front of it. An earlier version of
+        // this assertion required the share to be emitted before the submit,
+        // which fixed the payout ordering by slowing down the one thing that
+        // must not be slowed down.
+        //
+        // What has to hold is that 'block' -- whose listener snapshots the
+        // round and resets it -- is emitted after the winning share has been
+        // recorded and emitted.
+        const emitShareAt = tail.indexOf("this.emit('share'");
+        const emitBlockAt = tail.indexOf("this.emit('block'");
+        const submitAt = tail.indexOf('this._submitBlock');
+        assert.ok(emitShareAt > -1 && emitBlockAt > -1 && submitAt > -1,
+            'processShare no longer emits both events and submits the block; '
+            + 'this assertion has lost its subject and must be rewritten');
+        assert.ok(submitAt < emitShareAt,
+            'something is recorded or emitted before the block reaches the '
+            + 'node, which costs blocks to whoever is quicker');
+        assert.ok(emitShareAt < emitBlockAt,
+            'the block payout is emitted before the share that found it, so '
+            + 'that share is not in the snapshot of its own block');
     });
 
     console.log('\n' + '='.repeat(66));

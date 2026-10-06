@@ -440,6 +440,43 @@ bool PublishJob(RandomXEngine& engine, SharedState& state, int threads,
 // Self-test
 // ---------------------------------------------------------------------------
 
+// WHAT THE NODE'S ANSWER MEANS, AS A FUNCTION, SO IT CAN BE TESTED.
+//
+// This lived inside the solution lambda, where nothing could reach it. It is
+// three string comparisons and it decides whether a solo miner is told his
+// block was lost or told to shut down, so it is worth more than three string
+// comparisons' worth of care.
+//
+// Every test this project runs for --solo mines on regtest, alone. A miner
+// with no competitor cannot lose a race, so the entire class of "what happens
+// when somebody beats you" is unreachable by every gate we have -- which is
+// why v0.1.10's bug was found by a miner, v0.1.11's by another miner, and the
+// fix for the second was written on 2026-10-04 and shipped to nobody with no
+// test of the behaviour it changes.
+//
+// A regtest race is still the real proof and still needs building. This is the
+// half that needs no node at all, and it would have failed on v0.1.11.
+enum class SubmitOutcome { Accepted, LostRace, Refused };
+
+SubmitOutcome ClassifySubmit(const std::string& reason)
+{
+    if (reason.empty()) return SubmitOutcome::Accepted;
+
+    // The node's vocabulary for "somebody reached this height first". The
+    // block is valid and stored; it is simply not on the active chain.
+    //
+    // `duplicate-invalid` is deliberately absent: known AND bad is a real
+    // fault and must keep its alarm. It begins with "duplicate", so a prefix
+    // match here would have swallowed it -- these are whole-string compares
+    // for that reason and not for tidiness.
+    if (reason == "duplicate" ||
+        reason == "inconclusive" ||
+        reason == "duplicate-inconclusive") {
+        return SubmitOutcome::LostRace;
+    }
+    return SubmitOutcome::Refused;
+}
+
 bool SelfTest()
 {
     bool ok = true;
@@ -568,6 +605,42 @@ bool SelfTest()
 
         randomx_destroy_vm(vm);
         randomx_release_cache(cache);
+    }
+
+    std::printf("\n%sWhat the node's answer means%s\n", CLR_BOLD, CLR_RESET);
+    {
+        auto name = [](SubmitOutcome o) {
+            return o == SubmitOutcome::Accepted ? "accepted"
+                 : o == SubmitOutcome::LostRace ? "lost a race" : "refused";
+        };
+        auto says = [&](const char* what, const char* reason, SubmitOutcome want) {
+            check(what, name(ClassifySubmit(reason)), name(want));
+        };
+
+        says("an empty reason is acceptance",      "",  SubmitOutcome::Accepted);
+
+        // The three that cost a working miner its operator. Before 2026-10-04
+        // each of these counted as a refusal, and one of them left the alarm
+        // "that is real money; do not leave it running" repeating every thirty
+        // seconds for the life of the process. Two miners were shut down on
+        // that advice in one day.
+        says("inconclusive is a lost race",        "inconclusive",
+             SubmitOutcome::LostRace);
+        says("duplicate is a lost race",           "duplicate",
+             SubmitOutcome::LostRace);
+        says("duplicate-inconclusive is a lost race", "duplicate-inconclusive",
+             SubmitOutcome::LostRace);
+
+        // And the ones that must still alarm. duplicate-invalid shares a
+        // prefix with duplicate and means the opposite: known and bad.
+        says("duplicate-invalid is a refusal",     "duplicate-invalid",
+             SubmitOutcome::Refused);
+        says("high-hash is a refusal",             "high-hash",
+             SubmitOutcome::Refused);
+        says("bad-txnmrklroot is a refusal",       "bad-txnmrklroot",
+             SubmitOutcome::Refused);
+        says("an unknown reason is a refusal",     "something new",
+             SubmitOutcome::Refused);
     }
 
     std::printf("\n%s\n", ok ? "All self-tests passed." : "SELF-TEST FAILED.");
@@ -963,14 +1036,8 @@ int RunSolo(const Options& opt, RandomXEngine& engine, SharedState& state, int c
                 return true;
             }
 
-            // The node's own vocabulary for "somebody else got there first".
-            // `duplicate-invalid` is deliberately absent: that one means the
-            // block is known AND bad, which is a real fault and must alarm.
-            const bool lostRace = reason == "duplicate" ||
-                                  reason == "inconclusive" ||
-                                  reason == "duplicate-inconclusive";
-
-            if (lostRace) {
+            // ClassifySubmit is above SelfTest, where --self-test reaches it.
+            if (ClassifySubmit(reason) == SubmitOutcome::LostRace) {
                 state.stale.fetch_add(1);
                 Info("block " + std::to_string(job.height) +
                      " lost the race (" + reason + ") -- another miner reached "

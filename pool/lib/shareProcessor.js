@@ -35,7 +35,7 @@
 
 const EventEmitter = require('events');
 
-const { computeBlockRewards, estimateHashrate } = require('./rewards');
+const { computeBlockRewards, estimateHashrate, pplnsWindowDifficulty } = require('./rewards');
 const { COIN, COINBASE_MATURITY } = require('./constants');
 
 class ShareProcessor extends EventEmitter {
@@ -105,6 +105,70 @@ class ShareProcessor extends EventEmitter {
      * pay. A pool that pauses is a support ticket. A pool that pays twice is
      * the operator's own money, and a pool that skips a payment is a reputation.
      */
+    /**
+     * The broadcast's answer was lost. Did the transaction arrive?
+     *
+     * This is only answerable because the transaction was built and signed
+     * before it was sent, so it had a txid and a body before anybody could
+     * have seen it. With sendmany there was nothing to ask about and the only
+     * safe response was to stop and wait for a person.
+     *
+     * Returns true if the payment is known to be out there, false if the pool
+     * has been paused and a human has been told why. It never returns true on
+     * a guess: everything it does not understand ends in a pause.
+     */
+    async _settleUnknownPayment(txid, hex, cause) {
+        // Is it already known to this node -- mempool or chain?
+        try {
+            const tx = await this.daemon.cmd('getrawtransaction', [txid, true]);
+            if (tx && tx.txid === txid) return true;
+        } catch (err) {
+            // "No such mempool or blockchain transaction" is the node
+            // answering the question, not failing to. Anything else is a
+            // failure to ask, and is handled below by not guessing.
+            if (err.ambiguous !== false) {
+                this.paused = true;
+                this.log.error('could not ask the node whether the payment exists ' +
+                               `(${err.message}). PAYMENTS ARE PAUSED. The intent, ` +
+                               `with txid ${txid} and the exact bytes, is at ` +
+                               `${this.k('payment:inflight')}.`);
+                return false;
+            }
+        }
+
+        // Not known. Re-broadcasting the SAME bytes is safe by construction:
+        // same inputs, same outputs, same txid. The node either accepts it or
+        // tells us it already has it, and both answers mean the payment is
+        // out there. This is the one case where retrying a money RPC is not
+        // only allowed but correct, which is why sendrawtransaction is
+        // deliberately absent from MONEY_RPCS in daemon.js.
+        try {
+            await this.daemon.cmd('sendrawtransaction', [hex]);
+            this.log.warn(`re-broadcast ${txid} after a lost answer; the bytes ` +
+                          'were identical, so this cannot pay anybody twice');
+            return true;
+        } catch (err) {
+            const msg = String(err.message || '');
+            if (/already in block chain|txn-already|already have/i.test(msg)) {
+                return true;        // somebody else's copy got there first
+            }
+            this.paused = true;
+            this.log.error('=========================================================');
+            this.log.error('PAYMENT OUTCOME UNKNOWN AND NOT RECOVERABLE HERE.');
+            this.log.error(`  first failure : ${cause.message}`);
+            this.log.error(`  on retry      : ${msg}`);
+            this.log.error(`  txid          : ${txid}`);
+            this.log.error('');
+            this.log.error('  Balances have NOT been cleared. The signed bytes are');
+            this.log.error(`  in ${this.k('payment:inflight')}; the transaction can be`);
+            this.log.error('  looked up or sent again by hand:');
+            this.log.error('');
+            this.log.error(`    wam-cli getrawtransaction ${txid} true`);
+            this.log.error('=========================================================');
+            return false;
+        }
+    }
+
     async startupReconcile() {
         const raw = await this.redis.get(this.k('payment:inflight'));
         if (!raw) {
@@ -242,8 +306,15 @@ class ShareProcessor extends EventEmitter {
     _pplnsBufferSize() {
         const configured = this.config.pplnsMaxShares;
         if (configured) return configured;
+        // THE SAME NUMBER THE PAYOUT ASKS FOR, NOT A SECOND OPINION ON IT.
+        //
+        // This used `networkDifficulty * pplnsMultiplier` while rewards.js
+        // used `Math.max(1, ...)` of the same product. One floor, present in
+        // one file, and the buffer ended up a tenth of the window it feeds --
+        // see pplnsWindowDifficulty, which both now call.
         const avgShareDiff = this.config.startDifficulty || 1000;
-        const needed = (this.networkDifficulty * this.pplnsMultiplier) / avgShareDiff;
+        const needed = pplnsWindowDifficulty(this.networkDifficulty,
+                                             this.pplnsMultiplier) / avgShareDiff;
         return Math.max(10000, Math.min(2000000, Math.ceil(needed * 4)));
     }
 
@@ -274,6 +345,37 @@ class ShareProcessor extends EventEmitter {
      * Freezes the payout table and resets the round.
      */
     async recordBlock(share) {
+        // ONE BLOCK, ONE PAYOUT, HOWEVER MANY TIMES THIS IS CALLED.
+        //
+        // This was not safe to call twice, and nothing stopped it being. The
+        // pending record is keyed on the block hash so a second call merely
+        // overwrites it -- but the same call also runs `del(round)` and
+        // `incrby(poolfees)`, so a repeat WIPES A LIVE ROUND'S CONTRIBUTIONS
+        // and double-counts the fee. Every miner in that round loses the work
+        // they had done since the last block.
+        //
+        // It matters now because the spool drain has to offer a recovered
+        // block for payout without knowing whether the crash happened before
+        // or after the original accounting. The honest answer to "was this
+        // already paid" is to look, and the only safe way to let the drain ask
+        // is for asking twice to cost nothing.
+        //
+        // Both lists are checked, not just the pending one: a block recovered
+        // after it had already matured would otherwise be paid a second time.
+        //
+        // Found by dang150296 (Urriki1502) against bb6d521.
+        if (share.blockHash) {
+            const [pending, confirmed] = await Promise.all([
+                this.redis.hexists(this.k('blocks:pending'), share.blockHash),
+                this.redis.sismember(this.k('blocks:confirmed:hashes'), share.blockHash)
+            ]);
+            if (pending || confirmed) {
+                this.log.info(`block ${share.height} is already accounted for ` +
+                              `(${pending ? 'pending' : 'confirmed'}); nothing to do`);
+                return null;
+            }
+        }
+
         const [shares, roundContributions] = await Promise.all([
             this.mode === 'pplns' ? this.getPplnsShares() : Promise.resolve([]),
             this.getRoundContributions()
@@ -493,6 +595,19 @@ class ShareProcessor extends EventEmitter {
         // The list stays, because the page also wants the recent blocks to
         // show, and a sample and a count are two different questions.
         pipe.incr(this.k('blocks:confirmed:count'));
+        // AND A SET OF THE HASHES, FOR THE QUESTION "WAS THIS ALREADY PAID?"
+        //
+        // The list above is trimmed at 5000 and the counter is a number, so
+        // neither can answer it. recordBlock has to be able to: the spool
+        // drain offers a recovered block for payout without knowing whether
+        // the crash happened before or after the original accounting, and
+        // "already in pending" only covers a block that has not matured yet.
+        // Without this, a block recovered after maturing would be paid twice.
+        //
+        // A set of 32-byte hex strings, one per block ever confirmed. At 720
+        // blocks a day that is about 1.7 MB a year, which is the cheapest
+        // honest answer available.
+        pipe.sadd(this.k('blocks:confirmed:hashes'), record.blockHash);
         pipe.lrem(this.k('blocks:maturing'), 0, evidence);
 
         await pipe.exec();
@@ -636,9 +751,51 @@ class ShareProcessor extends EventEmitter {
         };
         await this.redis.set(this.k('payment:inflight'), JSON.stringify(intent));
 
+        // BUILD IT AND SIGN IT FIRST, SO IT HAS A NAME BEFORE IT HAS A FATE.
+        //
+        // sendmany creates and broadcasts in one call, so when the reply is
+        // lost there is nothing to ask about: no txid, no bytes, nothing to
+        // look up and nothing to send again. The only safe response was to
+        // pause and fetch a human, which is what the block below used to do
+        // every time -- correct, and it stops payouts until somebody is awake.
+        //
+        // Doing it in three steps gives the transaction an identity before
+        // anybody could have seen it. If the broadcast's answer is then lost,
+        // the recovery is a question with an answer: is this txid known? If
+        // yes, it was sent. If no, send these exact bytes again --
+        // sendrawtransaction is idempotent, same txid, same outputs, so
+        // re-sending cannot pay anyone twice.
+        //
+        // Reported by dang150296 (Urriki1502) on 2026-10-04: payout identity
+        // is created inside sendmany, with no deterministic txid or raw
+        // transaction stored before broadcast.
+        //
+        // The wallet still chooses the inputs and the change, through
+        // fundrawtransaction. Nothing about coin selection moves into this
+        // file; what moves is only WHEN the identity exists.
         let txid;
+        let signedHex;
         try {
-            txid = await this.daemon.cmd('sendmany', ['', sendMany]);
+            const raw = await this.daemon.cmd('createrawtransaction', [[], sendMany]);
+            const funded = await this.daemon.cmd('fundrawtransaction', [raw]);
+            const signed = await this.daemon.cmd('signrawtransactionwithwallet',
+                                                 [funded.hex]);
+            if (!signed || !signed.complete) {
+                throw Object.assign(
+                    new Error('the wallet could not fully sign the payment: ' +
+                              JSON.stringify((signed && signed.errors) || []).slice(0, 300)),
+                    { ambiguous: false });
+            }
+            signedHex = signed.hex;
+            const decoded = await this.daemon.cmd('decoderawtransaction', [signedHex]);
+            txid = decoded.txid;
+
+            // Written down BEFORE the broadcast, which is the whole point.
+            intent.txid = txid;
+            intent.hex = signedHex;
+            await this.redis.set(this.k('payment:inflight'), JSON.stringify(intent));
+
+            await this.daemon.cmd('sendrawtransaction', [signedHex]);
         } catch (err) {
             // THIS BLOCK USED TO ASSUME. Its comment read "the call failed, so
             // nothing was spent and the intent is stale", and it deleted the
@@ -656,30 +813,45 @@ class ShareProcessor extends EventEmitter {
             // site, a wrapper, a bug -- is unknown by default, because the
             // default has to be the direction that cannot lose money.
             if (err.ambiguous !== false) {
-                this.paused = true;
-                this.log.error('=========================================================');
-                this.log.error('PAYMENT OUTCOME UNKNOWN. PAYMENTS ARE PAUSED.');
-                this.log.error(`  ${err.message}`);
-                this.log.error('');
-                this.log.error('  The node may have broadcast this payment before the');
-                this.log.error('  connection failed. Balances have NOT been cleared, so');
-                this.log.error('  paying again would pay these miners twice.');
-                this.log.error('');
-                this.log.error('    wam-cli listtransactions "*" 20');
-                this.log.error('');
-                this.log.error(`  The intent is kept at ${this.k('payment:inflight')}.`);
-                this.log.error('  startupReconcile() prints what to do with it.');
-                this.log.error('=========================================================');
+                // An unknown outcome is now a QUESTION, not a dead end -- but
+                // only if the transaction got far enough to have a name. If it
+                // failed while being built or signed, nothing was broadcast
+                // and there is nothing to ask about.
+                if (txid) {
+                    const settled = await this._settleUnknownPayment(txid, signedHex, err);
+                    if (settled) {
+                        this.log.warn(`the payment's answer was lost (${err.message}) ` +
+                                      `but ${txid} is on the node. Continuing.`);
+                    } else {
+                        return;     // _settleUnknownPayment has paused and said why
+                    }
+                } else {
+                    this.paused = true;
+                    this.log.error('=========================================================');
+                    this.log.error('PAYMENT OUTCOME UNKNOWN BEFORE IT HAD A TXID.');
+                    this.log.error(`  ${err.message}`);
+                    this.log.error('');
+                    this.log.error('  It failed while being built or signed, so almost');
+                    this.log.error('  certainly nothing was broadcast -- but "almost" is');
+                    this.log.error('  not a word this pays miners on.');
+                    this.log.error('');
+                    this.log.error('    wam-cli listtransactions "*" 20');
+                    this.log.error('');
+                    this.log.error(`  The intent is kept at ${this.k('payment:inflight')}.`);
+                    this.log.error('=========================================================');
+                    return;
+                }
+            } else {
+
+                // A refusal from the node itself: it parsed the request and
+                // said no, so no transaction exists and the intent really is
+                // stale. Clearing it here is safe; leaving it would halt
+                // payments over a transient RPC error.
+                await this.redis.del(this.k('payment:inflight'));
+                this.log.error(`the payment was refused, balances left ` +
+                               `untouched: ${err.message}`);
                 return;
             }
-
-            // A refusal from the node itself: it parsed the request and said
-            // no, so no transaction exists and the intent really is stale.
-            // Clearing it here is safe; leaving it would halt payments over a
-            // transient RPC error.
-            await this.redis.del(this.k('payment:inflight'));
-            this.log.error(`sendmany refused, balances left untouched: ${err.message}`);
-            return;
         }
 
         // Only now is it safe to clear balances. Doing it before the RPC

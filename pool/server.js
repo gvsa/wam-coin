@@ -294,14 +294,92 @@ async function main() {
     shareProcessor.setNetworkDifficulty(chainInfo.difficulty);
     shareProcessor.start();
 
-    jobManager.on('share', (share) => {
-        shareProcessor.recordShare(share)
-            .catch((err) => log.error(`failed to record a share: ${err.message}`));
-    });
+    // ACCOUNTING HAPPENS IN THE ORDER IT WAS EMITTED, NOT IN THE ORDER REDIS
+    // HAPPENS TO FINISH.
+    //
+    // These were two independent fire-and-forget calls. jobManager now emits
+    // 'share' before 'block' for a block-finding share, but that only fixes
+    // the order the two were STARTED in -- recordBlock reads the PPLNS window
+    // and the round immediately, and recordShare writes to them, so the read
+    // could still land first and take a snapshot without the winning share in
+    // it. An ordering that holds only when Redis is fast is not an ordering.
+    //
+    // One chain, so each waits for the one before it. A failure is logged and
+    // the chain continues -- an error must not stop every later share from
+    // being recorded, which is what an uncaught rejection in the chain would
+    // do.
+    //
+    // Serial rather than parallel is affordable here and would not be in a
+    // large pool: these are small Redis writes at the rate miners find shares.
+    // Correctness in the money path is worth more than the concurrency.
+    let accounting = Promise.resolve();
+    const inOrder = (what, fn) => {
+        // The caller gets the real outcome; the chain gets a version that
+        // cannot reject, so one failure never stops everything after it.
+        const run = accounting.then(fn);
+        accounting = run.catch((err) =>
+            log.error(`failed to record ${what}: ${err.message}`));
+        return run;
+    };
+
+    // The share is written down BEFORE the miner is told it counted.
+    //
+    // processShare awaits this, so a Redis failure reaches the miner as
+    // "resubmit" instead of becoming a logged line about work he believes he
+    // was paid for. A hook and not a listener, because an event cannot be
+    // waited on.
+    jobManager._record = (share) => inOrder('a share',
+        () => shareProcessor.recordShare(share));
+
+    // Where a solved block waits if the node cannot take it yet.
+    //
+    // A block is 47.5 WAM and used to exist only in a local variable until it
+    // was accepted: a node down longer than the five-second retry, or this
+    // process dying, lost it outright. Redis is already the thing this pool
+    // trusts with miners' balances, so it is where the bytes go.
+    //
+    // A refused block is moved rather than deleted. The node read it and said
+    // no, so it will never be worth anything -- but it is the only copy of
+    // something a miner's electricity produced, and the reason it was refused
+    // is worth more beside it than in a log that rotates.
+    const spoolKey = `${config.redisPrefix || 'wam'}:blocks:unsent`;
+    const refusedKey = `${config.redisPrefix || 'wam'}:blocks:refused`;
+    jobManager._spoolStore = {
+        async put(hash, entry) {
+            await redis.hset(spoolKey, hash, JSON.stringify(entry));
+        },
+        async remove(hash, refusedReason) {
+            if (refusedReason) {
+                const raw = await redis.hget(spoolKey, hash);
+                if (raw) {
+                    await redis.hset(refusedKey, hash,
+                        JSON.stringify({ ...JSON.parse(raw), refusedReason,
+                                         refusedAt: Date.now() }));
+                }
+            }
+            await redis.hdel(spoolKey, hash);
+        },
+        async all() {
+            const map = await redis.hgetall(spoolKey);
+            return Object.values(map || {}).map((v) => JSON.parse(v));
+        }
+    };
+
+    // Before anything else, and then on a timer: offer whatever is still
+    // sitting there. The start-up pass is the one that matters -- it is the
+    // case where this process died holding a block.
+    jobManager.drainSpool()
+        .then((r) => { if (r.offered) log.warn(`block spool: ${r.offered} waiting, ${r.settled} settled`); })
+        .catch((err) => log.error(`block spool drain failed: ${err.message}`));
+    const drainEvery = (config.blockSpoolDrainSec || 60) * 1000;
+    const spoolTimer = setInterval(() => {
+        jobManager.drainSpool().catch((err) =>
+            log.error(`block spool drain failed: ${err.message}`));
+    }, drainEvery);
+    spoolTimer.unref?.();
 
     jobManager.on('block', (share) => {
-        shareProcessor.recordBlock(share)
-            .catch((err) => log.error(`failed to record block ${share.height}: ${err.message}`));
+        inOrder(`block ${share.height}`, () => shareProcessor.recordBlock(share));
     });
 
     // ---- 7. stratum -------------------------------------------------------

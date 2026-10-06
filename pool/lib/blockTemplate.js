@@ -36,6 +36,43 @@ const { EXTRANONCE2_SIZE, DEVFEE_PERCENT } = require('./constants');
 
 let jobCounter = 0;
 
+/**
+ * One share, one key, whatever the miner typed.
+ *
+ * THE KEY WAS BUILT FROM THE SUBMITTED STRINGS, AND THAT IS A PAID EXPLOIT.
+ *
+ * jobManager accepts hex as `/^[0-9a-fA-F]+$/` -- both cases, because the
+ * stratum protocol allows both and refusing uppercase would reject honest
+ * miners. The duplicate key was then the raw string, so `deadbeef` and
+ * `DEADBEEF` were two different shares to this set and the same share to the
+ * chain. Every letter in extranonce2, nTime and nonce doubles the number of
+ * keys one piece of proof of work can be credited under -- thousands of
+ * credits for one share's electricity.
+ *
+ * That is not a nuisance. Pool payouts are shares divided by total shares, so
+ * inflating your own count takes the difference straight out of every other
+ * miner in the round.
+ *
+ * Reported by dang150296 (Urriki1502) on 2026-10-04 as duplicate-share
+ * canonicalization, confirmed against this function the same hour.
+ *
+ * The repair is not `.toLowerCase()` at the call site. It is that the key is
+ * derived here, from values put into one form, so a caller cannot reintroduce
+ * it by passing the strings it happens to hold. nTime and nonce arrive as
+ * numbers; anything hex-shaped is folded to lower case.
+ */
+function submitKey(extranonce1, extranonce2, nTime, nonce) {
+    const hex = (v) => String(v).toLowerCase();
+    // A number stays itself; a hex string becomes the number it spells. Both
+    // call styles land on one key, which also folds away leading zeros and
+    // case in one step. `Number()` was tried first and is wrong here:
+    // Number('deadbeef') is NaN, so every lettered nonce collided into a
+    // single key -- caught by share-claim.test.js within a minute, which is
+    // what that test is for.
+    const num = (v) => (typeof v === 'number' ? v : parseInt(String(v), 16));
+    return `${hex(extranonce1)}:${hex(extranonce2)}:${num(nTime)}:${num(nonce)}`;
+}
+
 class BlockTemplate {
     /**
      * @param {object} rpcTemplate  raw getblocktemplate result
@@ -304,7 +341,7 @@ class BlockTemplate {
      * the share is not credited -- see the comment there.
      */
     registerSubmit(extranonce1, extranonce2, nTime, nonce) {
-        const key = `${extranonce1}:${extranonce2}:${nTime}:${nonce}`;
+        const key = submitKey(extranonce1, extranonce2, nTime, nonce);
         if (this.submits.has(key)) return false;
         this.submits.add(key);
         return true;
@@ -326,7 +363,7 @@ class BlockTemplate {
      * and at that point the entries are honest accounting.
      */
     releaseSubmit(extranonce1, extranonce2, nTime, nonce) {
-        this.submits.delete(`${extranonce1}:${extranonce2}:${nTime}:${nonce}`);
+        this.submits.delete(submitKey(extranonce1, extranonce2, nTime, nonce));
     }
 
     // -----------------------------------------------------------------------

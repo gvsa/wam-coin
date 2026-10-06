@@ -47,7 +47,9 @@ than that are excluded, and the reason is printed rather than assumed.
 
 import argparse
 import base64
+import decimal
 import getpass
+import hashlib
 import json
 import os
 import subprocess
@@ -108,6 +110,104 @@ def wam(x):
 
 
 # ---------------------------------------------------------------------------
+#  Reading a transaction, in whole numbers
+# ---------------------------------------------------------------------------
+#
+#  Everything below compares a decoded transaction against a plan, and a
+#  comparison is only worth making if it is exact. Coins are decimal and
+#  binary floating point is not, so every value crossing one of these checks
+#  is converted to atoms -- whole numbers -- through Decimal, and compared as
+#  integers. 0.1 + 0.2 is a famous example; the one that matters here is that
+#  two values printed identically can differ.
+#
+#  The construction arithmetic in cmd_plan is still float, and is left that
+#  way deliberately for now: rewriting what COMPUTES the amounts at the same
+#  time as adding the checks that verify them would mean neither is watching
+#  the other. These checks are exact, so float drift in the plan is caught
+#  here rather than carried through.
+
+COIN = decimal.Decimal(100000000)
+
+
+def _atoms(value, what="amount"):
+    """A coin value as whole atoms, or death. Never silently rounded."""
+    try:
+        d = decimal.Decimal(str(value)) * COIN
+    except (decimal.InvalidOperation, ValueError, TypeError):
+        die("%s is not a number: %r" % (what, value))
+    if not d.is_finite() or d != d.to_integral_value() or d < 0:
+        die("%s must be positive with at most 8 decimals: %r" % (what, value))
+    return int(d)
+
+
+def _outpoints(vins, where):
+    """The exact inputs, in order, refusing anything ambiguous."""
+    points = []
+    for v in vins:
+        if not isinstance(v, dict) or "txid" not in v or "vout" not in v:
+            die("an input in %s cannot be read" % where)
+        if "coinbase" in v:
+            die("%s spends a coinbase directly, which this never does" % where)
+        points.append((str(v["txid"]), int(v["vout"])))
+    if len(set(points)) != len(points):
+        die("%s spends the same output twice" % where)
+    return points
+
+
+def _outputs(tx, where):
+    """(address, atoms) for every output, refusing one we cannot name.
+
+    An output whose scriptPubKey carries no single address used to be skipped
+    -- `if addr:` -- so a payment to a raw script was invisible to the check
+    that looks for unexpected recipients. Invisible is the one thing an output
+    in a treasury transaction may not be.
+    """
+    out = []
+    for o in tx.get("vout", []):
+        spk = o.get("scriptPubKey")
+        if not isinstance(spk, dict):
+            die("an output in %s cannot be read" % where)
+        addr = spk.get("address")
+        if not isinstance(addr, str) or not addr:
+            die("%s has an output that pays no single address -- refusing to "
+                "judge a transaction whose recipients cannot all be named" % where)
+        out.append((addr, _atoms(o.get("value"), "an output value")))
+    return out
+
+
+def _verify_against_plan(plan, tx, where):
+    """Does this transaction do exactly what the plan says, to the atom?
+
+    Inputs in the same order, outputs exactly destination plus change, and the
+    fee equal to inputs minus outputs. Anything else dies.
+    """
+    want_in = _outpoints(plan.get("inputSet", []), "the plan")
+    if not want_in:
+        die("the plan does not name the outputs it spends -- it was written "
+            "by an older version of this script. Re-run `plan`.")
+    if _outpoints(tx.get("vin", []), where) != want_in:
+        die("%s does not spend the inputs the plan approved, or spends them "
+            "in a different order" % where)
+
+    amount = _atoms(plan["amount"], "the amount")
+    change = _atoms(plan["change"], "the change")
+    fee = _atoms(plan["fee"], "the fee")
+    total_in = _atoms(plan["inputTotal"], "the input total")
+
+    want_out = [(plan["to"], amount)]
+    if change:
+        want_out.append((TREASURY, change))
+    got_out = _outputs(tx, where)
+    if sorted(got_out) != sorted(want_out):
+        die("%s does not pay exactly what the plan says. It pays: %s" %
+            (where, ", ".join("%s to %s" % (wam(a / 1e8), ad) for ad, a in got_out)))
+
+    if total_in - sum(a for _, a in got_out) != fee:
+        die("%s does not conserve value: inputs minus outputs is not the "
+            "fee the plan states" % where)
+
+
+# ---------------------------------------------------------------------------
 # plan -- runs where the chain is
 # ---------------------------------------------------------------------------
 
@@ -151,11 +251,36 @@ def cmd_plan(args):
     for txid in rpc.call("getrawmempool") or []:
         try:
             entry = rpc.call("getrawtransaction", [txid, True])
-        except Exception:
-            continue
-        for vin in (entry or {}).get("vin", []):
-            if "txid" in vin:
-                spent.add((vin["txid"], vin["vout"]))
+        except SystemExit:
+            raise
+        except Exception as e:
+            # IT USED TO `continue`, AND THAT IS THE WHOLE BUG.
+            #
+            # This loop exists to find outputs an unconfirmed transaction has
+            # already spent, so they are not selected twice. A transaction we
+            # fail to read contributes nothing to `spent` -- so its inputs stay
+            # in `mature` and can be chosen, which is exactly the duplicate
+            # spend this loop was added to prevent. One failed read and the
+            # defence is silently off.
+            #
+            # An incomplete picture of the mempool is not a picture of an empty
+            # mempool. Found by dang150296 (Urriki1502), 2026-10-04, and it is
+            # the same fault as the pool's payout path and the release watcher
+            # on the same days: could not ask, read as nothing there.
+            die("cannot read mempool transaction %s (%s). The mempool picture "
+                "would be incomplete, and an incomplete picture is how an "
+                "already-spent output gets selected. Nothing was planned."
+                % (txid, e))
+        if not isinstance(entry, dict) or not isinstance(entry.get("vin"), list):
+            die("mempool transaction %s came back in a shape this cannot "
+                "read. Nothing was planned." % txid)
+        for vin in entry["vin"]:
+            if "coinbase" in vin:
+                continue
+            if "txid" not in vin or "vout" not in vin:
+                die("an input of mempool transaction %s cannot be read. "
+                    "Nothing was planned." % txid)
+            spent.add((vin["txid"], vin["vout"]))
     if spent:
         before = len(mature)
         mature = [u for u in mature if (u["txid"], u["vout"]) not in spent]
@@ -219,6 +344,12 @@ def cmd_plan(args):
         "change": change,
         "fee": fee,
         "inputs": len(chosen),
+        # THE EXACT OUTPUTS, NOT JUST HOW MANY OF THEM.
+        #
+        # `inputs` is a count, and a count proves nothing: a transaction
+        # spending 201 entirely different outputs matches 201. Both machines
+        # after this one compare against this list, in this order.
+        "inputSet": inputs,
         "inputTotal": round(got, 8),
         "sizeBytes": size,
         "plannedAtHeight": tip,
@@ -256,28 +387,104 @@ def cmd_plan(args):
 _B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
 
-def _wif_looks_whole(s):
-    """Does this decode as base58check? A mistyped character says no.
+def _cli_base(args):
+    """The wam-cli invocation the offline machine uses, without the method."""
+    cli = [args.cli, "-chain=main", "-rpcconnect=%s" % args.rpcconnect,
+           "-rpcport=%d" % args.port]
+    if args.rpcuser:
+        cli += ["-rpcuser=%s" % args.rpcuser, "-rpcpassword=%s" % args.rpcpassword]
+    return cli + ["-stdin"]
 
-    Pure arithmetic and one hash. No node, no network, and the string does
+
+def _offline_decode(args, raw_hex):
+    """Decode a transaction on the signing machine, before anything is approved.
+
+    The node's own parser, not one written here. A transaction decoder is
+    exactly the kind of code that looks simple and has edge cases measured in
+    consensus failures, and this machine is already about to ask the same node
+    to sign -- so the dependency is not new, only used one call earlier.
+    """
+    proc = subprocess.run(_cli_base(args) + ["decoderawtransaction"],
+                          input=raw_hex + "\n", capture_output=True, text=True)
+    if proc.returncode != 0:
+        die("the transaction in the plan could not be decoded: %s"
+            % (proc.stderr.strip() or proc.stdout.strip()))
+    try:
+        return json.loads(proc.stdout)
+    except ValueError as e:
+        die("the decoded transaction could not be read: %s" % e)
+
+
+# The private key's own arithmetic, checked before the key is used.
+#
+# This proved the base58check checksum and stopped there, which catches a
+# mistyped character and nothing else. A key with a sound checksum can still be
+# for another network, carry the wrong payload shape, or hold a scalar outside
+# the curve's order -- and each of those fails at the node, after the key has
+# been typed, on the one machine where retrying costs a walk to another room.
+WAM_WIF_VERSION = 190            # mainnet, consensus; see chainparams.cpp
+SECP256K1_N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+
+
+def _wif_problem(s):
+    """None if this is a usable WAM mainnet private key, else why not.
+
+    Pure arithmetic and two hashes. No node, no network, and the string does
     not leave this function.
     """
-    import hashlib
     if any(c not in _B58 for c in s):
-        return False
+        return "it contains a character that is not base58"
     n = 0
     for c in s:
         n = n * 58 + _B58.index(c)
-    raw = n.to_bytes((n.bit_length() + 7) // 8, "big")
+    raw = n.to_bytes((n.bit_length() + 7) // 8, "big") if n else b""
     raw = bytes(len(s) - len(s.lstrip("1"))) + raw
     if len(raw) < 5:
-        return False
+        return "it is too short to be a key"
     body, check = raw[:-4], raw[-4:]
-    return hashlib.sha256(hashlib.sha256(body).digest()).digest()[:4] == check
+    if hashlib.sha256(hashlib.sha256(body).digest()).digest()[:4] != check:
+        return ("its own checksum does not match, which means a mistyped or "
+                "missing character")
+    if body[0] != WAM_WIF_VERSION:
+        return ("it is a private key for another network -- version byte %d, "
+                "and WAM mainnet is %d" % (body[0], WAM_WIF_VERSION))
+    payload = body[1:]
+    if len(payload) == 33:
+        if payload[-1] != 1:
+            return "its compressed-key marker is wrong"
+        payload = payload[:-1]
+    elif len(payload) != 32:
+        return "its payload is %d bytes, and a key is 32" % len(payload)
+    scalar = int.from_bytes(payload, "big")
+    if not 1 <= scalar < SECP256K1_N:
+        return "the number in it is not a valid secp256k1 private key"
+    return None
 
 
 def cmd_sign(args):
     plan = json.load(open(args.infile, encoding="utf-8"))
+
+    # READ THE TRANSACTION BEFORE SHOWING ANYTHING, AND LONG BEFORE THE KEY.
+    #
+    # What this used to do: print plan["to"], plan["amount"] and the rest --
+    # which are text fields in a JSON file -- ask the operator to type the
+    # destination back, and then sign plan["unsignedHex"], which nothing had
+    # decoded or compared against any of it.
+    #
+    # So the ceremony confirmed the LABEL and signed the PARCEL. If the two
+    # ever disagreed -- a tampered file, a corrupted stick, a bug in `plan` --
+    # the operator would read the correct address on screen, type it back
+    # carefully, and sign something else. This file crosses an air gap on
+    # removable media, which is precisely the journey the gap exists to make
+    # safe, and this was the one place that trusted a label across it.
+    #
+    # Decoding needs the node, which this machine has -- it is about to ask it
+    # to sign. Doing it first costs one RPC call and means the transaction is
+    # read by something before it is approved by someone.
+    #
+    # Found by dang150296 (Urriki1502), 2026-10-04.
+    decoded = _offline_decode(args, plan["unsignedHex"])
+    _verify_against_plan(plan, decoded, "the unsigned transaction")
 
     print("=" * 66)
     print(" WHAT YOU ARE ABOUT TO SIGN")
@@ -288,6 +495,7 @@ def cmd_sign(args):
     print("  change back  %s WAM" % wam(plan["change"]))
     print("  fee          %s WAM" % wam(plan["fee"]))
     print("  reason       %s" % plan.get("reason", "(none given)"))
+    print("  verified             the bytes to be signed decode to exactly this")
     print("=" * 66)
     if input("  type the destination address again to confirm: ").strip() != plan["to"]:
         die("that is not the address in the plan; nothing was signed")
@@ -314,15 +522,15 @@ def cmd_sign(args):
         wif = getpass.getpass("  treasury private key (WIF, not echoed): ").strip()
         if not wif:
             die("no key was given")
-        if _wif_looks_whole(wif):
+        why = _wif_problem(wif)
+        if why is None:
             break
         left = 2 - attempt
         if left:
-            print("  that is not a whole key -- its own checksum does not "
-                  "match, which means a mistyped or missing character. "
-                  "%d try/tries left." % left)
+            print("  that key cannot be used: %s. %d try/tries left."
+                  % (why, left))
         else:
-            die("three mistyped keys; nothing was signed")
+            die("three unusable keys; nothing was signed")
 
     # EVERYTHING GOES DOWN STDIN, NOTHING ON THE COMMAND LINE.
     #
@@ -336,11 +544,7 @@ def cmd_sign(args):
     # it sat in the process list where any program on the machine could read
     # it. wam-cli -stdin takes the arguments one per line instead, which
     # keeps the key out of argv entirely.
-    cli = [args.cli, "-chain=main", "-rpcconnect=%s" % args.rpcconnect,
-           "-rpcport=%d" % args.port]
-    if args.rpcuser:
-        cli += ["-rpcuser=%s" % args.rpcuser, "-rpcpassword=%s" % args.rpcpassword]
-    cli += ["-stdin", "signrawtransactionwithkey"]
+    cli = _cli_base(args) + ["signrawtransactionwithkey"]
 
     payload = "\n".join([plan["unsignedHex"],
                           json.dumps([wif]),
@@ -382,6 +586,37 @@ def cmd_broadcast(args):
     # The only defence is to read the transaction itself and compare it
     # against the plan, field by field, before it is sent anywhere.
     tx = rpc.call("decoderawtransaction", [signed["signedHex"]])
+
+    # The same exact check the signer now makes, on the signed bytes this
+    # time. Inputs in the approved order, outputs to the atom, fee conserved.
+    # What follows it is the human-readable report, which stays because a
+    # person should still see what is about to happen in words.
+    _verify_against_plan(signed, tx, "the signed transaction")
+
+    # AND ARE THOSE INPUTS STILL THERE?
+    #
+    # Everything above compares the transaction to the plan. Nothing asked the
+    # chain whether the outputs the plan selected are still unspent -- and
+    # between planning, carrying the file to another room, signing it and
+    # carrying it back, they can stop being. A transaction spending one that
+    # is gone is rejected by every node, after the key has been used.
+    #
+    # gettxout with include_mempool=true is the question, asked for every
+    # input immediately before the send rather than once at the start.
+    missing = []
+    live_total = 0
+    for txid, vout in _outpoints(signed.get("inputSet", []), "the plan"):
+        entry = rpc.call("gettxout", [txid, vout, True])
+        if not entry:
+            missing.append("%s:%d" % (txid, vout))
+        else:
+            live_total += _atoms(entry.get("value"), "a live input value")
+    if missing:
+        die("%d of the inputs this spends are no longer unspent -- the first "
+            "is %s. Nothing was sent; re-run `plan`." % (len(missing), missing[0]))
+    if live_total != _atoms(signed["inputTotal"], "the input total"):
+        die("the inputs are worth %s WAM on the chain now, and the plan said "
+            "%s. Nothing was sent." % (wam(live_total / 1e8), wam(signed["inputTotal"])))
 
     paid = {}
     for o in tx["vout"]:

@@ -358,12 +358,17 @@ alone. <a href="https://gitlab.com/WAMCoin/wam-coin/blob/main/docs/POOL_OPERATOR
 is the whole thing: architecture, configuration, payouts, and what it costs to run. If you
 start one, say so and it will be listed here beside ours.</p>
 
-<p class="dim"><strong>The founder mines too</strong> — same software, same public pool,
-same difficulty as anyone else, and the addresses he mines to will be published here. A new
-chain with few miners is a chain that is cheap to attack, so he is the floor under its
-security until others arrive. His share of the hash rate will be large at launch and is
-meant to fall; it will be published so you can watch it fall rather than take his word for
-it.</p>
+<p class="dim"><strong>The founder does not mine, and holds no WAM.</strong> Not one unit,
+from the genesis block to today. The founder reserve in the genesis coinbase is locked by
+consensus until September 2027 — five outputs behind OP_CHECKLOCKTIMEVERIFY, readable from
+any node — and he has said in public that he will not spend it when it opens.</p>
+<p class="dim">This paragraph said the opposite until 4 October 2026. Written before
+launch, it said he would mine from the public pool, that the addresses he mined to would be
+published here, and that his share of the hash rate would be large at launch and fall. None
+of it happened, because he never mined: it was a plan in the future tense, left standing
+after the future arrived. What secures this chain is the people mining it, and what they
+are doing is on the <a href="https://explorer.wamcoin.org">explorer</a> rather than
+described here.</p>
 
 <h2 class="sec">Trading</h2>
 <p><strong>WAM trades by atomic swap, and there is no price.</strong> It cannot be
@@ -378,6 +383,13 @@ so 500 WAM went to him from the treasury — in the
 <a href="https://gitlab.com/WAMCoin/wam-coin/blob/main/docs/TREASURY_LEDGER.md">treasury
 ledger</a> with its transaction id — and he swapped 249.68 WAM against Litecoin. The other
 five are still requests for requirements, with nothing agreed.</p>
+<p class="dim"><strong>A real, organic exchange has already happened: somebody did work for
+this project and took WAM as the payment for it.</strong> The researcher who found the pool
+accounting fault in September was paid 10,000 WAM — the amount the published bounty tiers
+give that class of finding — in nine transactions, with every transaction id in the treasury
+ledger and the finding itself written out in full in
+<a href="https://gitlab.com/WAMCoin/wam-coin/blob/main/SECURITY.md">the security
+policy</a>.</p>
 <p class="dim">WAM is its own layer 1 rather than a token on someone else's chain, so it
 settles by atomic swap or a peer-to-peer order book — you swap another coin for it,
 directly, with no custodian in between. It cannot appear on an automated market maker such
@@ -521,10 +533,15 @@ does not.</p>
 فيه كل شيء: البنية، والإعداد، والدفعات، وما يكلّفه التشغيل. ومن يُنشئ واحداً فليخبرنا،
 ويُذكَر هنا بجانب مجمّعنا.</p>
 
-<p class="dim"><strong>والمؤسّس يعدّن أيضاً</strong> — بالبرنامج نفسه، ومن المجمّع العام
-نفسه، وبالصعوبة نفسها كأي أحد، والعناوين التي يعدّن إليها ستُنشر هنا. سلسلةٌ جديدة قليلة
-المعدّنين سلسلةٌ رخيصة المهاجمة، فهو الأرضية تحت أمانها حتى يأتي غيره. ونصيبه من قوّة
-الشبكة سيكون كبيراً يوم الإطلاق ومقصودٌ أن ينزل؛ وسيُنشر لتراه ينزل بنفسك بدل أن تُصدّقه.</p>
+<p class="dim"><strong>المؤسّس لا يعدّن، ولا يملك من WAM وحدةً واحدة</strong> — من كتلة
+التكوين إلى اليوم. واحتياطي المؤسّس في كتلة التكوين مقفولٌ بالإجماع حتى سبتمبر 2027، خمسة
+مخرَجات خلف OP_CHECKLOCKTIMEVERIFY تُقرأ من أيّ عقدة، وقد قال علناً إنّه لن ينفقه حين
+يُفتح.</p>
+<p class="dim">وكانت هذه الفقرة تقول العكس حتى 4 أكتوبر 2026. كُتبت قبل الإطلاق فقالت إنّه
+سيعدّن من المجمّع العام، وإنّ عناوينه ستُنشر هنا، <!-- wam:quote-line --> وإنّ نصيبه من قوّة الشبكة سيكون كبيراً
+يوم الإطلاق ثمّ ينزل. ولم يقع شيءٌ من ذلك، لأنّه لم يعدّن قطّ: خطّةٌ بصيغة المستقبل بقيت
+بعد أن جاء المستقبل. والذي يؤمّن هذه السلسلة هم من يعدّنونها، وما يفعلونه على
+<a href="https://explorer.wamcoin.org">المستكشف</a> لا في وصفٍ هنا.</p>
 
 <h2 class="sec">التداول</h2>
 <p><strong>تُتداول WAM بالمبادلة الذرّية، ولا سعر لها.</strong> ولا تُشترى بالمال
@@ -538,6 +555,11 @@ does not.</p>
 <a href="https://gitlab.com/WAMCoin/wam-coin/blob/main/docs/TREASURY_LEDGER.md">دفتر
 الخزينة</a> برقم معاملتها — وبادل 249.68 WAM بلايتكوين. والخمس الباقية ما زالت طلب
 متطلّبات لم يُوافَق على شيء فيها.</p>
+<p class="dim"><strong>وقد وقعت مبادلةٌ عضويّةٌ حقيقيّة: رجلٌ عمل عملاً لهذا المشروع وأخذ
+WAM ثمناً له.</strong> فالمراجع الذي وجد عطب حسابات المسبح في سبتمبر أُعطي عليه
+10,000 WAM — وهو ما تمنحه جداول المكافآت المنشورة لهذا الصنف من النتائج — في تسع معاملات،
+كلّ معرّفٍ منها في دفتر الخزينة، والثغرة نفسها مشروحة بتمامها في
+<a href="https://gitlab.com/WAMCoin/wam-coin/blob/main/SECURITY.md">سياسة الأمان</a>.</p>
 <p class="dim">WAM سلسلة مستقلّة بذاتها لا عملة رمزية على سلسلة غيرها، فتداولها يكون بمبادلة
 ذرّية أو بدفتر أوامر بين الأطراف — تبادل عملة أخرى بها مباشرةً بلا وسيط يحتفظ بمالك. ولا
 يمكن إدراجها في منصّة صانع سوق آلي مثل Uniswap بلا جسر ونسخة ملفوفة — وهو نفس سبب غياب
