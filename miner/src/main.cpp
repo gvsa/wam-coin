@@ -207,7 +207,7 @@ void WorkerLoop(int workerId, RandomXEngine& engine, SharedState& state)
     // wait for theirs. See RandomXEngine::CreateVms for why they must not
     // build their own.
     while (state.running.load() && !engine.VmsReady()) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     if (!state.running.load()) return;
 
@@ -232,7 +232,7 @@ void WorkerLoop(int workerId, RandomXEngine& engine, SharedState& state)
     uint32_t  nonce = 0;
     bool      haveWork = false;
 
-    const int kBatch = 64;                      // hashes per shared-lock hold
+    const int kBatch = 32;                      // hashes per shared-lock hold
 
     while (state.running.load()) {
         const uint64_t epoch = state.jobEpoch.load();
@@ -262,7 +262,7 @@ void WorkerLoop(int workerId, RandomXEngine& engine, SharedState& state)
         }
 
         if (!haveWork || state.solvedEpoch.load() == seenEpoch) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
             continue;
         }
 
@@ -1161,7 +1161,7 @@ int RunSolo(const Options& opt, RandomXEngine& engine, SharedState& state, int c
             break;
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
     state.running.store(false);

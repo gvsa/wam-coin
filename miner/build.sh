@@ -64,7 +64,7 @@ RANDOMX_INCLUDE="${RANDOMX_INCLUDE:-$RANDOMX_DEFAULT_BASE/src}"
 RANDOMX_LIB="${RANDOMX_LIB:-$RANDOMX_DEFAULT_BASE/build/librandomx.a}"
 CXX="${CXX:-g++}"
 OUT="${OUT:-$HERE/wam-miner}"
-LDFLAGS="${LDFLAGS:-}"
+LDFLAGS="${LDFLAGS:--flto}"
 LDLIBS="${LDLIBS:--lpthread}"
 RUN_SELF_TEST="${RUN_SELF_TEST:-1}"
 
@@ -142,10 +142,10 @@ echo "  compiling..."
 # -O3 and -march=native: this is the hot loop of the whole program, and a
 # miner is always built on the machine that will run it. Distributors who need
 # a portable binary should override with CXXFLAGS='-O3 -mtune=generic'.
-: "${CXXFLAGS:=-O3 -march=native}"
+: "${CXXFLAGS:=-O3 -march=native -flto}"
 
 # shellcheck disable=SC2086
-"$CXX" -std=c++17 $CXXFLAGS $LDFLAGS \
+x86_64-w64-mingw32-g++ -std=c++17 $CXXFLAGS $LDFLAGS \
     -I"$RANDOMX_INCLUDE" \
     -I"$HERE/src" \
     "$HERE/src/main.cpp" \
