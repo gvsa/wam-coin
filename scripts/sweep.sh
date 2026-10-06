@@ -334,6 +334,18 @@ else
     skip "published download is this network" "curl is not installed"
 fi
 
+# And the three repositories named in every announcement, which a reader is
+# told he may clone any of. On 2026-10-06 GitHub had a ruleset requiring main
+# to be changed through a pull request and had been silently refusing the
+# push. ship.sh is right to report a mirror and carry on -- and it says so in
+# one line, once, inside a ship that worked. The only reason it was noticed
+# is that somebody read that line, which is luck rather than a check.
+if command -v git >/dev/null 2>&1; then
+    run "the three homes hold the same project" "$PY" scripts/check_mirrors.py
+else
+    skip "the three homes hold the same project" "git is not installed"
+fi
+
 # ---------------------------------------------------------------------------
 printf '\n%sthe deployed machines%s\n' "$BLD" "$OFF"
 
