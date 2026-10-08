@@ -74,7 +74,10 @@ def check(name, fn):
 
 
 def render(md, marked=()):
-    return build_pages.convert(md, "docs/TEST.md", marked)
+    # A real path: convert() resolves relative links against it, and
+    # audit_repo.sh reads a path in the tree as a reference to a file that
+    # must exist. An invented one fails that audit, correctly.
+    return build_pages.convert(md, "docs/MINE.md", marked)
 
 
 # ---------------------------------------------------------------------------
@@ -151,8 +154,11 @@ def test_an_unmarked_block_is_not_marked():
 
 def test_mark_lands_on_the_block_built_from_a_wrapped_line():
     # A marked sentence wraps across source lines and becomes one paragraph.
+    # The fixture is the whitepaper's own wording, so it is marked here for
+    # the same reason the whitepaper marks it: audit_repo.sh reads these
+    # words as a claim, and a test fixture is a mention.
     out = render("the reserve is locked five years, with none of it\n"
-                 "liquid at launch\n", marked={1})
+                 "liquid at launch\n", marked={1})  # wam:quote-line
     assert out.count("<!-- wam:quote-line -->") == 1, \
         f"a wrapped paragraph was marked {out.count('wam:quote-line')} times"
     assert quoted.strip_quoted(out).strip() == "", \
@@ -190,7 +196,7 @@ def test_a_mark_inside_a_blockquote_does_not_split_it():
 def test_a_marked_table_row_marks_the_table():
     md = ("| Allocation | Status |\n"
           "|---|---|\n"
-          "| Founder reserve | locked 5 years, none liquid at launch |\n")
+          "| Founder reserve | locked 5 years, none liquid at launch |\n")  # wam:quote-line
     out = render(md, marked={2})
     assert out.count("<!-- wam:quote-line -->") == 1, \
         f"a marked row did not mark its table:\n        {out}"
