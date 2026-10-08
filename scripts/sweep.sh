@@ -152,6 +152,12 @@ run "repository self-agreement"  bash scripts/audit_repo.sh
 # guarantees the backlog does not grow.
 run "no assistant attribution"   "$PY" scripts/check_attribution.py
 run "mention is not use"         "$PY" scripts/check_mentions.py
+
+# And the library those checks lean on. A quotation mark that opens a region
+# and never closes it silences the REST of its file, and the symptom is a
+# file that has gone quiet -- which nothing notices. On 8 October 2026 one
+# docstring sentence naming the convention had been doing that for weeks.
+run "a mention is not a mark"    "$PY" scripts/test/test_quoted.py
 run "every link resolves"        "$PY" scripts/check_links.py
 run "the zone is signed and validates" "$PY" scripts/check_dnssec.py
 run "the seeds inside the binary answer" "$PY" scripts/check_fixed_seeds.py
@@ -321,6 +327,13 @@ printf '\n%sthe network as strangers meet it%s\n' "$BLD" "$OFF"
 # stranger can find the network at all, was permanently "not run" on the only
 # machine the sweep is run from.
 run "DNS seeds answer x9."    bash scripts/check_dns_seeds.sh
+
+# Every host:port on a page a stranger reads. The mining guide sent miners to
+# a testnet port that had stopped existing on launch day, and on 8 October
+# 2026 it was naming a third-party pool whose stratum port refuses the
+# connection from four different countries. The sentence "all three answered
+# when this page was last checked" is a claim with no checker behind it.
+run "published endpoints answer" "$PY" scripts/check_published_endpoints.py
 
 if command -v curl >/dev/null 2>&1; then
     run "published download is this network" bash scripts/check_release_matches.sh

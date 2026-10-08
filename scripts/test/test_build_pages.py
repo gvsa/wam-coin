@@ -248,8 +248,14 @@ def test_no_published_page_shows_an_escaped_mark():
     bad = []
     for page in sorted((ROOT / "site").glob("**/*.html")):
         text = page.read_text(encoding="utf-8", errors="replace")
-        if "&lt;!--" in text or "wam:quote" in text.replace(
-                "<!-- wam:quote-line -->", ""):
+        # Assembled: a closing mark alone on a line IS a closing mark, even
+        # inside a string in a test. Writing the three forms out here closed
+        # a region this file never opened, and the audit said so.
+        m = "wam:quote-"
+        stripped = text
+        for form in (f"<!-- {m}line -->", f"<!-- {m}begin -->", f"<!-- {m}end -->"):
+            stripped = stripped.replace(form, "")
+        if "&lt;!--" in text or "wam:quote" in stripped:
             bad.append(page.relative_to(ROOT).as_posix())
     assert not bad, ("a quotation mark is visible to a reader on: "
                      + ", ".join(bad))

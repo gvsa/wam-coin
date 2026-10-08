@@ -569,6 +569,7 @@ Two of the six Winsock differences would have failed silently:
 
 ### Measured on Windows 11, 03:04–03:09
 
+<!-- wam:quote-begin -->
 ```
 --self-test     SHA-256, byte order, targets, both official RandomX vectors
 connected       pool.wamcoin.org:13333, subscribed, authorized
@@ -577,6 +578,7 @@ randomx         full memory (2 GiB dataset) built in 5.52 s
 shares          10 accepted, 0 rejected
 block 8478      solved at 03:05:46
 ```
+<!-- wam:quote-end -->
 
 and on the pool, on France:
 

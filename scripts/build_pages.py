@@ -244,10 +244,21 @@ def convert(md, src, marked=()):
         It goes on the block AFTER conversion, never through inline() or
         esc() -- which is what turned `<!-- ... -->` into visible text the
         first time this was attempted.
+
+        A one-line mark covers one line, and a <pre> block is many: quoted.py
+        reads a file line by line, so an end-of-line mark on a code block
+        covered its LAST line and left the rest unmarked. docs/REHEARSALS.md
+        marks a rehearsal log that names the retired testnet port, and
+        check_published_endpoints.py read that port off the generated page as
+        a live instruction. A multi-line block therefore gets the region form
+        of the mark, which is what regions are for.
         """
-        if any(n in marked for n in range(start, end)):
-            return block + " <!-- wam:quote-line -->"
-        return block
+        if not any(n in marked for n in range(start, end)):
+            return block
+        if "\n" in block:
+            return ("<!-- wam:quote-begin -->\n" + block
+                    + "\n<!-- wam:quote-end -->")
+        return block + " <!-- wam:quote-line -->"
 
     while i < len(lines):
         ln = lines[i]
