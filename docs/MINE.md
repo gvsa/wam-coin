@@ -371,11 +371,14 @@ There is more than one, and they are not run by us:
 pool.wamcoin.org:3333             run by this project, 1% operator fee
 wam.ariabrain.com:3333
 stratum.cryptopickaxe.co.uk:6040
+wampool.vslabs.co.in:3333
 ```
 
 Ask their operators about their fees and their payout rules — those are
-theirs to state, not ours to state for them. All three answered when this
-page was last checked; if one does not answer for you, try another.
+theirs to state, not ours to state for them. A check in this repository
+dials every address on this page on every sweep, so if one stops answering
+we find out rather than hearing it from a miner. If one does not answer for
+you, try another.
 
 **Ours charges the same as the others on purpose.** It ran at 0% while it was
 the only pool in existence, and a pool charging nothing is not competing with
