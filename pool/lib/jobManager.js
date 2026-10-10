@@ -15,6 +15,8 @@ const {
     reverseBuffer, hashToBigIntLE, difficultyToTarget, targetToDifficulty
 } = require('./util');
 const { HEADER_SIZE, EXTRANONCE2_SIZE } = require('./constants');
+// What the node meant by its answer is decided in daemon.js and nowhere else.
+const { SUBMIT } = require('./daemon');
 
 /** Reject codes, mirroring the stratum convention used by every miner. */
 const REJECT = {
@@ -556,10 +558,7 @@ class JobManager extends EventEmitter {
                 settled++;
                 continue;
             }
-            const looked = result.results.some((r) => r.ok || r.error === null);
-            const already = result.reasons.some((r) =>
-                /duplicate|inconclusive/i.test(String(r)));
-            if (already) {
+            if (result.verdict === SUBMIT.ALREADY_HAVE) {
                 // THE NODE ALREADY HAS IT, AND THAT IS NOT THE SAME AS IT
                 // HAVING BEEN PAID.
                 //
@@ -583,7 +582,7 @@ class JobManager extends EventEmitter {
                 this._emitRecovered(e);
                 await this._unspool(e.hash);
                 settled++;
-            } else if (looked) {
+            } else if (result.verdict === SUBMIT.REFUSED) {
                 this.log.error(`spooled block ${e.height} was read and refused: ` +
                                `${result.reasons.join(' | ')} -- it will not be ` +
                                'offered again');
@@ -707,10 +706,11 @@ class JobManager extends EventEmitter {
         const RETRIES = 5;
         const GAP_MS = 1000;
         for (let attempt = 1; attempt <= RETRIES; attempt++) {
-            if (result.accepted) break;
-            const noDaemonAnswered = result.results.length > 0
-                                  && result.results.every((r) => !r.ok);
-            if (!noDaemonAnswered) break;   // it was looked at and refused
+            // Only silence is worth retrying. An answer -- accepted, already
+            // held, or refused -- is an answer, and sending the block again
+            // cannot change it. This asked the results directly before, which
+            // is a fourth reading of the node's vocabulary waiting to drift.
+            if (result.verdict !== SUBMIT.UNANSWERED) break;
             this.log.warn(`block ${job.height}: no daemon could answer ` +
                           `(${result.reasons.join(' | ')}) -- ` +
                           `retrying ${attempt}/${RETRIES}`);
@@ -735,18 +735,37 @@ class JobManager extends EventEmitter {
             this._unspool(blockHash).catch((e) =>
                 this.log.warn(`block ${job.height} is accepted but could not be ` +
                               `removed from the spool: ${e.message}`));
+        } else if (result.verdict === SUBMIT.ALREADY_HAVE) {
+            // A LOST RACE IS NOT A REJECTION, AND SAYING SO COSTS REAL THINGS.
+            //
+            // Two of our own miners can solve the same height milliseconds
+            // apart; the second is told the node already has one. So can
+            // another pool beat us to it. Both are ordinary proof of work,
+            // and until 10 October 2026 both were logged at ERROR as "the
+            // node read it and refused it" -- which reads, to whoever is
+            // watching the pool, as though we were producing bad blocks.
+            //
+            // The share itself was already credited: in PPLNS a miner is paid
+            // for the work he showed, not for who got the block in first.
+            share.blockAccepted = false;
+            share.blockStale = true;
+            this.stats.blocksStale = (this.stats.blocksStale || 0) + 1;
+            this.log.info(`block ${job.height} was already taken -- the node has `
+                          + `one for that height (${result.reasons.join(' | ')}). `
+                          + `A lost race, not a refusal; the share is credited `
+                          + `and nothing is owed.`);
+            this._unspool(blockHash).catch(() => {});
         } else {
             share.blockAccepted = false;
             share.rejectReasons = result.reasons;
             this.log.error(`block ${job.height} REJECTED: ${result.reasons.join(' | ')}`);
             this.emit('blockRejected', share);
 
-            // A node that LOOKED and refused has told us something final, and
-            // keeping those bytes forever helps nobody. A node that never
-            // answered has told us nothing, so the block stays spooled and the
-            // drain will offer it again.
-            const looked = result.results.some((r) => r.ok || r.error === null);
-            if (looked) {
+            // A node that LOOKED and named a fault has told us something
+            // final, and keeping those bytes forever helps nobody. A node that
+            // never answered has told us nothing, so the block stays spooled
+            // and the drain will offer it again.
+            if (result.verdict === SUBMIT.REFUSED) {
                 this.log.error(`    the block is kept for inspection but will not ` +
                                `be retried: the node read it and refused it`);
                 this._unspool(blockHash, result.reasons.join(' | ')).catch(() => {});

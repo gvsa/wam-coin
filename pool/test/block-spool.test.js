@@ -72,20 +72,23 @@ function memStore() {
     };
 }
 
-/** submitBlock outcomes, in the shape daemon.js returns. */
-const NOBODY_ANSWERED = {
-    accepted: false, reasons: ['connect ECONNREFUSED'],
-    results: [{ ok: false, error: 'connect ECONNREFUSED', result: null }]
-};
-const ACCEPTED = { accepted: true, reasons: [], results: [{ ok: true, error: null, result: null }] };
-const READ_AND_REFUSED = {
-    accepted: false, reasons: ['bad-txnmrklroot'],
-    results: [{ ok: true, error: null, result: 'bad-txnmrklroot' }]
-};
-const DUPLICATE = {
-    accepted: false, reasons: ['duplicate'],
-    results: [{ ok: true, error: null, result: 'duplicate' }]
-};
+/** submitBlock outcomes, in the shape daemon.js returns.
+ *
+ * The verdict is produced by the real classifier rather than written in by
+ * hand. These fakes carried hand-made results until 2026-10-10, so when the
+ * reading of the node's answer moved into daemon.js the tests went on
+ * passing their own idea of it. A fake that disagrees with the thing it
+ * stands in for tests nothing.
+ */
+const { outcomeOf } = require('./outcome');
+
+const NOBODY_ANSWERED = outcomeOf(false, ['connect ECONNREFUSED'],
+    [{ ok: false, error: 'connect ECONNREFUSED', result: null }]);
+const ACCEPTED = outcomeOf(true, [], [{ ok: true, error: null, result: null }]);
+const READ_AND_REFUSED = outcomeOf(false, ['bad-txnmrklroot'],
+    [{ ok: true, error: null, result: 'bad-txnmrklroot' }]);
+const DUPLICATE = outcomeOf(false, ['duplicate'],
+    [{ ok: true, error: null, result: 'duplicate' }]);
 
 function jm(store, outcome) {
     const m = new JobManager({ submitBlock: async () => outcome.shift ? outcome.shift() : outcome },
