@@ -221,7 +221,29 @@ def check_links(url, html):
             ok(f"{host} -> {code}")
         except urllib.error.HTTPError as e:
             # 403/405 from sites that dislike scripts is not a broken link.
-            (warn if e.code in (403, 405, 429) else bad)(f"{host} -> HTTP {e.code}")
+            #
+            # AND NEITHER IS A 5xx, WHICH IS THE OTHER SIDE SAYING IT CANNOT
+            # ANSWER RIGHT NOW.
+            #
+            # On 2026-10-10 the sweep failed on `github.com -> HTTP 503` and
+            # reported that this project does not present itself as a real
+            # one. GitHub answered 200 four minutes later. A 503 is their
+            # server being unavailable; it says nothing about our page, our
+            # name, or our repository, and a check that turns somebody else's
+            # bad minute into a finding about us teaches its reader to skim
+            # the red lines.
+            #
+            # 404 stays a finding, because that one IS about us: the name is
+            # wrong, or the repository is not public.
+            if e.code in (403, 405, 429) or 500 <= e.code < 600:
+                warn(f"{host} -> HTTP {e.code}: could not be asked, which is "
+                     f"not the same as a bad answer")
+            else:
+                bad(f"{host} -> HTTP {e.code}")
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            # Same again: no route, a timeout or a reset is this machine's
+            # network or theirs, and is not evidence about the link.
+            warn(f"{host} -> {type(e).__name__}: could not be reached from here")
         except Exception as e:
             bad(f"{host} -> {type(e).__name__}: it is on the page and does not answer")
 
