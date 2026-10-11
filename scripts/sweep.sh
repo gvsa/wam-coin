@@ -263,6 +263,20 @@ run "no page promises and forgets"  "$PY" scripts/check_promises.py
 # docs/TREASURY_LEDGER.md.
 run "treasury claims match the ledger" "$PY" scripts/check_treasury_claims.py
 
+# That one reads what we SAY about the money. This reads the LEDGER itself,
+# against the chain, and it is the half that was missing. docs/TREASURY_LEDGER.md
+# does not merely record the spends: it hands the reader an identity and tells
+# him to repeat it -- 2.5 x height minus every amount and every fee is what a
+# node will report. On 2026-10-11 that worked example still stood at height
+# 4,989 and subtracted one 500 WAM spend, while ten further rows sat in the
+# table beneath it. Anybody who did as the file asked would have landed 10,010
+# WAM away from the chain, in the file about where the money went, and nothing
+# here had noticed for nine days.
+#
+# It also answers the question the ledger exists for: the identity cannot hold
+# if a coin ever left the treasury without a row.
+run "the ledger is what the chain says"  "$PY" scripts/check_treasury_ledger.py --node "${NODES%% *}"
+
 # All three of those read the pages. Nothing read the thing that WRITES them.
 # scripts/build_pages.py has put five defects on the live site -- an escaped
 # quotation mark mid-sentence in the whitepaper, numbered rules rendered

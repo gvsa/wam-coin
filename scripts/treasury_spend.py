@@ -300,16 +300,131 @@ def cmd_plan(args):
     mature.sort(key=lambda u: u["height"])
 
     target = float(args.amount)
+    parts = max(1, int(getattr(args, "parts", 1) or 1))
+    if parts > 1:
+        print("  parts               %d, all cut from this one scan" % parts)
+
+    # ONE SCAN, N PARTS, AND NO OUTPUT OFFERED TWICE.
+    #
+    # A bounty does not fit in one transaction. The treasury is paid one 2.5
+    # WAM output per block and never consolidated, so 10,000 WAM is about
+    # 4,000 inputs and 590 KB -- six times what any node will relay. It has to
+    # leave in parts.
+    #
+    # Planning those parts one at a time costs a trip to the offline machine
+    # per part, because a plan can only avoid the inputs of a transaction that
+    # has already been sent: scantxoutset reads the chain, and the mempool
+    # filter above sees only what was broadcast. On 2026-10-02 that cost a
+    # signature -- part two was planned while part one was still unconfirmed,
+    # the scan offered the same 501 outputs in the same order, and the two
+    # plans came out byte-identical.
+    #
+    # Parts cut from one scan cannot collide, because the pool is consumed as
+    # each part takes from it. The key is then used once per part in a single
+    # sitting, instead of once per journey.
+    pool = list(mature)
+    built = []
+    for i in range(1, parts + 1):
+        reason = (args.reason if parts == 1
+                  else "%s (%d of %d)" % (args.reason, i, parts))
+        built.append(_plan_part(rpc, pool, target, args.to, reason, tip,
+                                i, parts))
+
+    # AND IT IS CHECKED RATHER THAN ASSUMED.
+    #
+    # The sentence above says the parts cannot collide. This is the line that
+    # makes it true, because a plan that spends an outpoint another plan also
+    # spends is a signature thrown away, and it is found at broadcast, after
+    # the key has been used. Nothing is written until every part is disjoint.
+    seen = {}
+    for plan in built:
+        for inp in plan["inputSet"]:
+            key = (inp["txid"], inp["vout"])
+            if key in seen:
+                die("part %d and part %d both spend %s:%d. No file was "
+                    "written and nothing is safe to sign."
+                    % (seen[key], plan["part"], key[0], key[1]))
+            seen[key] = plan["part"]
+
+    names = []
+    for plan in built:
+        out = (args.out if parts == 1
+               else _part_name(args.out, plan["part"], parts))
+        with open(out, "w", encoding="utf-8", newline="\n") as f:
+            json.dump(plan, f, indent=2)
+        names.append(out)
+
+    print()
+    print("=" * 66)
+    print(" READ THIS BEFORE YOU SIGN IT")
+    print("=" * 66)
+    if parts == 1:
+        plan = built[0]
+        print("  paying             %s WAM" % wam(target))
+        print("  to                 %s" % args.to)
+        print("  from               %s  (the treasury)" % TREASURY)
+        print("  inputs             %d, totalling %s WAM"
+              % (plan["inputs"], wam(plan["inputTotal"])))
+        print("  change back        %s WAM" % wam(plan["change"]))
+        print("  fee                %s WAM  (%d bytes)"
+              % (wam(plan["fee"]), plan["sizeBytes"]))
+        print("  reason             %s" % args.reason)
+        print()
+        print("  written to         %s" % names[0])
+        print()
+        print("  Carry that file to the air-gapped machine and run:")
+        print("      python3 scripts/treasury_spend.py sign --in %s" %
+              os.path.basename(names[0]))
+        print("=" * 66)
+        return
+
+    print("  paying             %s WAM in %d parts, to one address"
+          % (wam(target * parts), parts))
+    print("  to                 %s" % args.to)
+    print("  from               %s  (the treasury)" % TREASURY)
+    print("  reason             %s" % args.reason)
+    print()
+    for plan, out in zip(built, names):
+        print("  %d of %d   %s WAM   %4d inputs   fee %s   %s"
+              % (plan["part"], parts, wam(plan["amount"]), plan["inputs"],
+                 wam(plan["fee"]), out))
+    print()
+    print("  total leaving      %s WAM  (%s paid, %s in fees)"
+          % (wam(sum(p["amount"] + p["fee"] for p in built)),
+             wam(sum(p["amount"] for p in built)),
+             wam(sum(p["fee"] for p in built))))
+    print("  no two parts spend the same output: %d outpoints, all distinct"
+          % len(seen))
+    print()
+    print("  Carry all %d files to the air-gapped machine, and sign each:" % parts)
+    for out in names:
+        print("      python3 scripts/treasury_spend.py sign --in %s"
+              % os.path.basename(out))
+    print("=" * 66)
+
+
+def _part_name(path, i, n):
+    """treasury-plan.json, part 2 of 8 -> treasury-plan-2of8.json"""
+    base, ext = os.path.splitext(path)
+    return "%s-%dof%d%s" % (base, i, n, ext or ".json")
+
+
+def _plan_part(rpc, pool, target, to, reason, tip, part, parts):
+    """Take inputs off the front of `pool` and build one unsigned plan.
+
+    `pool` is consumed: every output this part spends is removed from it
+    before it returns, so the next part cannot be offered the same coins."""
     chosen, got = [], 0.0
-    for u in mature:
+    for u in pool:
         chosen.append(u)
         got += float(u["amount"])
         # Over-collect by one input's worth so the fee is always covered.
         if got >= target + 3.0:
             break
     if got < target:
-        die("the treasury has only %s WAM spendable and %s was asked for"
-            % (wam(got), wam(target)))
+        die("the treasury has %s WAM left to select from and part %d of %d "
+            "asked for %s. Nothing was planned."
+            % (wam(got), part, parts, wam(target)))
 
     # Size, then fee. 148 bytes per P2PKH input, 34 per output, 10 overhead.
     size = len(chosen) * 148 + 2 * 34 + 10
@@ -319,7 +434,7 @@ def cmd_plan(args):
         die("the chosen inputs do not cover the amount and the fee")
 
     inputs = [{"txid": u["txid"], "vout": u["vout"]} for u in chosen]
-    outputs = [{args.to: target}]
+    outputs = [{to: target}]
     # A change output below the dust threshold cannot be created, and
     # dropping it silently would pay the difference to miners.
     if change >= 0.00000546:
@@ -336,10 +451,13 @@ def cmd_plan(args):
                 "scriptPubKey": u["scriptPubKey"], "amount": float(u["amount"])}
                for u in chosen]
 
-    plan = {
+    # The pool is a list, and `chosen` came off its front in order.
+    del pool[:len(chosen)]
+
+    return {
         "network": "mainnet",
         "from": TREASURY,
-        "to": args.to,
+        "to": to,
         "amount": target,
         "change": change,
         "fee": fee,
@@ -355,29 +473,10 @@ def cmd_plan(args):
         "plannedAtHeight": tip,
         "unsignedHex": raw,
         "prevtxs": prevtxs,
-        "reason": args.reason,
+        "reason": reason,
+        "part": part,
+        "parts": parts,
     }
-    with open(args.out, "w", encoding="utf-8", newline="\n") as f:
-        json.dump(plan, f, indent=2)
-
-    print()
-    print("=" * 66)
-    print(" READ THIS BEFORE YOU SIGN IT")
-    print("=" * 66)
-    print("  paying             %s WAM" % wam(target))
-    print("  to                 %s" % args.to)
-    print("  from               %s  (the treasury)" % TREASURY)
-    print("  inputs             %d, totalling %s WAM" % (len(chosen), wam(got)))
-    print("  change back        %s WAM" % wam(change))
-    print("  fee                %s WAM  (%d bytes)" % (wam(fee), size))
-    print("  reason             %s" % args.reason)
-    print()
-    print("  written to         %s" % args.out)
-    print()
-    print("  Carry that file to the air-gapped machine and run:")
-    print("      python3 scripts/treasury_spend.py sign --in %s" %
-          os.path.basename(args.out))
-    print("=" * 66)
 
 
 # ---------------------------------------------------------------------------
@@ -462,7 +561,193 @@ def _wif_problem(s):
 
 
 def cmd_sign(args):
-    plan = json.load(open(args.infile, encoding="utf-8"))
+    parts = max(1, int(getattr(args, "parts", 1) or 1))
+    names = ([args.infile] if parts == 1
+             else [_part_name(args.infile, i, parts)
+                   for i in range(1, parts + 1)])
+    plans = []
+    for n in names:
+        try:
+            plans.append(json.load(open(n, encoding="utf-8")))
+        except OSError as e:
+            die("cannot read %s: %s. Nothing was signed." % (n, e))
+        except ValueError as e:
+            die("%s is not readable as a plan (%s). Nothing was signed."
+                % (n, e))
+
+    # ONE PAYMENT, OR IT IS NOT ONE SIGNING.
+    #
+    # The key is about to be typed once and used on every file in this batch.
+    # That is only defensible if the batch is one payment: the same
+    # destination, and no two parts spending the same coins. Both are checked
+    # here, on this machine, because these files crossed removable media to
+    # get here and this is the last place anything looks at them before a
+    # signature exists.
+    why = _batch_problem(names, plans)
+    if why:
+        die("%s Nothing was signed." % why)
+
+    for n, plan in zip(names, plans):
+        _sign_preflight(args, plan, n)
+
+    print("=" * 66)
+    print(" WHAT YOU ARE ABOUT TO SIGN")
+    print("=" * 66)
+    if len(plans) == 1:
+        plan = plans[0]
+        print("  paying       %s WAM" % wam(plan["amount"]))
+        print("  to           %s" % plan["to"])
+        print("  from         %s" % plan["from"])
+        print("  change back  %s WAM" % wam(plan["change"]))
+        print("  fee          %s WAM" % wam(plan["fee"]))
+        print("  reason       %s" % plan.get("reason", "(none given)"))
+    else:
+        print("  paying       %s WAM in %d parts"
+              % (wam(sum(p["amount"] for p in plans)), len(plans)))
+        print("  to           %s" % plans[0]["to"])
+        print("  from         %s" % plans[0]["from"])
+        print("  fees         %s WAM in total"
+              % wam(sum(p["fee"] for p in plans)))
+        print("  reason       %s" % plans[0].get("reason", "(none given)"))
+        print()
+        for n, plan in zip(names, plans):
+            print("    %s WAM   %4d inputs   fee %s   %s"
+                  % (wam(plan["amount"]), plan["inputs"], wam(plan["fee"]),
+                     os.path.basename(n)))
+        print()
+        print("  the key is asked for once and used on all %d" % len(plans))
+    print("  verified             the bytes to be signed decode to exactly this")
+    print("=" * 66)
+    if input("  type the destination address again to confirm: ").strip() \
+            != plans[0]["to"]:
+        die("that is not the address in the plan; nothing was signed")
+
+    wif = _ask_for_key()
+    written = []
+    try:
+        for i, (n, plan) in enumerate(zip(names, plans), 1):
+            out = (args.out if parts == 1 else _part_name(args.out, i, parts))
+            _sign_one(args, plan, wif, out)
+            written.append(out)
+            if len(plans) > 1:
+                print("  signed %d of %d -> %s" % (i, len(plans), out))
+    finally:
+        del wif
+
+    print()
+    print("  signed, and the key was not written anywhere.")
+    if parts == 1:
+        print("  carry %s back and run:" % written[0])
+        print("      python3 scripts/treasury_spend.py broadcast --in %s" %
+              os.path.basename(written[0]))
+    else:
+        print("  carry all %d files back and run:" % len(written))
+        print("      python3 scripts/treasury_spend.py broadcast --in %s "
+              "--parts %d" % (os.path.basename(args.out), parts))
+    print("=" * 66)
+
+
+def _batch_problem(names, plans):
+    """Why these plans are not one payment, or None if they are.
+
+    Pure: no node, no key, no file. Everything it judges is already in the
+    files, and they crossed removable media to get here."""
+    if len(plans) < 2:
+        return None
+    dests = sorted({p.get("to") for p in plans})
+    if len(dests) != 1:
+        return ("these %d parts pay %d different addresses (%s). That is not "
+                "one payment and they are not signed together."
+                % (len(plans), len(dests), ", ".join(str(d) for d in dests)))
+    if dests[0] is None:
+        return "a part does not name a destination at all."
+    seen = {}
+    for n, plan in zip(names, plans):
+        inset = plan.get("inputSet")
+        if not isinstance(inset, list) or not inset:
+            return ("%s does not name the outputs it spends, so nothing can "
+                    "tell whether it collides with the others."
+                    % os.path.basename(n))
+        for inp in inset:
+            key = (inp.get("txid"), inp.get("vout"))
+            if key in seen:
+                return ("%s and %s both spend %s:%s. One of the two "
+                        "signatures would be thrown away."
+                        % (os.path.basename(seen[key]), os.path.basename(n),
+                           key[0], key[1]))
+            seen[key] = n
+    return None
+
+
+def _ask_for_key():
+    """The key is read from the terminal, used, and never written down."""
+    # getpass keeps it off the screen and out of the shell's history.
+    # A TYPO IS CAUGHT HERE, NOT BY THE NODE, AND IT COSTS ONE RETRY.
+    #
+    # The key is typed by hand, from somewhere that is not on this machine,
+    # into a prompt that shows nothing. Fifty-two characters, and one wrong
+    # one used to end the run with "Invalid private key" from the node -- so
+    # the whole command had to be started again, the address retyped, for a
+    # single letter.
+    #
+    # A WIF carries its own base58check checksum, so a typo is detectable
+    # right here with no node, no network and no key ever leaving this
+    # function. Three tries, then it gives up rather than looping for ever.
+    #
+    # It does not prove the key is the TREASURY's -- that needs secp256k1 and
+    # is the node's job. It proves the key is a key, which is what a typo
+    # breaks.
+    for attempt in range(3):
+        wif = getpass.getpass("  treasury private key (WIF, not echoed): ").strip()
+        if not wif:
+            die("no key was given")
+        why = _wif_problem(wif)
+        if why is None:
+            return wif
+        left = 2 - attempt
+        if left:
+            print("  that key cannot be used: %s. %d try/tries left."
+                  % (why, left))
+    die("three unusable keys; nothing was signed")
+
+
+def _sign_one(args, plan, wif, out):
+    """Sign one plan with a key already in hand, and write the result."""
+    # EVERYTHING GOES DOWN STDIN, NOTHING ON THE COMMAND LINE.
+    #
+    # Two reasons, and the first one is fatal on Windows. The transaction is
+    # 29,974 bytes, which is 59,948 hex characters, and cmd.exe stops at
+    # 8,191 for the whole line -- so the earlier version of this could not
+    # run there at all. It failed with "the command line is too long" and the
+    # founder was the one who noticed.
+    #
+    # The second is worse and was invisible: the key was an argv element, so
+    # it sat in the process list where any program on the machine could read
+    # it. wam-cli -stdin takes the arguments one per line instead, which
+    # keeps the key out of argv entirely.
+    cli = _cli_base(args) + ["signrawtransactionwithkey"]
+
+    payload = "\n".join([plan["unsignedHex"],
+                         json.dumps([wif]),
+                         json.dumps(plan["prevtxs"])]) + "\n"
+    proc = subprocess.run(cli, input=payload, capture_output=True, text=True)
+    del payload
+    if proc.returncode != 0:
+        die("signing failed: %s" % (proc.stderr.strip() or proc.stdout.strip()))
+
+    res = json.loads(proc.stdout)
+    if not res.get("complete"):
+        die("the transaction is not fully signed: %s" %
+            json.dumps(res.get("errors", []))[:400])
+
+    signed = dict(plan)
+    signed["signedHex"] = res["hex"]
+    signed.pop("prevtxs", None)          # no longer needed, and it is bulky
+    with open(out, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(signed, f, indent=2)
+
+
+def _sign_preflight(args, plan, name):
 
     # READ THE TRANSACTION BEFORE SHOWING ANYTHING, AND LONG BEFORE THE KEY.
     #
@@ -484,92 +769,9 @@ def cmd_sign(args):
     #
     # Found by dang150296 (Urriki1502), 2026-10-04.
     decoded = _offline_decode(args, plan["unsignedHex"])
-    _verify_against_plan(plan, decoded, "the unsigned transaction")
-
-    print("=" * 66)
-    print(" WHAT YOU ARE ABOUT TO SIGN")
-    print("=" * 66)
-    print("  paying       %s WAM" % wam(plan["amount"]))
-    print("  to           %s" % plan["to"])
-    print("  from         %s" % plan["from"])
-    print("  change back  %s WAM" % wam(plan["change"]))
-    print("  fee          %s WAM" % wam(plan["fee"]))
-    print("  reason       %s" % plan.get("reason", "(none given)"))
-    print("  verified             the bytes to be signed decode to exactly this")
-    print("=" * 66)
-    if input("  type the destination address again to confirm: ").strip() != plan["to"]:
-        die("that is not the address in the plan; nothing was signed")
-
-    # The key is read from the terminal, used once, and never written down.
-    # getpass keeps it off the screen and out of the shell's history.
-    # A TYPO IS CAUGHT HERE, NOT BY THE NODE, AND IT COSTS ONE RETRY.
-    #
-    # The key is typed by hand, from somewhere that is not on this machine,
-    # into a prompt that shows nothing. Fifty-two characters, and one wrong
-    # one used to end the run with "Invalid private key" from the node -- so
-    # the whole command had to be started again, the address retyped, for a
-    # single letter.
-    #
-    # A WIF carries its own base58check checksum, so a typo is detectable
-    # right here with no node, no network and no key ever leaving this
-    # function. Three tries, then it gives up rather than looping for ever.
-    #
-    # It does not prove the key is the TREASURY's -- that needs secp256k1 and
-    # is the node's job. It proves the key is a key, which is what a typo
-    # breaks.
-    wif = ""
-    for attempt in range(3):
-        wif = getpass.getpass("  treasury private key (WIF, not echoed): ").strip()
-        if not wif:
-            die("no key was given")
-        why = _wif_problem(wif)
-        if why is None:
-            break
-        left = 2 - attempt
-        if left:
-            print("  that key cannot be used: %s. %d try/tries left."
-                  % (why, left))
-        else:
-            die("three unusable keys; nothing was signed")
-
-    # EVERYTHING GOES DOWN STDIN, NOTHING ON THE COMMAND LINE.
-    #
-    # Two reasons, and the first one is fatal on Windows. The transaction is
-    # 29,974 bytes, which is 59,948 hex characters, and cmd.exe stops at
-    # 8,191 for the whole line -- so the earlier version of this could not
-    # run there at all. It failed with "the command line is too long" and the
-    # founder was the one who noticed.
-    #
-    # The second is worse and was invisible: the key was an argv element, so
-    # it sat in the process list where any program on the machine could read
-    # it. wam-cli -stdin takes the arguments one per line instead, which
-    # keeps the key out of argv entirely.
-    cli = _cli_base(args) + ["signrawtransactionwithkey"]
-
-    payload = "\n".join([plan["unsignedHex"],
-                          json.dumps([wif]),
-                          json.dumps(plan["prevtxs"])]) + "\n"
-    proc = subprocess.run(cli, input=payload, capture_output=True, text=True)
-    del wif, payload
-    if proc.returncode != 0:
-        die("signing failed: %s" % (proc.stderr.strip() or proc.stdout.strip()))
-
-    res = json.loads(proc.stdout)
-    if not res.get("complete"):
-        die("the transaction is not fully signed: %s" %
-            json.dumps(res.get("errors", []))[:400])
-
-    out = dict(plan)
-    out["signedHex"] = res["hex"]
-    out.pop("prevtxs", None)          # no longer needed, and it is bulky
-    with open(args.out, "w", encoding="utf-8", newline="\n") as f:
-        json.dump(out, f, indent=2)
-
-    print()
-    print("  signed, and the key was not written anywhere.")
-    print("  carry %s back and run:" % args.out)
-    print("      python3 scripts/treasury_spend.py broadcast --in %s" %
-          os.path.basename(args.out))
+    _verify_against_plan(plan, decoded,
+                         "the unsigned transaction in %s"
+                         % os.path.basename(name))
 
 
 # ---------------------------------------------------------------------------
@@ -577,8 +779,45 @@ def cmd_sign(args):
 # ---------------------------------------------------------------------------
 
 def cmd_broadcast(args):
-    signed = json.load(open(args.infile, encoding="utf-8"))
+    parts = max(1, int(getattr(args, "parts", 1) or 1))
+    if parts == 1:
+        return _broadcast_one(args, args.infile, Rpc(args.conf, port=args.port),
+                              ask=not args.yes)
+
+    # EVERY PART IS CHECKED AGAINST THE CHAIN BEFORE ANY PART IS SENT.
+    #
+    # The confirmation is asked once, because eight identical prompts for one
+    # payment teach the operator to type SEND without reading. What replaces
+    # them is that all eight are verified first -- plan match, destination,
+    # amount, fee, and whether their inputs are still unspent -- so the one
+    # question covers eight transactions that have each already passed every
+    # check the single-file path applies.
     rpc = Rpc(args.conf, port=args.port)
+    names = [_part_name(args.infile, i, parts) for i in range(1, parts + 1)]
+    for n in names:
+        _broadcast_one(args, n, rpc, ask=False, send=False)
+
+    print()
+    print("=" * 66)
+    print("  %d part(s) verified against the chain, none sent yet." % parts)
+    print("=" * 66)
+    if not args.yes:
+        if input("  type SEND to broadcast all %d: " % parts).strip() != "SEND":
+            die("not sent")
+
+    sent = []
+    for n in names:
+        sent.append(_broadcast_one(args, n, rpc, ask=False, send=True))
+    print()
+    print("  %d transaction(s) sent." % len(sent))
+    return None
+
+
+def _broadcast_one(args, infile, rpc, ask=True, send=True):
+    try:
+        signed = json.load(open(infile, encoding="utf-8"))
+    except OSError as e:
+        die("cannot read %s: %s. Nothing was sent." % (infile, e))
 
     # DECODE WHAT IS ACTUALLY THERE, not what the file claims.
     #
@@ -669,8 +908,10 @@ def cmd_broadcast(args):
             print("  MISMATCH  %s" % p)
         die("the signed transaction does not match the plan. Nothing was sent.")
 
-    print("  every field matches the plan.")
-    if not args.yes:
+    print("  every field matches the plan, and its inputs are still unspent.")
+    if not send:
+        return None
+    if ask:
         if input("  type SEND to broadcast it: ").strip() != "SEND":
             die("not sent")
 
@@ -679,8 +920,10 @@ def cmd_broadcast(args):
     print("  broadcast. txid %s" % txid)
     print()
     print("  Publish it: the amount, the reason and this txid. That is the")
-    print("  promise in SECURITY.md and in docs/TREASURY_CUSTODY.md, and this")
-    print("  is the treasury's first movement since block 1.")
+    print("  promise in SECURITY.md and in docs/TREASURY_CUSTODY.md, and it")
+    print("  is a row in docs/TREASURY_LEDGER.md before it is a sentence")
+    print("  anywhere else.")
+    return txid
 
 
 # ---------------------------------------------------------------------------
@@ -698,6 +941,10 @@ def main():
     p.add_argument("--conf", default="/root/.wam-mainnet/wam.conf")
     p.add_argument("--port", type=int, default=9554)
     p.add_argument("--out", default="treasury-plan.json")
+    p.add_argument("--parts", type=int, default=1,
+                   help="cut the payment into N equal parts from ONE scan, "
+                        "with no output offered twice; --amount is the "
+                        "amount of each part")
     p.set_defaults(func=cmd_plan)
 
     p = sub.add_parser("sign", help="sign it where the key is (offline)")
@@ -708,6 +955,9 @@ def main():
     p.add_argument("--port", type=int, default=9554)
     p.add_argument("--rpcuser", default="")
     p.add_argument("--rpcpassword", default="")
+    p.add_argument("--parts", type=int, default=1,
+                   help="sign N parts in one sitting; the key is asked for "
+                        "once and used on all of them")
     p.set_defaults(func=cmd_sign)
 
     p = sub.add_parser("broadcast", help="check it, then send it (online)")
@@ -715,6 +965,9 @@ def main():
     p.add_argument("--conf", default="/root/.wam-mainnet/wam.conf")
     p.add_argument("--port", type=int, default=9554)
     p.add_argument("--yes", action="store_true", help="skip the typed confirmation")
+    p.add_argument("--parts", type=int, default=1,
+                   help="verify N parts against the chain, then send them "
+                        "after one confirmation")
     p.set_defaults(func=cmd_broadcast)
 
     args = ap.parse_args()

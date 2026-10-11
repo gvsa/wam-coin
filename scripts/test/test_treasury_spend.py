@@ -58,6 +58,13 @@ def check(name, fn):
     except AssertionError as e:
         failed.append(name)
         print("  %sFAIL%s  %s\n        %s" % (RED, OFF, name, e))
+    except SystemExit as e:
+        # die() raises SystemExit, which is NOT an Exception and so was not
+        # caught here. One refusal inside a check ended the entire run at
+        # that line: the checks before it printed, the ones after it never
+        # ran, and the output read like a short pass.
+        failed.append(name)
+        print("  %sFAIL%s  %s\n        it refused: %s" % (RED, OFF, name, e))
     except Exception as e:                       # noqa: BLE001
         failed.append(name)
         print("  %sFAIL%s  %s\n        unexpected %s: %s"
@@ -245,6 +252,143 @@ refuses("a plan that does not name its inputs is refused",
         lambda: verify(plan={k: v for k, v in PLAN.items() if k != "inputSet"}),
         "a plan written by the old script was accepted")
 
+
+# ---------------------------------------------------------------------------
+print()
+print("%sone payment in parts, and no coin offered twice%s" % (BLD, OFF))
+
+
+class FakeRpc:
+    """A node that answers createrawtransaction and nothing else.
+
+    _plan_part needs exactly one RPC call and no chain, so the selection and
+    the fee arithmetic are testable without either."""
+
+    def __init__(self):
+        self.calls = 0
+
+    def call(self, method, params=None):
+        assert method == "createrawtransaction", method
+        self.calls += 1
+        return "00" * 10
+
+
+def treasury_pool(n, start_height=1):
+    """n of the 2.5 WAM coinbase outputs the treasury is actually made of."""
+    return [{"txid": "%064x" % i, "vout": 0, "amount": 2.5,
+             "height": start_height + i,
+             "scriptPubKey": "76a914" + "00" * 20 + "88ac"}
+            for i in range(n)]
+
+
+def outpoints(plan):
+    return {(i["txid"], i["vout"]) for i in plan["inputSet"]}
+
+
+def parts_are_disjoint():
+    pool = treasury_pool(4200)
+    rpc = FakeRpc()
+    built = [T._plan_part(rpc, pool, 1248.75, TO, "r", 100, i, 8)
+             for i in range(1, 9)]
+    assert rpc.calls == 8, rpc.calls
+    seen = set()
+    for plan in built:
+        here = outpoints(plan)
+        assert not (here & seen), "two parts spend the same output"
+        seen |= here
+    assert len(seen) == sum(p["inputs"] for p in built)
+
+
+def pool_is_consumed():
+    pool = treasury_pool(4200)
+    before = len(pool)
+    plan = T._plan_part(FakeRpc(), pool, 1248.75, TO, "r", 100, 1, 8)
+    assert len(pool) == before - plan["inputs"], (len(pool), plan["inputs"])
+
+
+def every_part_pays_its_amount():
+    pool = treasury_pool(4200)
+    rpc = FakeRpc()
+    for i in range(1, 9):
+        plan = T._plan_part(rpc, pool, 1248.75, TO, "r", 100, i, 8)
+        assert plan["amount"] == 1248.75, plan["amount"]
+        assert plan["to"] == TO
+        # value is conserved: what came in is what went out, plus the fee
+        total = round(plan["amount"] + plan["change"] + plan["fee"], 8)
+        assert total == round(plan["inputTotal"], 8), (total, plan["inputTotal"])
+
+
+def a_short_pool_is_refused():
+    # eight parts of 1248.75 need about 4,000 outputs; 600 is one part's worth
+    pool = treasury_pool(600)
+    rpc = FakeRpc()
+    T._plan_part(rpc, pool, 1248.75, TO, "r", 100, 1, 8)
+    dies(lambda: T._plan_part(rpc, pool, 1248.75, TO, "r", 100, 2, 8),
+         "the second part was planned out of coins that are not there")
+
+
+check("eight parts cut from one scan share no output", parts_are_disjoint)
+check("a part removes what it spends from the pool", pool_is_consumed)
+check("every part pays its amount and conserves value",
+      every_part_pays_its_amount)
+check("a part that cannot be funded is refused, not shrunk",
+      a_short_pool_is_refused)
+
+
+def named(i, n):
+    return T._part_name("treasury-plan.json", i, n)
+
+
+def parts_are_named():
+    assert named(2, 8) == "treasury-plan-2of8.json", named(2, 8)
+    assert named(8, 8) == "treasury-plan-8of8.json", named(8, 8)
+    assert T._part_name("x", 1, 2) == "x-1of2.json", T._part_name("x", 1, 2)
+
+
+check("the parts are named so a person can see which is which",
+      parts_are_named)
+
+
+# --- the signer will not use one key on two different payments -------------
+
+def plan_with(to=TO, ins=None, n=0):
+    return {"to": to, "amount": 1248.75,
+            "inputSet": ins if ins is not None
+            else [{"txid": "%064x" % (n * 10 + k), "vout": 0} for k in range(3)]}
+
+
+def batch_ok():
+    assert T._batch_problem(["a.json", "b.json"],
+                            [plan_with(n=1), plan_with(n=2)]) is None
+
+
+def batch_two_destinations():
+    why = T._batch_problem(["a.json", "b.json"],
+                           [plan_with(n=1),
+                            plan_with(to=TREASURY, n=2)])
+    assert why and "different addresses" in why, why
+
+
+def batch_shared_outpoint():
+    shared = [{"txid": "c" * 64, "vout": 0}]
+    why = T._batch_problem(["a.json", "b.json"],
+                           [plan_with(ins=shared), plan_with(ins=shared)])
+    assert why and "both spend" in why, why
+
+
+def batch_nameless_inputs():
+    why = T._batch_problem(["a.json", "b.json"],
+                           [plan_with(n=1), {"to": TO}])
+    assert why and "does not name the outputs" in why, why
+
+
+check("two parts to one address with distinct coins are one payment", batch_ok)
+check("two parts to different addresses are refused as one signing",
+      batch_two_destinations)
+check("two parts spending the same coin are refused before the key is asked",
+      batch_shared_outpoint)
+check("a part that names no inputs is refused, not skipped",
+      batch_nameless_inputs)
 
 # ---------------------------------------------------------------------------
 print()

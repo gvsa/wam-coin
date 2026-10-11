@@ -88,8 +88,12 @@ bounty" — while three other places in the repository said "there is a bounty"
 and linked here. A reviewer followed our own sentence to our own file and found
 it contradicted. He was right and the file was wrong.
 
-**Nothing has been paid yet.** Between 14 and 15 September this paragraph
-claimed the opposite: that 1,000 WAM had already been paid to the reviewer who
+**What has been paid is in the ledger, and nothing else has.** 10,000 WAM went
+to chovy on 1–2 October 2026, and the first instalment of Alboy's went on 11
+October; the 1,000 below is still unpaid. Until 2 October this paragraph opened
+"nothing has been paid yet", which stayed after it stopped being true and
+contradicted the line further down this same file. Between 14 and 15 September
+it claimed the opposite error: that 1,000 WAM had already been paid to the reviewer who
 found the pool API leaking payout addresses, bought from a miner at a price the
 miners set in public, with the offers, the price and the transaction published.
 None of that had happened. Mainnet did not exist when the sentence was written,
@@ -109,14 +113,17 @@ Check it rather than believe it, from any node:
 
     wam-cli scantxoutset start '["addr(WdMMqW1DcgWZ6HtyJuEMdce6QkKg4raGmE)"]'
 
-At height 4,989 that returned 4,788 unspent outputs totalling 11,972.49400520
-WAM. One output per block, and it accrues 1,800 WAM per day.
+At height 18,436 that returned 14,225 unspent outputs totalling
+35,579.87485720 WAM. One output per block, and it accrues 1,800 WAM per day.
 
-**It has moved once.** This paragraph said "the treasury has never moved a
-coin since block 1", and that was true until 2026-09-22, when 500 WAM went to
-a GLEEC maintainer so he could run an atomic-swap test on a pull request he
-had opened and fixed himself. Not a listing fee — none was asked for and none
-was paid. Every coin that leaves the treasury is recorded with its amount, its
+**It has moved eleven times, and every movement is a bounty or a test coin.**
+This paragraph said "the treasury has never moved a coin since block 1", and
+that was true until 2026-09-22, when 500 WAM went to a GLEEC maintainer so he
+could run an atomic-swap test on a pull request he had opened and fixed
+himself. Not a listing fee — none was asked for and none was paid. The ten
+movements since are the bounties below, which leave in instalments because the
+treasury is paid one 2.5 WAM output per block and never consolidated. Every
+coin that leaves is recorded with its amount, its fee, its
 reason and its transaction id in
 [docs/TREASURY_LEDGER.md](docs/TREASURY_LEDGER.md), and the balance above can
 be checked against the chain with the command above rather than believed.
@@ -138,8 +145,8 @@ running, which comes first, because a chain with no nodes has nothing worth
 securing.
 
 **This programme's share of it is one eighth: 93,750 WAM, for the whole life
-of the programme.** 11,000 of that is already committed to the two findings
-below. One of every class in the table above comes to 91,250, so the table is
+of the programme.** 21,000 of that is committed to the findings below. One of
+every class in the table above comes to 91,250, so the table is
 payable even if every class is found — which is the test a promise has to
 pass before it is made.
 
@@ -183,6 +190,59 @@ been signed and broadcast and simply never arrived. The first of the nine was
 Every transaction id is in `docs/TREASURY_LEDGER.md`, and the total on the
 chain is 10000.00000000 WAM to `WcQCFiCzwikQTTmPeafn73e3asC32ofyLr`, which
 anybody can add up without asking us.
+
+**10,000 WAM — WAM-F5, pool share accounting, accepted 11 October 2026, first
+instalment paid 11 October 2026.**
+
+The pool rebuilds its job every 55 seconds even when the tip has not moved, so
+that newly arrived transactions reach miners, and keeps four jobs submittable.
+On this chain the mempool is almost always empty, so every job at one height
+came out byte-identical — same coinbase, same merkle root, same header — and
+the duplicate-share guard was a `Set` held per job. One RandomX solution was
+therefore claimed again under each live sibling: up to three credits for one
+unit of electricity. PPLNS pays a miner his weight against everyone else's, so
+the excess came out of the other miners in the round, and one stratum
+connection with a valid payout address was the whole requirement.
+
+Reported by Alboy on 11 October 2026 and reproduced end to end over the
+stratum socket. Fixed in two independent places rather than one: the claim is
+now keyed to the work it was done on, in `pool/lib/blockTemplate.js`, and
+`pool/lib/shareProcessor.js` separately refuses a proof-of-work hash it has
+already credited in the round. Held down by
+`pool/test/cross-job-replay.test.js`.
+
+Classified at 10,000 — *credit without entitlement, paying out coins nobody
+earned* — which is what it is, with no stretching of the rung's wording in
+either direction.
+
+Why it survived: `pool/test/share-claim.test.js` built one job and proved the
+guard refuses a repeat inside it. It never asked what happens across two. That
+test now builds two.
+
+**250 WAM — WAM-F6, a consensus field that no network assigned, accepted 11
+October 2026, not claimed.**
+
+`consensus.enforce_BIP94` was declared in `Consensus::Params` with no default
+initialiser, read in three consensus paths — `ContextualCheckBlockHeader`, the
+block assembler, and `GetNextWorkRequired` — and assigned by no network at all.
+The params object is heap-allocated, so every one of those reads was
+indeterminate. It read false on the binaries this project released, which is
+the behaviour this chain has had since block 1; but an indeterminate read is
+not a promise, and a compiler owes nobody that answer. That is the shape that
+makes two nodes disagree about which blocks are valid.
+
+Measured consequence: `mining_basic.py test_timewarp` failed on WAM's regtest,
+on the exact assertion the BIP94 mitigation exists to satisfy.
+
+Also reported by Alboy, the same day. Fixed by assigning the field in all three
+networks in `src/wam/chainparams.cpp` — false on mainnet and testnet, which
+keeps the behaviour the released binaries already had, and true on regtest. The
+class is now held down by `scripts/check_consensus_params.py`, which fails the
+sweep if any scalar in `Consensus::Params` is left both undefaulted and
+unassigned by some network.
+
+Hardening rung, 250 WAM. The reporter claimed the 10,000 above and has not
+asked for this one. It is payable on request, at the rung.
 
 **1,000 WAM — the pool API leak, accepted 13 September 2026, unpaid.** Three of
 four `/api/*` endpoints returned every miner's full payout address while the
