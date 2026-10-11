@@ -520,6 +520,13 @@ else
         run "there is something to restore from" \
             "$PY" scripts/check_backups.py $NODES
 
+        # Room, and the direction it is going. The daily report already
+        # prints free memory and disk; what it cannot print is that a machine
+        # is losing 400 MB a day and has six weeks. A threshold fires on the
+        # night it is already a problem; a slope gives time to buy a bigger
+        # machine. A chain only grows, so disk is the one that will bite.
+        run "room, and which way it is going"             "$PY" scripts/check_headroom.py --nodes "$NODES"
+
         # Who tried to join, and why they did not stay.
         #
         # A stranger connected three times across three days and left
