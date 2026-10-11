@@ -61,7 +61,29 @@ let jobCounter = 0;
  * it by passing the strings it happens to hold. nTime and nonce arrive as
  * numbers; anything hex-shaped is folded to lower case.
  */
-function submitKey(extranonce1, extranonce2, nTime, nonce) {
+/*
+ * AND THE KEY HAD TO NAME THE WORK, NOT THE SUBMISSION.
+ *
+ * Making the key canonical fixed the spelling and left the scope, and the
+ * scope was the job. The pool rebuilds a job every jobRebroadcastTimeout
+ * seconds (55 on mainnet) even when the tip has not moved, keeps
+ * maxJobHistory (4) of them submittable, and every job at one height is built
+ * from the same previousblockhash and the same mempool -- which on this chain
+ * is empty, so the coinbase, the merkle root and the whole header come out
+ * byte-identical. One RandomX solution is therefore valid under every live
+ * job, and the per-job Set let it be claimed once under each: up to three
+ * credits on mainnet for one unit of electricity, taken out of the other
+ * miners in the PPLNS round.
+ *
+ * Reported by Alboy on 2026-10-11 as WAM-F5, reproduced end to end over the
+ * stratum socket, and confirmed here against a real mainnet template the same
+ * hour: two jobs, identical coinbase, identical header, second claim granted.
+ *
+ * The previousblockhash is now part of the key and the Set is carried across
+ * jobs at the same height (jobManager.refreshTemplate), so the claim is
+ * scoped to the work. A new tip is new work and starts a new Set.
+ */
+function submitKey(prevHash, extranonce1, extranonce2, nTime, nonce) {
     const hex = (v) => String(v).toLowerCase();
     // A number stays itself; a hex string becomes the number it spells. Both
     // call styles land on one key, which also folds away leading zeros and
@@ -70,7 +92,8 @@ function submitKey(extranonce1, extranonce2, nTime, nonce) {
     // single key -- caught by share-claim.test.js within a minute, which is
     // what that test is for.
     const num = (v) => (typeof v === 'number' ? v : parseInt(String(v), 16));
-    return `${hex(extranonce1)}:${hex(extranonce2)}:${num(nTime)}:${num(nonce)}`;
+    return `${hex(prevHash)}:${hex(extranonce1)}:${hex(extranonce2)}:` +
+           `${num(nTime)}:${num(nonce)}`;
 }
 
 class BlockTemplate {
@@ -95,7 +118,11 @@ class BlockTemplate {
         this.transactions = rpcTemplate.transactions || [];
         this.coinbaseValue = rpcTemplate.coinbasevalue;
 
-        this.submits = new Set();   // duplicate-share detection, per job
+        // The claim set is the WORK's, not this object's. jobManager hands
+        // the previous job's set to every job built at the same height, so a
+        // solution claimed under one job cannot be claimed again under its
+        // siblings. A new tip gets a fresh one, because that is new work.
+        this.submits = opts.submits || new Set();
 
         this._validateDevFee();
         this._buildCoinbase();
@@ -341,7 +368,8 @@ class BlockTemplate {
      * the share is not credited -- see the comment there.
      */
     registerSubmit(extranonce1, extranonce2, nTime, nonce) {
-        const key = submitKey(extranonce1, extranonce2, nTime, nonce);
+        const key = submitKey(this.previousBlockHash, extranonce1,
+                              extranonce2, nTime, nonce);
         if (this.submits.has(key)) return false;
         this.submits.add(key);
         return true;
@@ -363,7 +391,8 @@ class BlockTemplate {
      * and at that point the entries are honest accounting.
      */
     releaseSubmit(extranonce1, extranonce2, nTime, nonce) {
-        this.submits.delete(submitKey(extranonce1, extranonce2, nTime, nonce));
+        this.submits.delete(submitKey(this.previousBlockHash, extranonce1,
+                                      extranonce2, nTime, nonce));
     }
 
     // -----------------------------------------------------------------------

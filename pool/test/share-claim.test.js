@@ -37,9 +37,15 @@ async function test(name, fn) {
     catch (e) { fail.push(name); console.log(`  \x1b[31mFAIL\x1b[0m  ${name}\n        ${e.message}`); }
 }
 
-/** The claim bookkeeping only, without building a whole template. */
-function claimSet() {
+/** The claim bookkeeping only, without building a whole template.
+ *
+ * The previousblockhash is part of the key since WAM-F5, so the fixture
+ * carries one. Without it every key here read "undefined:..." -- the tests
+ * still passed, on a shape the pool never produces.
+ */
+function claimSet(prev) {
     return Object.create(BlockTemplate.prototype, {
+        previousBlockHash: { value: prev || "0".repeat(64), writable: true },
         submits: { value: new Set(), writable: true }
     });
 }

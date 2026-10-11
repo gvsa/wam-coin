@@ -161,11 +161,28 @@ class JobManager extends EventEmitter {
 
         if (!force && !isNewBlock && !stale) return;
 
+        // THE CLAIM FOLLOWS THE WORK ACROSS JOBS AT ONE HEIGHT.
+        //
+        // This rebuilds every jobRebroadcastTimeout seconds even when the tip
+        // has not moved, so that newly arrived transactions reach miners --
+        // and on this chain the mempool is almost always empty, so the new
+        // job's coinbase, merkle root and header come out byte-identical to
+        // the old one's. One solution was therefore valid under every live
+        // job, and each job's own Set let it be claimed again: up to three
+        // credits on mainnet for one unit of electricity, taken out of the
+        // other miners in the PPLNS round.
+        //
+        // Reported by Alboy on 2026-10-11 as WAM-F5.
+        //
+        // Carrying the Set means the claim is scoped to the work. isNewBlock
+        // is the one case that must NOT carry it: a new tip is new work, and
+        // reusing the Set there would refuse honest shares for ever.
         const template = new BlockTemplate(rpc, {
             poolAddress: this.config.poolAddress,
             netVersions: this.config.netVersions,
             coinbaseSignature: this.config.coinbaseSignature,
-            extranonce1Size: 4
+            extranonce1Size: 4,
+            submits: isNewBlock ? undefined : (this.currentJob && this.currentJob.submits)
         });
 
         // ---- RandomX seed for this height ---------------------------------

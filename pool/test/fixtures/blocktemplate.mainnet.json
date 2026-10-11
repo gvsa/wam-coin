@@ -1,0 +1,26 @@
+{
+  "version": 536870912,
+  "previousblockhash": "bef71477719be3eb542882e2af4297a41a3b861bb96c9437e98b8d4ee7842d0a",
+  "coinbasevalue": 5000000000,
+  "devfee": {
+    "amount": 250000000,
+    "script": "76a914a101cf17c209638136abe19e14dc4e1c9987370f88ac",
+    "address": "WdMMqW1DcgWZ6HtyJuEMdce6QkKg4raGmE",
+    "percent": 5,
+    "last_height": 400000,
+    "active": true
+  },
+  "target": "000000d2f7000000000000000000000000000000000000000000000000000000",
+  "mintime": 1791733266,
+  "curtime": 1791734728,
+  "bits": "1e00d2f7",
+  "height": 18286,
+  "default_witness_commitment": "6a24aa21a9ed4b73acb5871a05c53294022a9f77d35fdc42fe9562b1d39d888308df36f8a2b5",
+  "transactions": [],
+  "randomx_seedhash": "ae3d3eca9a987ebc66f7723a2d4190e338c655e76c64eef0e2de90ba0b5a7f9f",
+  "randomx_seedheight": 16384,
+  "noncerange": "00000000ffffffff",
+  "sizelimit": 4000000,
+  "weightlimit": 4000000,
+  "sigoplimit": 80000
+}

@@ -175,6 +175,15 @@ run "the listing entry matches source" "$PY" scripts/check_listing_entry.py
 # was read as covering the whitepaper, and the whitepaper was wrong for days
 # underneath a green line.
 run "the 3 code copies of vesting agree"  "$PY" scripts/check_vesting_sync.py
+
+# And the fields nothing copies, because WAM REPLACES upstream's chainparams
+# rather than editing it. A field upstream assigns and our replacement does
+# not keeps its declaration, keeps the code that reads it, and tells nobody.
+# consensus.enforce_BIP94 was exactly that: declared with no default, read in
+# validation.cpp, node/miner.cpp and pow.cpp, assigned by no network at all,
+# and indeterminate because the params object is heap-allocated. Found from
+# outside on 2026-10-11, not by us.
+run "no consensus field is unset" "$PY" scripts/check_consensus_params.py
 run "supply arithmetic"          "$PY" scripts/verify_supply.py
 run "executable bits in index"   bash scripts/test/test_exec_bits.sh
 

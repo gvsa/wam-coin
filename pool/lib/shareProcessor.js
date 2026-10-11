@@ -274,6 +274,47 @@ class ShareProcessor extends EventEmitter {
     // -----------------------------------------------------------------------
 
     async recordShare(share) {
+        // ONE PROOF OF WORK IS PAID FOR ONCE, WHATEVER DOOR IT CAME THROUGH.
+        //
+        // The claim in blockTemplate.js is the first gate and it is scoped to
+        // the work now. This is the second, and it exists because the first
+        // one has been got around twice by two different routes: once by the
+        // spelling of the key (hex case, 2026-10-04) and once by its scope
+        // (a sibling job at the same height, 2026-10-11). Both were found by
+        // somebody outside this project, and both were the same sentence --
+        // one unit of electricity, credited more than once, paid for by the
+        // other miners in the round.
+        //
+        // A third route is not worth waiting for. The RandomX hash IS the
+        // work: it cannot be produced twice without doing the work twice, it
+        // does not depend on which job carried it, and the pool already has
+        // it in hand here. SADD returns 0 if the member was already present,
+        // and it is atomic, so two shares racing cannot both pass.
+        //
+        // Scoped to the round and deleted with it, so the set is bounded by
+        // the shares in one block and never grows without end.
+        if (share.powHash) {
+            let fresh;
+            try {
+                fresh = await this.redis.sadd(this.k('round:pow'), share.powHash);
+            } catch (err) {
+                // A redis that cannot answer must not become a free pass: the
+                // share is refused rather than credited blind.
+                this.log.error(`could not check the proof of work for a share `
+                                  + `from ${share.worker}: ${err.message}`);
+                throw err;
+            }
+            if (fresh === 0) {
+                this.log.warn(`share from ${share.worker} carries a proof of `
+                                 + `work already credited this round `
+                                 + `(${share.powHash.slice(0, 16)}...) -- not `
+                                 + `credited again`);
+                this.stats = this.stats || {};
+                this.stats.replayedShares = (this.stats.replayedShares || 0) + 1;
+                return;
+            }
+        }
+
         const now = Math.floor(Date.now() / 1000);
         const entry = JSON.stringify({
             w: share.worker,
@@ -423,6 +464,10 @@ class ShareProcessor extends EventEmitter {
         const pipe = this.redis.pipeline();
         pipe.hset(this.k('blocks:pending'), share.blockHash, JSON.stringify(record));
         pipe.del(this.k('round'));           // PROP round closes here
+        // The proof-of-work set belongs to the round and dies with it. Left
+        // behind it would grow for ever and start refusing honest shares in
+        // the astronomically unlikely case of a repeat across rounds.
+        pipe.del(this.k('round:pow'));
         pipe.incrby(this.k('poolfees'), rewards.poolFee);
         await pipe.exec();
 

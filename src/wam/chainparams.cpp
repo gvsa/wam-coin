@@ -352,6 +352,22 @@ public:
         consensus.BIP66Height = 1;
         consensus.CSVHeight   = 1;
         consensus.SegwitHeight = 1;
+
+        // BIP94: upstream assigns this for every network it defines, and
+        // this file replaces that file wholesale -- so the field was
+        // declared, read in three consensus paths (validation.cpp,
+        // node/miner.cpp, pow.cpp) and never assigned anywhere. It has no
+        // default initialiser in Consensus::Params and the params object is
+        // heap-allocated, so the reads were indeterminate: it happens to be
+        // false on this build, and nothing in the code says so.
+        //
+        // Upstream's values, kept: false on mainnet, testnet and signet,
+        // true on regtest where the timewarp mitigation is exercised.
+        //
+        // Reported by Alboy on 2026-10-11 as WAM-F6, with the measured
+        // consequence: mining_basic.py test_timewarp fails on WAM's regtest
+        // on the exact assertion the rule exists to satisfy.
+        consensus.enforce_BIP94 = false;
         consensus.MinBIP9WarningHeight = 0;
 
         consensus.nRuleChangeActivationThreshold = 1815; // 90% of 2016
@@ -588,6 +604,9 @@ public:
         consensus.BIP66Height = 1;
         consensus.CSVHeight   = 1;
         consensus.SegwitHeight = 1;
+
+        // BIP94, as upstream sets it for this network. See mainnet.
+        consensus.enforce_BIP94 = false;
         consensus.MinBIP9WarningHeight = 0;
         consensus.nRuleChangeActivationThreshold = 1512;
         consensus.nMinerConfirmationWindow = 2016;
@@ -733,6 +752,9 @@ public:
         consensus.BIP66Height = 1;
         consensus.CSVHeight   = 1;
         consensus.SegwitHeight = 0;
+
+        // BIP94, as upstream sets it for this network. See mainnet.
+        consensus.enforce_BIP94 = true;
         consensus.MinBIP9WarningHeight = 0;
         consensus.nRuleChangeActivationThreshold = 108;
         consensus.nMinerConfirmationWindow = 144;
