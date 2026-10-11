@@ -73,6 +73,8 @@ import subprocess
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / "lib"))
+import quoted  # noqa: E402
 from wamcli import flags as _wamcli_flags          # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -212,10 +214,23 @@ def main() -> int:
 
     print(f"\n{BLD}the ledger's own numbers, against the chain{OFF}\n")
 
+    # A ROW WRITTEN AS AN EXAMPLE IS NOT A SPEND.
+    #
+    # Both files this reads are prose that people edit, and both can show
+    # what they are talking about: the ledger can carry a specimen row to
+    # explain its own table, and wam-params.h can quote a number in a comment
+    # while declaring another. Read literally, the first becomes a payment
+    # nobody made and the second a consensus constant nobody set -- and this
+    # check would then accuse the ledger of hiding money, which is the worst
+    # thing in this repository to be wrong about.
+    #
+    # scripts/lib/quoted.py is the convention: an author marks the specimen,
+    # and every check drops what is marked before it reads anything.
     try:
-        text = (ROOT / LEDGER).read_text(encoding="utf-8", errors="replace")
-        k = consensus_constants(
-            (ROOT / PARAMS).read_text(encoding="utf-8", errors="replace"))
+        text = quoted.strip_quoted(
+            (ROOT / LEDGER).read_text(encoding="utf-8", errors="replace"))
+        k = consensus_constants(quoted.strip_quoted(
+            (ROOT / PARAMS).read_text(encoding="utf-8", errors="replace")))
     except OSError as e:
         print(f"  {YEL}could not read the sources ({e}) -- nothing was "
               f"checked{OFF}\n")
