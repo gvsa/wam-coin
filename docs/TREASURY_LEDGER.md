@@ -35,8 +35,8 @@ The fee has a column of its own because a spend costs the treasury what it
 sent *and* what it paid to send it. A fee left out of the arithmetic is a
 number this file cannot be checked against, which defeats the point of it.
 
-At height 18,436 that is `2.5 × 18436 − 10,510.00000000 − 0.12514280 =
-35,579.87485720`, which is what `scantxoutset` returns, in 14,225 unspent
+At height 18,452 that is `2.5 × 18452 − 20,500.00000000 − 0.24387480 =
+25,629.75612520`, which is what `scantxoutset` returns, in 10,242 unspent
 outputs. Two independent routes to the same number, to the last decimal
 place.
 
@@ -57,6 +57,14 @@ place.
 | 2026-10-01 | **1248.75000000 WAM** | `0.01484520` | `WcQCFiCzwikQTTmPeafn73e3asC32ofyLr` | Same bounty, 8 of 9. | txid `e8ace6f3a2a951e24be887d7a10b8773e9b4269e4911dd5ce43256d95029a666` |
 | 2026-10-02 | **1248.75000000 WAM** | `0.01484520` | `WcQCFiCzwikQTTmPeafn73e3asC32ofyLr` | Same bounty, 9 of 9. | txid `7c87c49a9bd35d0b75d4271febb3cb864d104068285bafbc4ab8f6b59ae19fa3` |
 | 2026-10-11 | **10.00000000 WAM** | `0.00019320` | `WZSY6XFjmsef7Xb2E7DLhnkeU44bYyTLrA` | Security bounty to Alboy, findings WAM-F5 and WAM-F6, accepted 11 October 2026. WAM-F5 is the pool crediting one RandomX solution once per live job instead of once; WAM-F6 is a consensus field that no network assigned, read in three consensus paths. Classified at 10,000 WAM for WAM-F5 under the published tiers. WAM-F6 sits in the hardening rung at 250 WAM and has not been claimed. 1 of 9 — the test payment, sent first and confirmed received before the rest. | txid `a2754907f887e65bbafffed62564e5ac4848962e99afad6a01760be1011b54b0` |
+| 2026-10-11 | **1248.75000000 WAM** | `0.01484520` | `WZSY6XFjmsef7Xb2E7DLhnkeU44bYyTLrA` | Same bounty, 2 of 9. | txid `ccd6de28e9b31a2e209749250736729ad04205a05152f97cf4506ac9ce60d3be` |
+| 2026-10-11 | **1248.75000000 WAM** | `0.01481560` | `WZSY6XFjmsef7Xb2E7DLhnkeU44bYyTLrA` | Same bounty, 3 of 9. | txid `38fb1bc2156e0b89dd50f8a33a8011ce578147d3b3351c7b4b45d87a7a2acfa7` |
+| 2026-10-11 | **1248.75000000 WAM** | `0.01484520` | `WZSY6XFjmsef7Xb2E7DLhnkeU44bYyTLrA` | Same bounty, 4 of 9. | txid `1f9cce2a6f7673776fcb9d00c224fafd1a7ab316ed1d830a997d178bc15371b6` |
+| 2026-10-11 | **1248.75000000 WAM** | `0.01484520` | `WZSY6XFjmsef7Xb2E7DLhnkeU44bYyTLrA` | Same bounty, 5 of 9. | txid `f45a75635195a6acbe035038bedff52d9264ca52b2ac4dc0d751bdcc181901ff` |
+| 2026-10-11 | **1248.75000000 WAM** | `0.01484520` | `WZSY6XFjmsef7Xb2E7DLhnkeU44bYyTLrA` | Same bounty, 6 of 9. | txid `2570f0c5799ce0aa010942c8427db500ed6c2f988311797876b0227b45eb2535` |
+| 2026-10-11 | **1248.75000000 WAM** | `0.01484520` | `WZSY6XFjmsef7Xb2E7DLhnkeU44bYyTLrA` | Same bounty, 7 of 9. | txid `0495e63eaeb38e1e5992c9501fe13a4ff45ef8edc9ecff078c3670c8d9d4d61b` |
+| 2026-10-11 | **1248.75000000 WAM** | `0.01484520` | `WZSY6XFjmsef7Xb2E7DLhnkeU44bYyTLrA` | Same bounty, 8 of 9. | txid `7436e0bd60b0374df73e600959d47c7d3481dac60a40f0ac03560a833d0f9efc` |
+| 2026-10-11 | **1248.75000000 WAM** | `0.01484520` | `WZSY6XFjmsef7Xb2E7DLhnkeU44bYyTLrA` | Same bounty, 9 of 9. | txid `b5d7710f76e7f247625cd04da5b1e7a3dc5c64f454f7bcf05dbcec7c2d851266` |
 
 The treasury is paid one output per block and never consolidated, so every
 spend above is built from 2.5 WAM outputs and nothing else: the 500 WAM line
@@ -65,8 +73,8 @@ is also why a bounty leaves in instalments rather than at once — 10,000 WAM in
 one transaction is about 4,000 inputs and 590 KB, six times the standard size
 limit, and no node would relay it.
 
-**Balance after the last line:** `35,579.87485720 WAM` in 14,225 unspent
-outputs, at height 18,436.
+**Balance after the last line:** `25,629.75612520 WAM` in 10,242 unspent
+outputs, at height 18,452.
 
 ---
 

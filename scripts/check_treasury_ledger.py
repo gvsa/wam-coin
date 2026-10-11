@@ -233,29 +233,48 @@ def main() -> int:
         return 2
 
     cli = f"wam-cli {_wamcli_flags(a.network)}"
-    rc, out, err = rsh(a.node, f"{cli} getblockcount")
-    if rc != 0 or not out.strip().isdigit():
+
+    # THE HEIGHT AND THE BALANCE MUST DESCRIBE ONE CHAIN STATE.
+    #
+    # This asked getblockcount and then ran scantxoutset, and failed on its
+    # first real run with "off by -2.50000000 WAM -- the chain holds MORE than
+    # the table accounts for". Nothing was wrong with the ledger. A block had
+    # arrived between the two calls: the scan counted a treasury output that
+    # the accrual, computed at the earlier height, did not. 2.5 WAM, which is
+    # exactly one block, every time.
+    #
+    # Blocks come every two minutes and the scan takes about one on 10,000
+    # outputs, so the window is wide and the failure is intermittent -- the
+    # worst kind of check, because an intermittent accusation about missing
+    # money teaches the reader to ignore it.
+    #
+    # scantxoutset answers with the height and the best block it scanned at.
+    # Taking the height from the scan makes the two consistent by
+    # construction rather than by being quick.
+    rc, out, err = rsh(a.node,
+                       f"{cli} scantxoutset start '[\"addr({TREASURY})\"]'",
+                       timeout=300)
+    if rc != 0:
         first = (err or out or "no answer").splitlines()[0][:90]
-        print(f"  {YEL}no height from the node ({first}). Nothing was "
+        print(f"  {YEL}scantxoutset did not answer ({first}). Nothing was "
               f"checked.{OFF}\n")
         return 2
-    tip = int(out)
-
-    rc, out, _ = rsh(a.node,
-                     f"{cli} scantxoutset start '[\"addr({TREASURY})\"]'",
-                     timeout=300)
-    if rc != 0:
-        print(f"  {YEL}scantxoutset did not answer. Nothing was checked.{OFF}\n")
-        return 2
     scan = json.loads(out)
+    if not scan.get("success") or "height" not in scan:
+        print(f"  {YEL}the scan did not complete, so the balance it reports "
+              f"is not a balance. Nothing was checked.{OFF}\n")
+        return 2
+    tip = int(scan["height"])
     held = atoms(scan["total_amount"])
 
-    print(f"  height {tip}, {len(rows)} row(s) in the ledger, "
+    print(f"  height {tip} ({scan.get('bestblock', '')[:16]}...), "
+          f"{len(rows)} row(s) in the ledger, "
           f"{len(scan['unspents'])} unspent output(s)\n")
 
     # --- 1. every row is the transaction it says it is --------------------
     bad = []
     spent = 0
+    heights = {}
     newest_row_height = 0
     by_height = []
     for r in rows:
@@ -279,11 +298,21 @@ def main() -> int:
         if stray:
             bad.append((r, "it also pays an address in neither the row nor "
                            "the treasury: %s" % stray[0]))
-        conf = tx.get("confirmations", 0)
-        h = tip - conf + 1 if conf else None
-        if h:
-            newest_row_height = max(newest_row_height, h)
-            by_height.append((h, want + fee))
+        # The row's block height, from the block rather than from a
+        # confirmation count: a count is relative to whatever the tip was
+        # during THIS call, and the tip used for the accrual came from the
+        # scan. Mixing the two puts a row one block out. Cached, because
+        # nineteen rows live in a handful of blocks.
+        bh = tx.get("blockhash")
+        if bh:
+            if bh not in heights:
+                rc, bout, _ = rsh(a.node, f"{cli} getblock {bh} 1")
+                heights[bh] = (json.loads(bout)["height"]
+                               if rc == 0 else None)
+            h = heights[bh]
+            if h is not None:
+                newest_row_height = max(newest_row_height, h)
+                by_height.append((h, want + fee))
         spent += want + fee
 
     for r, why in bad:
