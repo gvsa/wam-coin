@@ -122,16 +122,38 @@ if [ -n "$HOST" ]; then
     esac
 fi
 
+# EXIT 2 IS "I COULD NOT LOOK", AND IT IS NOT A FAILURE.
+#
+# This file already knew that -- the seeding check at the bottom reads 2 and 3
+# and calls unchecked() -- and three checks here did not. They asked "did it
+# exit zero" and called everything else a failure.
+#
+# What that cost: make_icons.py exits 2 when Pillow is absent, which it is on
+# every seed. So preflight on a seed has been reporting "the GUI icons are
+# missing or malformed -- Windows and macOS would ship Bitcoin's logo", every
+# single run, about four icon files that were present and correct. Found by
+# the sweep on 2026-10-12.
+#
+# A launch-readiness check that is permanently red about one thing is a check
+# an operator learns to scroll past, and the next one it goes red about is the
+# real one.
+judge() {
+    local label="$1" fail_msg="$2" unchecked_msg="$3"; shift 3
+    "$@" >/dev/null 2>&1
+    case $? in
+        0) ok "$label" ;;
+        2) unchecked "$unchecked_msg" ;;
+        *) bad "$fail_msg" ;;
+    esac
+}
+
 # The GUI ships four icon files and patch_upstream.py replaced one of them
 # until 2026-09-24. A build whose brand/generated icons are missing does not
 # fail loudly -- patch_upstream cannot find a source file and stops, which is
 # a confusing way to learn that a release was blocked by an icon.
-if "$PY" scripts/make_icons.py --check >/dev/null 2>&1; then
-    ok "the Windows and macOS icons are generated and well formed"
-else
-    bad "the GUI icons are missing or malformed -- Windows and macOS would ship
-           Bitcoin's logo on a WAM wallet. Run: $PY scripts/make_icons.py"
-fi
+judge "the Windows and macOS icons are generated and well formed"     "the GUI icons are missing or malformed -- Windows and macOS would ship
+           Bitcoin's logo on a WAM wallet. Run: $PY scripts/make_icons.py"     "Pillow is not installed here, so the icons were NOT read -- this is not a
+           pass. Install it, or read them where it is: $PY -m pip install Pillow"     "$PY" scripts/make_icons.py --check
 
 # THE WALLET'S OWN WORDS, IN EVERY LANGUAGE IT SHIPS.
 #
@@ -149,24 +171,16 @@ fi
 # before an hour of compiling rather than after.
 if [ -d build/wam-core/src/qt ] || [ -d "$HOME/wam/build/wam-core/src/qt" ]; then
     QT_T="build/wam-core"; [ -d "$QT_T/src/qt" ] || QT_T="$HOME/wam/build/wam-core"
-    if "$PY" scripts/rebrand_qt.py --tree "$QT_T" --check >/dev/null 2>&1; then
-        ok "the wallet's text, in every language it ships, says WAM"
-    else
-        bad "the GUI still names another coin in text a person reads.
-           Run: $PY scripts/rebrand_qt.py --tree $QT_T"
-    fi
+    judge "the wallet's text, in every language it ships, says WAM"         "the GUI still names another coin in text a person reads.
+           Run: $PY scripts/rebrand_qt.py --tree $QT_T"         "there is no src/qt under $QT_T, so the wallet's wording was NOT read"         "$PY" scripts/rebrand_qt.py --tree "$QT_T" --check
 else
     unchecked "no build tree with src/qt here, so the wallet's wording was not read"
 fi
 
 if [ -d build/wam-core/src ] || [ -d "$HOME/wam/build/wam-core/src" ]; then
     T="build/wam-core"; [ -d "$T/src" ] || T="$HOME/wam/build/wam-core"
-    if "$PY" scripts/rename_binaries.py --tree "$T" --check >/dev/null 2>&1; then
-        ok "the build tree builds wamd / wam-cli / wam-tx / wam-util / wam-wallet"
-    else
-        bad "the build tree still builds Bitcoin's binary names
-           run: "$PY" scripts/rename_binaries.py --tree $T"
-    fi
+    judge "the build tree builds wamd / wam-cli / wam-tx / wam-util / wam-wallet"         "the build tree still builds Bitcoin's binary names
+           run: $PY scripts/rename_binaries.py --tree $T"         "there is no src/Makefile.am under $T, so the binary names were NOT read"         "$PY" scripts/rename_binaries.py --tree "$T" --check
 fi
 
 if [ -n "$HOST" ]; then
