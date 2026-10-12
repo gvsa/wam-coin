@@ -366,6 +366,24 @@ if command -v curl >/dev/null 2>&1; then
     # 2026 nobody could, because SHA256SUMS was published unsigned and whoever
     # can replace a binary can replace the list of hashes beside it.
     run "the published release is signed"  bash scripts/check_release_signed.sh
+
+    # Signed, published, mirrored -- and never READ. On 2026-10-12
+    # dang150296 ran readelf over the v0.1.11 Linux release and found wamd
+    # requesting an executable stack, which is the condition a stack
+    # overflow needs in order to run what it wrote. RandomX ships assembly
+    # with no .note.GNU-stack section, so the linker assumed the worst and
+    # marked the whole binary; nothing we ship needs it.
+    #
+    # He found one. This check reads every binary in every Linux artefact of
+    # the release and found three -- wamd, wam-miner and wam-qt, the three
+    # that link librandomx.a. The graphical wallet is the one an ordinary
+    # person runs, and nobody had reported that one.
+    #
+    # Every other property of those files was already right: full RELRO,
+    # PIE, stack canaries, FORTIFY. The gap was not the build. It was that
+    # this project verified what it SAID about a release and never what the
+    # release WAS.
+    run "the published binaries are hardened" bash scripts/check_binary_hardening.sh
 else
     skip "published download is this network" "curl is not installed"
 fi

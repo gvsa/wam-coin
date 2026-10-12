@@ -88,6 +88,61 @@ git -C "$RANDOMX_DIR" checkout --quiet "$RANDOMX_TAG"
 # so a slip fails loudly instead of being discovered by a stranger's crash.
 RANDOMX_ARCH="${WAM_RANDOMX_ARCH:-x86-64}"
 
+# ===========================================================================
+#  THE NOTE THE ASSEMBLER WILL NOT ADD FOR YOU
+# ===========================================================================
+#
+# RandomX ships hand-written assembly -- jit_compiler_x86_static.S and its
+# ARM and RISC-V siblings -- and none of the three carries a
+# .note.GNU-stack section. When the linker meets one object without that
+# note it cannot know whether the code needs an executable stack, so it
+# assumes the worst and marks the WHOLE output RWE.
+#
+# Measured on the published v0.1.11 Linux release:
+#
+#     wam-cli  wam-tx  wam-util  wam-wallet     GNU_STACK RW
+#     wamd                                      GNU_STACK RWE
+#
+# One binary out of five, and it is the only one that links librandomx.a.
+#
+# It is not needed. RandomX takes its executable memory from mmap with
+# PROT_EXEC -- build/randomx/src/virtual_memory.c -- never from the stack, so
+# the permission buys nothing and removes a protection every other program we
+# ship has. An executable stack is the condition a stack-overflow exploit
+# needs in order to run what it wrote.
+#
+# Reported by dang150296 (Urriki1502) on 2026-10-12, with readelf output,
+# after the pool and the node had both been audited and this had not. Nothing
+# in this project read the hardening flags of the binaries it publishes;
+# scripts/check_binary_hardening.sh does now.
+#
+# The note is added here rather than passed at link time because librandomx.a
+# is a static archive: the objects inside it carry the answer, and no flag on
+# a later link can put a note into an object that has none.
+RANDOMX_PATCHED=0
+for _s in "$RANDOMX_DIR"/src/*.S; do
+    [ -f "$_s" ] || continue
+    grep -q 'note\.GNU-stack' "$_s" && continue
+    printf '
+/* Added by WAM: see scripts/fetch-upstream.sh. RandomX needs
+   executable memory from mmap, never from the stack, and without this
+   note the linker marks the whole node RWE. */
+.section .note.GNU-stack,"",%%progbits
+' >> "$_s"
+    log "     added .note.GNU-stack to $(basename "$_s")"
+    RANDOMX_PATCHED=1
+done
+
+# AND THE ARCHIVE HAS TO BE REBUILT, OR THE PATCH IS A COMMENT.
+#
+# The build below is skipped when librandomx.a already exists. An archive
+# built before the note was added does not have it, and the fix would then
+# apply to nothing while this script said it had applied it.
+if [ "$RANDOMX_PATCHED" = 1 ] && [ -f "$RANDOMX_DIR/build/librandomx.a" ]; then
+    log "     the note changed the sources; discarding the old librandomx.a"
+    rm -f "$RANDOMX_DIR/build/librandomx.a"
+fi
+
 if [ ! -f "$RANDOMX_DIR/build/librandomx.a" ]; then
     log "     building librandomx (ARCH=$RANDOMX_ARCH)"
     cmake -S "$RANDOMX_DIR" -B "$RANDOMX_DIR/build" \
