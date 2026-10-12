@@ -37,6 +37,7 @@ const EventEmitter = require('events');
 
 const { computeBlockRewards, estimateHashrate, pplnsWindowDifficulty } = require('./rewards');
 const { COIN, COINBASE_MATURITY } = require('./constants');
+const { defineAtomicCommands, CLAIM_AND_RECORD_NAME } = require('./atomic');
 
 class ShareProcessor extends EventEmitter {
     /**
@@ -45,7 +46,10 @@ class ShareProcessor extends EventEmitter {
      */
     constructor(redis, daemon, config, logger) {
         super();
-        this.redis = redis;
+        // Before anything else, because a pool that cannot make the
+        // pending-to-evidence transition atomic must not start. See
+        // pool/lib/atomic.js for what the two-command version cost.
+        this.redis = defineAtomicCommands(redis);
         this.daemon = daemon;
         this.config = config;
         this.log = logger;
@@ -565,9 +569,31 @@ class ShareProcessor extends EventEmitter {
         record.orphanedAt = Date.now();
         record.orphanReason = reason;
 
+        // THE SAME TRANSITION, SO THE SAME ATOM.
+        //
+        // This was a pipeline, which is one round trip and not a transaction:
+        // HDEL could land and LPUSH not, and then the block had been dropped
+        // from pending with no orphan record anywhere. Less costly than the
+        // maturation case -- an orphan pays nobody -- but it is the identical
+        // mistake, and the orphan count and the pool-fee reversal below both
+        // depend on this having happened exactly once.
+        //
+        // It also now checks that it won the claim. It never did, so two runs
+        // could each orphan the same block and decrement poolfees twice.
+        const claimed = Number(await this.redis[CLAIM_AND_RECORD_NAME](
+            this.k('blocks:pending'), this.k('blocks:orphaned'),
+            hash, JSON.stringify(record)));
+        if (claimed !== 1) {
+            this.log.warn(`block ${record.height} was already orphaned by ` +
+                          'another run; not counting it again');
+            return;
+        }
+
+        // Everything below is repairable from blocks:orphaned if it is lost:
+        // a capped list, a counter and a fee reversal, all derivable from the
+        // evidence the atom above has already written. Only the payout table
+        // was irreplaceable, and it is now safe.
         const pipe = this.redis.pipeline();
-        pipe.hdel(this.k('blocks:pending'), hash);
-        pipe.lpush(this.k('blocks:orphaned'), JSON.stringify(record));
         pipe.ltrim(this.k('blocks:orphaned'), 0, 999);
         // Same reason as blocks:confirmed:count below. This list is capped at
         // 1000, so the orphan total would freeze there too -- later, quieter,
@@ -580,32 +606,34 @@ class ShareProcessor extends EventEmitter {
     }
 
     async _mature(hash, record) {
-        // The claim IS the delete. HDEL returns how many fields it removed, so
-        // of any number of concurrent callers exactly one gets 1 and the rest
-        // get 0 -- and only the winner credits. The guard above stops two runs
-        // in this process; this stops two processes, and a pipeline that was
-        // never atomic in the first place.
+        // THE CLAIM AND THE EVIDENCE ARE ONE OPERATION, OR NEITHER HAPPENS.
         //
-        // Until today the credit and the delete sat in one redis.pipeline(),
-        // which batches commands into one round trip and is NOT a transaction:
-        // a crash or a dropped connection between them left the balances
-        // credited and the block still pending, so the next run credited it
-        // again.
-        const claimed = await this.redis.hdel(this.k('blocks:pending'), hash);
+        // The claim is still the delete: HDEL reports how many fields it
+        // removed, so of any number of concurrent callers exactly one gets 1
+        // and only that one credits. The guard above stops two runs in this
+        // process; this stops two processes.
+        //
+        // What changed on 2026-10-12 is that the delete and the evidence are
+        // no longer two awaits. They were, and between them this block
+        // belonged to no state at all: gone from pending, absent from
+        // maturing, not credited. An interruption there destroyed the payout
+        // table, and because recordBlock deletes the round's shares in the
+        // same breath that writes it, there was nothing left to rebuild it
+        // from -- not for the pool and not for an operator by hand.
+        //
+        // The comment that used to sit here said losing a credit was
+        // recoverable. It was not. Reported by SmoothX; see pool/lib/atomic.js.
+        record.maturedAt = Date.now();
+        const evidence = JSON.stringify(record);
+
+        const claimed = Number(await this.redis[CLAIM_AND_RECORD_NAME](
+            this.k('blocks:pending'), this.k('blocks:maturing'),
+            hash, evidence));
         if (claimed !== 1) {
             this.log.warn(`block ${record.height} was already claimed for ` +
                           'maturation by another run; not crediting it again');
             return;
         }
-
-        record.maturedAt = Date.now();
-        const evidence = JSON.stringify(record);
-
-        // Evidence inside the window that cannot be closed. If this process
-        // dies between the claim and the credit, this list is what tells an
-        // operator which block to replay by hand. Losing a credit is
-        // recoverable; paying it twice is not, so the order is deliberate.
-        await this.redis.lpush(this.k('blocks:maturing'), evidence);
 
         const pipe = this.redis.pipeline();
 

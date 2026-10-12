@@ -58,6 +58,7 @@ const path = require('path');
 
 const BlockTemplate = require('../lib/blockTemplate');
 const ShareProcessor = require('../lib/shareProcessor');
+const { attachAtomic, attachUnsupported } = require('./fakeAtomic');
 
 const GRN = '\x1b[32m', RED = '\x1b[31m', BLD = '\x1b[1m', OFF = '\x1b[0m';
 let pass = 0;
@@ -129,6 +130,8 @@ function fakeRedis() {
             return s ? s.size : 0;
         }
     };
+    attachUnsupported(api, 'it models the share-claim sets and nothing of ' +
+                           'block accounting');
     return api;
 }
 

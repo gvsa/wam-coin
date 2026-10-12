@@ -22,6 +22,7 @@
 
 const assert = require('assert');
 const ShareProcessor = require('../lib/shareProcessor');
+const { attachUnsupported } = require('./fakeAtomic');
 
 let pass = 0;
 const fail = [];
@@ -32,7 +33,11 @@ function test(name, fn) {
 }
 
 const log = { info() {}, warn() {}, error() {}, debug() {} };
-const redis = {};
+// Nothing here touches redis: these are config checks. The command is
+// present because ShareProcessor refuses a client without it, and it
+// throws rather than returning a number, so a config test can never
+// drift into asserting something about block accounting by accident.
+const redis = attachUnsupported({}, 'this file tests configuration handling only');
 const daemon = {};
 
 function sp(config) {

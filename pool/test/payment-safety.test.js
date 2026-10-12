@@ -30,6 +30,7 @@
 const assert = require('assert');
 const EventEmitter = require('events');
 const ShareProcessor = require('../lib/shareProcessor');
+const { attachAtomic, attachUnsupported } = require('./fakeAtomic');
 
 let pass = 0;
 const fail = [];
@@ -85,6 +86,7 @@ function fakeRedis(initial = {}) {
             return p;
         }
     };
+    attachUnsupported(r, 'it models balances and the payment batch, not block maturation');
     return r;
 }
 
