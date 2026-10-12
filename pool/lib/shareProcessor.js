@@ -622,7 +622,7 @@ class ShareProcessor extends EventEmitter {
         // from -- not for the pool and not for an operator by hand.
         //
         // The comment that used to sit here said losing a credit was
-        // recoverable. It was not. Reported by SmoothX; see pool/lib/atomic.js.
+        // recoverable. It was not. Reported by Smooth Jazz Crypto; see pool/lib/atomic.js.
         record.maturedAt = Date.now();
         const evidence = JSON.stringify(record);
 

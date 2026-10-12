@@ -39,7 +39,7 @@
 //  deleting blocks:round had already falsified. There was no recovery to
 //  fall back on.
 //
-//  Reported by SmoothX on 2026-10-12 against 87ac8f0, with the fix: make the
+//  Reported by Smooth Jazz Crypto (@smoothjazcrypto) on 2026-10-12 against 87ac8f0, with the fix: make the
 //  transition one server-side operation. Redis runs a script to completion
 //  before anything else, so there is no window to crash in. The same shape
 //  was in _orphan, which this covers too -- found while fixing this one, not

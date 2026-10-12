@@ -145,7 +145,7 @@ running, which comes first, because a chain with no nodes has nothing worth
 securing.
 
 **This programme's share of it is one eighth: 93,750 WAM, for the whole life
-of the programme.** 21,000 of that is committed to the findings below. One of
+of the programme.** 22,000 of that is committed to the findings below. One of
 every class in the table above comes to 91,250, so the table is
 payable even if every class is found — which is the test a promise has to
 pass before it is made.
@@ -243,6 +243,48 @@ unassigned by some network.
 
 Hardening rung, 250 WAM. The reporter claimed the 10,000 above and has not
 asked for this one. It is payable on request, at the rung.
+
+**1,000 WAM — pool maturation, a matured block could lose every trace of who
+was owed what, accepted 12 October 2026, unpaid.**
+
+When a block matured, the pool deleted it from `blocks:pending` and only then
+wrote the evidence to `blocks:maturing` — two separate Redis commands. An
+interruption between them left the block in no state at all: gone from
+pending, absent from maturing, never credited.
+
+What makes that final rather than inconvenient is one line in `recordBlock`:
+the round's shares are deleted in the same pipeline that writes the pending
+record. So that field is not a copy of anything. It is the only surviving
+statement of what each miner in the round is owed, and once it is gone the
+payout table cannot be rebuilt — not by the pool on restart, not by an
+operator by hand. The coins arrive in the pool's wallet with nobody able to
+say whose they are.
+
+The code argued for that order in a comment: *losing a credit is recoverable;
+paying it twice is not.* The second half is true. The first half was false,
+and the line deleting the round is what falsified it. The defect was a
+deliberate trade-off resting on a premise the code had already broken.
+
+Reported by Smooth Jazz Crypto (@smoothjazcrypto) on 12 October 2026, against
+`87ac8f0`, with a reproduction over the project's own test harness and the
+fix: make the transition one server-side operation. Fixed in
+`pool/lib/atomic.js` — a Lua script moves the field and writes the evidence
+together, and the pool refuses to start against a Redis that cannot run it,
+because a fallback is the same defect reachable by configuration. `_orphan`
+had the identical shape, was not reported, and was found while fixing this.
+
+Classified at 1,000 — the rung for denial of service against the pool — and
+said plainly as a judgement rather than a reading of the wording. The
+mechanism is the credit ledger, which is the 10,000 rung; the impact is one
+block's payout table inside a sub-second window that no attacker can cause,
+which is the 1,000 band.
+
+The reporter also made the point that mattered most. The regression test for
+the September finding crashes the pool at a point somebody chose — after the
+evidence is written — so the one interval it never touched was the one this
+fault lived in. `pool/test/crash-window.test.js` chooses nothing: it walks
+the failure across every Redis command the maturation path issues, one run
+per position, and asserts after each that the block is still recoverable.
 
 **1,000 WAM — the pool API leak, accepted 13 September 2026, unpaid.** Three of
 four `/api/*` endpoints returned every miner's full payout address while the

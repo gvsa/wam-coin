@@ -11,7 +11,7 @@
 //  WHY THIS EXISTS
 //
 //  Every fault ever found in this pool's money path was found by somebody
-//  outside the project: chovy, dang150296, Alboy, SmoothX. That is not luck,
+//  outside the project: chovy, dang150296, Alboy, Smooth Jazz Crypto. That is not luck,
 //  and it is not that they are better readers. It is that the pool's own
 //  tests crash it at points somebody CHOSE.
 //
@@ -22,7 +22,7 @@
 //  and it is a good test. It begins its simulated crash after
 //  blocks:maturing has already been written -- so the one interval it does
 //  not cover is the interval between the destructive claim and that write.
-//  That interval is where SmoothX found, on 2026-10-12, that a block's entire
+//  That interval is where Smooth Jazz Crypto found, on 2026-10-12, that a block's entire
 //  payout table could be destroyed: deleted from pending, absent from
 //  maturing, never credited, and unrecoverable because the round's shares are
 //  deleted in the same breath that writes the pending record.
@@ -273,7 +273,7 @@ let total = 0;
     // AND THE GUARD THAT PROVES THIS FILE CAN FAIL.
     //
     // A test that walks every position and always passes is indistinguishable
-    // from a test that walks none. This reproduces the defect SmoothX
+    // from a test that walks none. This reproduces the defect Smooth Jazz Crypto
     // reported, in the only way still available now that the transition is one
     // operation: a double whose claim is two steps, with the failure between
     // them. If the invariant above cannot detect that, it cannot detect
