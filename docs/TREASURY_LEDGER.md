@@ -35,8 +35,8 @@ The fee has a column of its own because a spend costs the treasury what it
 sent *and* what it paid to send it. A fee left out of the arithmetic is a
 number this file cannot be checked against, which defeats the point of it.
 
-At height 18,452 that is `2.5 × 18452 − 20,500.00000000 − 0.24387480 =
-25,629.75612520`, which is what `scantxoutset` returns, in 10,242 unspent
+At height 19,371 that is `2.5 × 19371 − 21,500.00000000 − 0.25578960 =
+26,927.24421040`, which is what `scantxoutset` returns, in 10,760 unspent
 outputs. Two independent routes to the same number, to the last decimal
 place.
 
@@ -65,6 +65,7 @@ place.
 | 2026-10-11 | **1248.75000000 WAM** | `0.01484520` | `WZSY6XFjmsef7Xb2E7DLhnkeU44bYyTLrA` | Same bounty, 7 of 9. | txid `0495e63eaeb38e1e5992c9501fe13a4ff45ef8edc9ecff078c3670c8d9d4d61b` |
 | 2026-10-11 | **1248.75000000 WAM** | `0.01484520` | `WZSY6XFjmsef7Xb2E7DLhnkeU44bYyTLrA` | Same bounty, 8 of 9. | txid `7436e0bd60b0374df73e600959d47c7d3481dac60a40f0ac03560a833d0f9efc` |
 | 2026-10-11 | **1248.75000000 WAM** | `0.01484520` | `WZSY6XFjmsef7Xb2E7DLhnkeU44bYyTLrA` | Same bounty, 9 of 9. | txid `b5d7710f76e7f247625cd04da5b1e7a3dc5c64f454f7bcf05dbcec7c2d851266` |
+| 2026-10-13 | **1000.00000000 WAM** | `0.01191480` | `wam1q03z5vzzkz03a5nq986y9n49u6ku28rvcw5p0mz` | Security bounty to Smooth Jazz Crypto (@smoothjazcrypto), accepted 12 October 2026: the pool deleted a matured block from its pending state before writing any durable record of it, and the round's shares are deleted when that state is written — so an interruption between the two destroyed the only surviving statement of what each miner was owed. Classified at 1,000 WAM under the denial-of-service rung, as a judgement: the mechanism is the credit ledger, the impact is one block in a window no attacker can cause. One transaction, 402 inputs. | txid `867bffa18cafda9a82349125a2c1e15828a095ffe584b44dfa63d90d722dab70` |
 
 The treasury is paid one output per block and never consolidated, so every
 spend above is built from 2.5 WAM outputs and nothing else: the 500 WAM line
@@ -73,8 +74,8 @@ is also why a bounty leaves in instalments rather than at once — 10,000 WAM in
 one transaction is about 4,000 inputs and 590 KB, six times the standard size
 limit, and no node would relay it.
 
-**Balance after the last line:** `25,629.75612520 WAM` in 10,242 unspent
-outputs, at height 18,452.
+**Balance after the last line:** `26,927.24421040 WAM` in 10,760 unspent
+outputs, at height 19,371.
 
 ---
 

@@ -89,8 +89,9 @@ and linked here. A reviewer followed our own sentence to our own file and found
 it contradicted. He was right and the file was wrong.
 
 **What has been paid is in the ledger, and nothing else has.** 10,000 WAM went
-to chovy on 1–2 October 2026, and the first instalment of Alboy's went on 11
-October; the 1,000 below is still unpaid. Until 2 October this paragraph opened
+to chovy on 1–2 October 2026, 10,000 to Alboy on 11 October, and 1,000 to
+Smooth Jazz Crypto on 13 October — 21,000 WAM to three people. The 1,000 for
+the pool API leak is the one still unpaid. Until 2 October this paragraph opened
 "nothing has been paid yet", which stayed after it stopped being true and
 contradicted the line further down this same file. Between 14 and 15 September
 it claimed the opposite error: that 1,000 WAM had already been paid to the reviewer who
@@ -113,16 +114,18 @@ Check it rather than believe it, from any node:
 
     wam-cli scantxoutset start '["addr(WdMMqW1DcgWZ6HtyJuEMdce6QkKg4raGmE)"]'
 
-At height 18,436 that returned 14,225 unspent outputs totalling
-35,579.87485720 WAM. One output per block, and it accrues 1,800 WAM per day.
+At height 19,371 that returned 10,760 unspent outputs totalling
+26,927.24421040 WAM. One output per block, and it accrues 1,800 WAM per day.
 
-**It has moved eleven times, and every movement is a bounty or a test coin.**
+**It has moved twenty times, and every movement is a bounty or a test coin.**
 This paragraph said "the treasury has never moved a coin since block 1", and
 that was true until 2026-09-22, when 500 WAM went to a GLEEC maintainer so he
 could run an atomic-swap test on a pull request he had opened and fixed
-himself. Not a listing fee — none was asked for and none was paid. The ten
-movements since are the bounties below, which leave in instalments because the
-treasury is paid one 2.5 WAM output per block and never consolidated. Every
+himself. Not a listing fee — none was asked for and none was paid. The
+nineteen movements since are the bounties below: two of them left in nine
+instalments each, because the treasury is paid one 2.5 WAM output per block
+and never consolidated, so 10,000 WAM in a single transaction would be about
+4,000 inputs and six times what any node will relay. Every
 coin that leaves is recorded with its amount, its fee, its
 reason and its transaction id in
 [docs/TREASURY_LEDGER.md](docs/TREASURY_LEDGER.md), and the balance above can
@@ -245,7 +248,10 @@ Hardening rung, 250 WAM. The reporter claimed the 10,000 above and has not
 asked for this one. It is payable on request, at the rung.
 
 **1,000 WAM — pool maturation, a matured block could lose every trace of who
-was owed what, accepted 12 October 2026, unpaid.**
+was owed what, accepted 12 October 2026, PAID 13 October 2026.** One
+transaction of 402 inputs, txid
+`867bffa18cafda9a82349125a2c1e15828a095ffe584b44dfa63d90d722dab70`, in block
+19,370, and in `docs/TREASURY_LEDGER.md` with the rest.
 
 When a block matured, the pool deleted it from `blocks:pending` and only then
 wrote the evidence to `blocks:maturing` — two separate Redis commands. An
