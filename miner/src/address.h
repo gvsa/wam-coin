@@ -149,25 +149,29 @@ struct NetAddressParams {
 inline NetAddressParams NetParamsFor(const std::string& network)
 {
     if (network == "testnet") return {"twam", 65, 128};
-    if (network == "regtest") return {"wamrt", 100, 196};
+    // regtest shares testnet's version bytes. kernel/chainparams.cpp sets
+    // PUBKEY_ADDRESS 65 and SCRIPT_ADDRESS 128 for both. This said 100 and
+    // 196 -- Bitcoin's values, carried over and never checked against our
+    // own node -- so the miner refused every legacy regtest address the node
+    // hands out. It went unseen because the regtest gates mine to a
+    // wamrt1... address, which never reaches the version byte at all.
+    if (network == "regtest") return {"wamrt", 65, 128};
     return {"wam", 73, 135};
 }
 
 /**
- * The locking script that pays `address`, or a thrown std::runtime_error
- * naming what is wrong with it.
+ * The witness script for a bech32/bech32m address, or a thrown
+ * std::runtime_error naming what is wrong with it.
+ *
+ * Split out of AddressToScript so that a failure here can be caught and
+ * reconsidered rather than ending the attempt. See the call site.
  */
-inline Bytes AddressToScript(const std::string& address,
-                             const NetAddressParams& net)
+inline Bytes Bech32ToScript(const std::string& address)
 {
     std::string lower = address;
     for (char& c : lower) c = char(std::tolower((unsigned char)c));
 
-    const bool looksBech32 =
-        lower.size() > net.hrp.size() + 1 &&
-        lower.compare(0, net.hrp.size() + 1, net.hrp + "1") == 0;
-
-    if (looksBech32) {
+    {
         if (address != lower) {
             std::string upper = address;
             for (char& c : upper) c = char(std::toupper((unsigned char)c));
@@ -227,6 +231,67 @@ inline Bytes AddressToScript(const std::string& address,
         script.push_back(uint8_t(program.size()));
         script.insert(script.end(), program.begin(), program.end());
         return script;
+    }
+}
+
+/**
+ * The locking script that pays `address`, or a thrown std::runtime_error
+ * naming what is wrong with it.
+ */
+inline Bytes AddressToScript(const std::string& address,
+                             const NetAddressParams& net)
+{
+    std::string lower = address;
+    for (char& c : lower) c = char(std::tolower((unsigned char)c));
+
+    // THE HRP PREFIX IS BECH32-ONLY, AND THE RULE IS THE NODE'S, NOT OURS.
+    //
+    // key_io.cpp, DecodeDestination:
+    //
+    //     bool is_bech32 = (ToLower(str.substr(0, params.Bech32HRP().size()))
+    //                       == params.Bech32HRP());
+    //     if (!is_bech32 && DecodeBase58Check(str, data, 21)) { ... }
+    //
+    // Three characters, case-insensitive, and no '1' required. When they
+    // match, the node never attempts base58. So a valid base58check address
+    // beginning "wam", "WAM", "WaM" and so on is one the node calls invalid
+    // -- about 1 in 1,700 legacy mainnet addresses.
+    //
+    // This file used hrp + "1", which is narrower, so the miner would build a
+    // coinbase paying an address the node refuses to parse. In solo mining
+    // that block is still valid and the coins are still paid: to a script the
+    // operator's own wallet cannot recognise as his. Nothing would report it
+    // except a balance that never arrives.
+    //
+    // Matching the node exactly is the only safe answer. The node is what
+    // pays; being more permissive than it is a debt that cannot be settled.
+    const bool isBech32Prefix =
+        lower.size() >= net.hrp.size() &&
+        lower.compare(0, net.hrp.size(), net.hrp) == 0;
+
+    if (isBech32Prefix) {
+        try {
+            return Bech32ToScript(address);
+        } catch (const std::exception& e) {
+            // A real base58 address that merely starts with the prefix is
+            // told what is actually wrong. "bech32 checksum failed" sends an
+            // operator hunting for a typo in an address that has none.
+            std::vector<uint8_t> probe;
+            if (Base58Decode(address, probe) && probe.size() == 25) {
+                uint8_t p1[32], p2[32];
+                SHA256d(probe.data(), 21, p1);
+                std::memcpy(p2, p1, 32);
+                if (std::memcmp(p2, probe.data() + 21, 4) == 0) {
+                    throw std::runtime_error(
+                        "that is valid base58check, but it begins with '" +
+                        address.substr(0, net.hrp.size()) + "'. The node reads any "
+                        "address starting with '" + net.hrp + "' as bech32 and never "
+                        "tries base58, so it would call this address invalid and "
+                        "could not pay it. Generate another one.");
+                }
+            }
+            throw;
+        }
     }
 
     // ---- base58check ------------------------------------------------------

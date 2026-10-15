@@ -185,6 +185,20 @@ run "the 3 code copies of vesting agree"  "$PY" scripts/check_vesting_sync.py
 # outside on 2026-10-11, not by us.
 run "no consensus field is unset" "$PY" scripts/check_consensus_params.py
 run "supply arithmetic"          "$PY" scripts/verify_supply.py
+
+# "Which script pays this address" is answered in three places: the pool in
+# JavaScript, the miner in C++, and the node, which is consensus. Nothing
+# compared them until 2026-10-15, and two of them had drifted -- the pool was
+# refusing one valid base58 address in twenty, found from outside after
+# twenty-six days, and the miner was refusing every legacy regtest address
+# the node hands out, found by this check on its first run.
+#
+# It compiles a driver against miner/src/address.h, so without a C++ compiler
+# it exits 2 and says nothing was compared. --node is passed by the caller
+# when a mainnet node is reachable; without it the two copies are still
+# checked against each other.
+run "pool, miner and node agree on addresses" \
+    "$PY" scripts/check_address_agreement.py
 run "executable bits in index"   bash scripts/test/test_exec_bits.sh
 
 # Its neighbour above checks that a script is marked runnable. This checks

@@ -61,7 +61,7 @@ node server.js
 ### The settings that matter
 
 ```jsonc
-"poolAddress": "W...",     // MUST start with W on mainnet. Checked at startup.
+"poolAddress": "wam1...",  // or "W..." / "w...". Mainnet. Checked at startup.
 "rewardMode": "pplns",     // or "prop"
 "poolFeePercent": 1.0,     // YOUR fee. Separate from the chain's 5%.
 "pplnsMultiplier": 2,      // window = 2 x network difficulty
@@ -69,9 +69,13 @@ node server.js
 "paymentIntervalSec": 600
 ```
 
-`poolAddress` is validated against the network's version byte before anything else starts.
-A testnet address on a mainnet pool would send every block reward into a void, so this
-check is deliberately fatal rather than a warning.
+`poolAddress` takes any mainnet address: `wam1…` (bech32), `W…` (P2PKH) or `w…` (P2SH).
+`wam-cli getnewaddress` gives you a `wam1…` one, and that is the usual answer — on this
+pool 43 of the 45 addresses miners have ever used are bech32.
+
+It is validated before anything else starts. A testnet address on a mainnet pool would
+send every block reward into a void, so this check is deliberately fatal rather than a
+warning.
 
 ---
 
