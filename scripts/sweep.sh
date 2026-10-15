@@ -287,6 +287,15 @@ run "the ledger is what the chain says"  "$PY" scripts/check_treasury_ledger.py 
 # page. The documents were right each time; only the page was wrong.
 run "the pages say what the documents say" "$PY" scripts/test/test_build_pages.py
 
+# And the one document generated from a binary rather than written. An
+# operator asked for an example wam.conf on 2026-10-13 and we shipped none:
+# the release is binaries and documents, and upstream's bitcoin.conf was
+# never renamed, never adapted and never packaged. share/examples/wam.conf
+# is generated from `wamd -help` so it cannot become a stale hand-written
+# list -- which only holds while somebody regenerates it. This compares the
+# committed option list against what the binary accepts today.
+run "the example conf matches the binary" "$PY" scripts/check_example_conf.py
+
 # And the script that actually moves it. On 2026-10-04 treasury_spend.py had
 # no test of any kind: 490 lines, the treasury's key in memory while it signs,
 # a file carried by hand between two machines, and nothing that runs. The pool
