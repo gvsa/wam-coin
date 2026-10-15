@@ -76,9 +76,17 @@ RED = "\033[31m"; GRN = "\033[32m"; YEL = "\033[33m"; BLD = "\033[1m"; OFF = "\0
 
 # The pages a stranger lands on, and the documents they are generated from --
 # both, because fixing one without the other means the next build undoes it.
+#
+# miner/README.md is here because of #3. A pool operator added his stratum
+# address to it rather than to docs/MINE.md, which was a reasonable place to
+# put it -- it is the file a miner reads -- and this list did not include it.
+# So an endpoint was published to readers in a file nothing dialled, and the
+# promise this check exists to keep ("a published host:port must answer") did
+# not cover it. A hand-kept list of where endpoints may appear will keep
+# missing one; this is the second file added to it after a real miss.
 TARGETS = ["site/*.html", "site/*/*.html", "site/CHANNELS.txt", "CHANNELS.txt",
            "docs/MINE.md", "docs/START_HERE.md", "docs/START_HERE_AR.md",
-           "docs/POOL_OPERATOR.md", "README.md"]
+           "docs/POOL_OPERATOR.md", "README.md", "miner/README.md"]
 
 # A port served over TLS answers a TLS handshake, not a JSON line. Proving
 # something listens is all this check needs from those.

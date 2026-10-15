@@ -372,6 +372,7 @@ pool.wamcoin.org:3333             run by this project, 1% operator fee
 wam.ariabrain.com:3333
 stratum.cryptopickaxe.co.uk:6040
 wampool.vslabs.co.in:3333
+veinpool.fr:3310                  and :3311 for servers, a higher start
 ```
 
 Ask their operators about their fees and their payout rules — those are
