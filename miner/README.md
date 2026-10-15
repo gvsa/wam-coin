@@ -79,6 +79,14 @@ Add a worker label if you run more than one machine:
 wam-miner -o stratum+tcp://pool.wamcoin.org:3333 -u <your WAM address>.livingroom
 ```
 
+Community pool: **VEIN Pool** (EU, France, PPLNS) — https://veinpool.fr/coin/wam
+
+```
+wam-miner -o stratum+tcp://veinpool.fr:3310 -u <your WAM address>.livingroom
+```
+
+(use port `3311` for servers: higher starting difficulty)
+
 | Option | Meaning |
 | --- | --- |
 | `-o, --url` | pool host and port; `stratum+tcp://` is optional |
