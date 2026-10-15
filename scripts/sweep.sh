@@ -199,6 +199,14 @@ run "supply arithmetic"          "$PY" scripts/verify_supply.py
 # checked against each other.
 run "pool, miner and node agree on addresses" \
     "$PY" scripts/check_address_agreement.py
+
+# How much has been paid in bounties is stated in four places by hand. On
+# 2026-10-13 the front page's footer said 21,000 WAM, which was right and
+# counted three payments, while the paragraph directly above it said the
+# exchange had happened "twice" and named two. Both sentences were visible at
+# once and contradicted each other for two days.
+run "the paid bounty total matches the ledger" \
+    "$PY" scripts/check_bounty_total.py
 run "executable bits in index"   bash scripts/test/test_exec_bits.sh
 
 # Its neighbour above checks that a script is marked runnable. This checks

@@ -35,8 +35,8 @@ The fee has a column of its own because a spend costs the treasury what it
 sent *and* what it paid to send it. A fee left out of the arithmetic is a
 number this file cannot be checked against, which defeats the point of it.
 
-At height 19,371 that is `2.5 × 19371 − 21,500.00000000 − 0.25578960 =
-26,927.24421040`, which is what `scantxoutset` returns, in 10,760 unspent
+At height 21,126 that is `2.5 × 21126 − 21,750.00000000 − 0.25882440 =
+31,064.74117560`, which is what `scantxoutset` returns, in 12,414 unspent
 outputs. Two independent routes to the same number, to the last decimal
 place.
 
@@ -66,6 +66,7 @@ place.
 | 2026-10-11 | **1248.75000000 WAM** | `0.01484520` | `WZSY6XFjmsef7Xb2E7DLhnkeU44bYyTLrA` | Same bounty, 8 of 9. | txid `7436e0bd60b0374df73e600959d47c7d3481dac60a40f0ac03560a833d0f9efc` |
 | 2026-10-11 | **1248.75000000 WAM** | `0.01484520` | `WZSY6XFjmsef7Xb2E7DLhnkeU44bYyTLrA` | Same bounty, 9 of 9. | txid `b5d7710f76e7f247625cd04da5b1e7a3dc5c64f454f7bcf05dbcec7c2d851266` |
 | 2026-10-13 | **1000.00000000 WAM** | `0.01191480` | `wam1q03z5vzzkz03a5nq986y9n49u6ku28rvcw5p0mz` | Security bounty to Smooth Jazz Crypto (@smoothjazcrypto), accepted 12 October 2026: the pool deleted a matured block from its pending state before writing any durable record of it, and the round's shares are deleted when that state is written — so an interruption between the two destroyed the only surviving statement of what each miner was owed. Classified at 1,000 WAM under the denial-of-service rung, as a judgement: the mechanism is the credit ledger, the impact is one block in a window no attacker can cause. One transaction, 402 inputs. | txid `867bffa18cafda9a82349125a2c1e15828a095ffe584b44dfa63d90d722dab70` |
+| 2026-10-15 | **250.00000000 WAM** | `0.00303480` | `WRRXkrgxGkhePeBgFf4Xn1LYP8HfGKPzGh` | Security bounty to ahten (@ahteen66), accepted 15 October 2026: `addressToScript` in `pool/lib/util.js` tested whether an address looked like bech32 before trying to decode it as base58, so about one valid base58 address in twenty was refused as a segwit address for another chain -- including this treasury address itself, which decodes cleanly as version 73. A miner whose address matched was disconnected at `mining.authorize`; an operator whose `poolAddress` matched could not start his pool. No funds were at risk. The same fault had been fixed in the miner on 19 September and the pool was never updated with it. Classified at 250, the hardening rung, which is where the reporter classified it. One transaction of 102 inputs, in block 21,114. | txid `2ba6139518819ffeee0a15d4075680f04fa00a4730859cbe206ea4b1c57c2d12` |
 
 The treasury is paid one output per block and never consolidated, so every
 spend above is built from 2.5 WAM outputs and nothing else: the 500 WAM line
@@ -74,8 +75,8 @@ is also why a bounty leaves in instalments rather than at once — 10,000 WAM in
 one transaction is about 4,000 inputs and 590 KB, six times the standard size
 limit, and no node would relay it.
 
-**Balance after the last line:** `26,927.24421040 WAM` in 10,760 unspent
-outputs, at height 19,371.
+**Balance after the last line:** `31,064.74117560 WAM` in 12,414 unspent
+outputs, at height 21,126.
 
 ---
 

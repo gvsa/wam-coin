@@ -99,13 +99,14 @@ npm run build:native
 npm test
 node server.js</code></pre>
 <h3 id="the-settings-that-matter">The settings that matter</h3>
-<pre><code>"poolAddress": "W...",     // MUST start with W on mainnet. Checked at startup.
+<pre><code>"poolAddress": "wam1...",  // or "W..." / "w...". Mainnet. Checked at startup.
 "rewardMode": "pplns",     // or "prop"
 "poolFeePercent": 1.0,     // YOUR fee. Separate from the chain's 5%.
 "pplnsMultiplier": 2,      // window = 2 x network difficulty
 "minimumPayoutWam": 1.0,
 "paymentIntervalSec": 600</code></pre>
-<p><code>poolAddress</code> is validated against the network's version byte before anything else starts. A testnet address on a mainnet pool would send every block reward into a void, so this check is deliberately fatal rather than a warning.</p>
+<p><code>poolAddress</code> takes any mainnet address: <code>wam1…</code> (bech32), <code>W…</code> (P2PKH) or <code>w…</code> (P2SH). <code>wam-cli getnewaddress</code> gives you a <code>wam1…</code> one, and that is the usual answer — on this pool 43 of the 45 addresses miners have ever used are bech32.</p>
+<p>It is validated before anything else starts. A testnet address on a mainnet pool would send every block reward into a void, so this check is deliberately fatal rather than a warning.</p>
 <hr>
 <h2 id="pplns-vs-prop">PPLNS vs PROP</h2>
 <p><strong>PROP</strong> splits each block among the shares submitted since the previous block. Simple, and easy to explain to miners — but it rewards pool hopping. A miner who mines only the early part of each round earns above their fair share, and everyone else pays for it.</p>

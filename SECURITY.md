@@ -89,9 +89,9 @@ and linked here. A reviewer followed our own sentence to our own file and found
 it contradicted. He was right and the file was wrong.
 
 **What has been paid is in the ledger, and nothing else has.** 10,000 WAM went
-to chovy on 1–2 October 2026, 10,000 to Alboy on 11 October, and 1,000 to
-Smooth Jazz Crypto on 13 October — 21,000 WAM to three people. The 1,000 for
-the pool API leak is the one still unpaid. Until 2 October this paragraph opened
+to chovy on 1–2 October 2026, 10,000 to Alboy on 11 October, 1,000 to
+Smooth Jazz Crypto on 13 October, and 250 to ahten on 15 October — 21,250 WAM
+to four people. The 1,000 for the pool API leak is the one still unpaid. Until 2 October this paragraph opened
 "nothing has been paid yet", which stayed after it stopped being true and
 contradicted the line further down this same file. Between 14 and 15 September
 it claimed the opposite error: that 1,000 WAM had already been paid to the reviewer who
@@ -194,8 +194,12 @@ Every transaction id is in `docs/TREASURY_LEDGER.md`, and the total on the
 chain is 10000.00000000 WAM to `WcQCFiCzwikQTTmPeafn73e3asC32ofyLr`, which
 anybody can add up without asking us.
 
-**10,000 WAM — WAM-F5, pool share accounting, accepted 11 October 2026, first
-instalment paid 11 October 2026.**
+**10,000 WAM — WAM-F5, pool share accounting, accepted 11 October 2026, PAID 11
+October 2026.** Nine transactions, every id in `docs/TREASURY_LEDGER.md`: a test
+payment of 10 WAM sent first and confirmed received, then 1,248.75 eight times.
+This heading said "first instalment paid" until 2026-10-15, after all nine had
+gone out — the wording was true on the day it was written and nothing moved it
+when the rest followed the same day.
 
 The pool rebuilds its job every 55 seconds even when the tip has not moved, so
 that newly arrived transactions reach miners, and keeps four jobs submittable.
@@ -291,6 +295,48 @@ evidence is written — so the one interval it never touched was the one this
 fault lived in. `pool/test/crash-window.test.js` chooses nothing: it walks
 the failure across every Redis command the maturation path issues, one run
 per position, and asserts after each that the block is still recoverable.
+
+**250 WAM — pool address validation, valid base58 addresses refused as bech32,
+accepted 15 October 2026, PAID 15 October 2026.** One transaction of 102
+inputs, txid
+`2ba6139518819ffeee0a15d4075680f04fa00a4730859cbe206ea4b1c57c2d12`, in block
+21,114, and in `docs/TREASURY_LEDGER.md` with the rest.
+
+`addressToScript` in `pool/lib/util.js` tested whether an address *looked like*
+bech32 before trying to decode it as base58. The test asks whether there is a
+`1` with only bech32 characters after it, and a valid base58 address answers
+yes by chance about one time in twenty — measured at 4.99% over 200,000
+generated mainnet P2PKH addresses here, and at 5.04%, 4.8% and 5.12% in the
+reporter's own three simulations.
+
+This project's own treasury address is one of them.
+`WdMMqW1DcgWZ6HtyJuEMdce6QkKg4raGmE` lower-cases to a `1` followed by 27
+characters that all happen to be in the bech32 alphabet, so the pool called it
+*a segwit address for 'wdmmqw'* and refused it, while base58check decodes it
+cleanly as version 73 — this network's P2PKH version.
+
+A miner whose address matched was refused at `mining.authorize` and
+disconnected, told that his own address belonged to another chain. An operator
+whose `poolAddress` matched could not start his pool at all.
+
+No funds were at risk: payments go out through `sendmany`, where the node
+parses the address, and an affected address never reached that point.
+
+Reported by ahten (@ahteen66) on 15 October 2026, with a reproduction against
+the project's own test harness, prevalence simulations, and the fix. He also
+found the thing that makes this more than one file's mistake: the identical
+fault was fixed in the miner on 19 September 2026, in `miner/src/address.h`
+(`2e91026`), and the pool was never updated with it. `pool/lib/util.js` carried
+its original commit, twenty-six days later.
+
+Fixed by decoding first: base58check carries a checksum, so it decides instead
+of guessing, and a real segwit address cannot survive it. The message that
+names a Bitcoin or Litecoin address is kept — it is a useful answer to a
+routine mistake — and now runs after the decoder has refused the address
+rather than before it.
+
+Classified at 250, the hardening rung, which is where the reporter classified
+it. Held down by `pool/test/address-validation.test.js`.
 
 **1,000 WAM — the pool API leak, accepted 13 September 2026, unpaid.** Three of
 four `/api/*` endpoints returned every miner's full payout address while the
