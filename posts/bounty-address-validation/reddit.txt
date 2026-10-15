@@ -1,0 +1,67 @@
+REDDIT — u/WAMCoinCore, as a self post.
+=======================================
+Same text as BitcoinTalk. Reddit renders the backticks as code; BitcoinTalk
+does not and shows them literally, which is legible either way.
+
+---------------------------------------------------------------
+
+A reader outside this project found the mining pool refusing valid addresses,
+and he has been paid for it.
+
+`addressToScript` in `pool/lib/util.js` tested whether an address *looked
+like* bech32 before decoding it as base58. That test is a guess: it asks
+whether there is a `1` with only bech32 characters after it, and a valid
+base58 address answers yes by chance about one time in twenty — 4.99% over
+200,000 generated addresses.
+
+This project's own treasury address is one of them. Lower-cased, it has a `1`
+followed by 27 characters that all happen to be in the bech32 alphabet, so the
+pool called it a segwit address for another chain and refused it — while
+base58check decodes it cleanly as this network's P2PKH version.
+
+A miner whose address matched was refused at `mining.authorize` and
+disconnected, told his own address belonged to another chain. An operator whose
+`poolAddress` matched could not start his pool at all.
+
+He also found what makes this more than one file's mistake: the
+identical fault was fixed in the miner on 19 September, in
+`miner/src/address.h`. The pool was never updated with it, and carried its
+original commit for twenty-six days.
+
+Fixed by decoding first. base58check carries a checksum, so it decides instead
+of guessing, and a real segwit address cannot survive it. The message naming a
+Bitcoin or Litecoin address is kept, and now runs after the decoder has refused
+the address rather than before it. `pool/test/address-validation.test.js` holds
+the order down.
+
+250 WAM, the hardening rung — where he classified it himself. txid
+`2ba6139518819ffeee0a15d4075680f04fa00a4730859cbe206ea4b1c57c2d12`, block
+21,114 — written out at https://wamcoin.org/security/ and in the treasury
+ledger with every other payment.
+
+
+The measurement, for anyone who wants to repeat it: 200,000 generated
+addresses per network and per script type, refused at 4.99% and 5.08% on
+mainnet P2PKH and P2SH, and within a tenth of a point of that on testnet and
+regtest. The reporter ran 5,000, 1,000 and 200,000 of his own and got 5.04%,
+4.8% and 5.12%. It is a property of the alphabets rather than of any one
+network: after a `1`, a base58 address has 53 characters of 58 that are also
+bech32 characters, case-insensitively.
+
+Why it survived a month: nothing compared the pool's answer to the miner's.
+The same decision — which script pays this address — is written in JavaScript
+in the pool and in C++ in the miner, and a fix to one had no way of reaching
+the other. That is now a check of its own, which reads both and the node, and
+fails if any two of them answer differently about any address.
+
+Reported by ahten.
+
+Source, in three places:
+https://gitlab.com/WAMCoin/wam-coin
+https://github.com/wamcoin-core-dev/wam-coin
+https://gitea.com/WAMCoin/wam-coin
+
+https://wamcoin.org
+https://wamcoin.net
+
+The technical discussion is on Discord: https://discord.gg/Gxvmrjy9Qb

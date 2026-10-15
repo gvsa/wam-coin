@@ -207,6 +207,15 @@ run "pool, miner and node agree on addresses" \
 # once and contradicted each other for two days.
 run "the paid bounty total matches the ledger" \
     "$PY" scripts/check_bounty_total.py
+
+# Three times now a sentence denying something has outlived the thing it
+# denied. CHANNELS.txt went stale three times in two days in September; the
+# front page said WAM was not listed when a venue had merged it; and on
+# 2026-10-15 four live documents at once still said there was no market, no
+# exchange and -- in the package handed to listing venues -- that the chain
+# had not launched, a month after it did.
+run "no live page denies what became true" \
+    "$PY" scripts/check_stale_denials.py
 run "executable bits in index"   bash scripts/test/test_exec_bits.sh
 
 # Its neighbour above checks that a script is marked runnable. This checks

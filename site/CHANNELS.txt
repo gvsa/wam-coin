@@ -46,15 +46,19 @@
  wallet about what you hold. Check the host against this file before you
  point anything at it.
 
- There are no others. No second account on any platform named above, no
- Instagram, no "support" account, no exchange listing, no presale, no
- airdrop, no token sale, no wallet app. If you have found one of those and
- it says WAM, it is not us.
+ There are no others. If an account, a pool, a server, an application or a
+ person says WAM and is not in the list above, it is not us. Nobody here
+ sells WAM, asks you for coins, or offers you a return, whatever the name
+ on the account.
 
  That sentence used to name each platform it was denying, and it went out
  of date three times in two days -- once denying a Reddit account that was
  ours. A list of what does not exist has to be rewritten every time
- something does; a rule does not.
+ something does; a rule does not. It was then rewritten as a shorter list
+ and fell into the same hole: until 2026-10-15 it was still denying a venue
+ listing and a wallet application, when WAM had been in the Komodo / GLEEC
+ registry since 22 September and wam-qt had shipped with v0.1.11. This
+ version is the rule, and denies nothing that can become true.
 
  The Reddit account is ours, registered on 10 August 2026 so that nobody
  else could take the name. One post was made from it, carrying links to

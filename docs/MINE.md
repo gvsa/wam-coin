@@ -355,10 +355,10 @@ afterwards.
 
 Real coins on the live chain. Mainnet opened at 00:00 UTC on 15 September
 2026. A block pays 50 WAM: 47.50 to whoever found it and 2.50 to the
-treasury, by a consensus rule every node checks. There is no price, no
-exchange and nothing to sell them on, and there may never be. Mine because
-you want to hold the coin of a chain you can verify, not because you expect a
-market.
+treasury, by a consensus rule every node checks. This project sets no price
+and runs no market, and what you mine may never be worth anything. Mine
+because you want to hold the coin of a chain you can verify, not because you
+expect a market.
 
 Coins from a block cannot be spent for 100 blocks, about three hours. That is
 consensus, not the pool.

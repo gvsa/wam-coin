@@ -1,0 +1,45 @@
+X — a thread of two. X counts every URL as 23 characters whatever its length.
+=============================================================================
+Counted below, not estimated.
+
+Two posts rather than one because the five links and the Discord line are six
+URLs, which is 138 of the 280 characters before a word is written. The finding
+does not fit in the 142 that are left. Post 2 is a reply to post 1, so the
+links sit under the thing they belong to.
+
+---------------------------------------------------------------
+POST 1
+
+The WAM pool was refusing about one valid address in twenty — this project's
+own treasury address among them — because it guessed at an address's format
+instead of decoding it.
+
+Found from outside. Fixed, tested, and paid at the published rung.
+
+wamcoin.org/security
+
+---------------------------------------------------------------
+POST 2 — a reply to post 1
+
+WAM's source, in three places, at three companies:
+
+gitlab.com/WAMCoin/wam-coin
+github.com/wamcoin-core-dev/wam-coin
+gitea.com/WAMCoin/wam-coin
+
+wamcoin.org
+wamcoin.net
+
+The technical discussion is on Discord: https://discord.gg/Gxvmrjy9Qb
+
+---------------------------------------------------------------
+
+NOTES
+
+No hash rate figure and no block height outside the txid's own line. Both move,
+an X post does not, and a stale number is worse than no number on the one
+platform where a post outlives its own facts.
+
+The amount is not in post 1. "Paid at the published rung" sends a reader to the
+table that says what each rung is, which is the thing worth reading; a number
+on its own invites an argument about the number.

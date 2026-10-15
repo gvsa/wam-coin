@@ -1,0 +1,40 @@
+BLUESKY — from @wamcoin.org. 300 characters, counted as real characters.
+========================================================================
+Counted below, not estimated.
+
+Bluesky counts what is written, so the six URLs cost what they actually are
+rather than 23 each. They still cost 132 characters, so this is a thread of
+two for the same reason X is.
+
+---------------------------------------------------------------
+POST 1
+
+The WAM pool was refusing about one valid address in twenty - this project's
+own treasury address among them - because it guessed at an address's format
+instead of decoding it.
+
+Found from outside. Fixed, tested, and paid at the published rung.
+
+wamcoin.org/security
+
+---------------------------------------------------------------
+POST 2 - a reply to post 1
+
+WAM's source, in three places, at three companies:
+
+gitlab.com/WAMCoin/wam-coin
+github.com/wamcoin-core-dev/wam-coin
+gitea.com/WAMCoin/wam-coin
+
+wamcoin.org
+wamcoin.net
+
+The technical discussion is on Discord: https://discord.gg/Gxvmrjy9Qb
+
+---------------------------------------------------------------
+
+NOTES
+
+Em dashes are written as hyphens here. Bluesky renders them, but a post copied
+from this file into a client that does not has produced a mojibake character
+in the middle of a sentence before.
