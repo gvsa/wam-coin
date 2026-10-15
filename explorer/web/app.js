@@ -420,17 +420,33 @@ async function renderConcentration() {
     return `${(h / 24).toFixed(1)} days`;
   };
 
+  // WHICH BLOCKS, BECAUSE A COUNT CANNOT SHOW MOVEMENT.
+  //
+  // This printed "5037 blocks" for the long window, and 5037 is what a
+  // window capped at 5040 reads every single day once the chain is past
+  // that height. It rolls, but nothing here said so, and the founder
+  // watched the same number for days and concluded the panel had frozen
+  // and was lying to readers. He was right about what it looked like.
+  //
+  // The heights move every two minutes. Printing them turns "is this
+  // thing even running" into something a reader settles by looking twice.
+  const blocks = (w) => {
+    if (!w.fromHeight || !w.toHeight) return `${w.blocksRead} blocks`;
+    const n = (x) => x.toLocaleString('en-US');
+    return `blocks ${n(w.fromHeight)}–${n(w.toHeight)}`;
+  };
+
   const sevenSpan = sd && span(sd.spanSeconds);
   text($('concSeven'), sd && sd.blocksRead
     ? line(sd.complete ? 'the long window' : 'the whole chain so far',
-           sevenSpan ? `${sd.blocksRead} blocks, ${sevenSpan}` : `${sd.blocksRead} blocks`,
+           sevenSpan ? `${blocks(sd)}, ${sevenSpan}` : blocks(sd),
            sd.topPercent, sd.distinct)
     : 'the long window: reading…');
 
   const nowSpan = span(c.spanSeconds);
   text($('concSummary'),
     line('right now',
-         nowSpan ? `${c.blocksRead} blocks, ${nowSpan}` : `${c.blocksRead} blocks`,
+         nowSpan ? `${blocks(c)}, ${nowSpan}` : blocks(c),
          pc, c.distinct));
 
   const t = $('concTable');

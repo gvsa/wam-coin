@@ -133,11 +133,14 @@ class Concentration {
         const tally = new Map();
         let total = 0;
         let first = null, last = null;
+        let lowest = null, highest = null;
         for (const [h, rec] of this.finders) {
             if (h <= this.tip - depth) continue;
             const addr = rec.addr;
             tally.set(addr, (tally.get(addr) || 0) + 1);
             total++;
+            if (lowest === null || h < lowest) lowest = h;
+            if (highest === null || h > highest) highest = h;
             if (rec.time) {
                 if (first === null || rec.time < first) first = rec.time;
                 if (last === null || rec.time > last) last = rec.time;
@@ -147,6 +150,24 @@ class Concentration {
         return {
             window: depth,
             blocksRead: total,
+            // WHICH BLOCKS, NOT JUST HOW MANY.
+            //
+            // The long window is capped at 5040, so once the chain passed
+            // that height "5037 blocks" became a constant and has printed
+            // the same number every day since. It rolls -- heights below the
+            // window are dropped on every update -- but nothing on the page
+            // showed that, so the founder watched it for days and concluded
+            // the panel had frozen and was lying to readers.
+            //
+            // A count cannot show movement. A range can: the heights move
+            // every two minutes, in front of whoever is watching.
+            // The heights actually tallied, not the window's arithmetic
+            // bounds. The newest three blocks are held back because they can
+            // still be reorganised away, so `tip` is not in this answer and
+            // printing it as the end of the range would state a block that
+            // was never counted.
+            fromHeight: lowest,
+            toHeight: highest,
             // Measured from the oldest and newest block in the window, in
             // seconds, or null when fewer than two blocks carry a time.
             spanSeconds: (first !== null && last !== null && last > first)
