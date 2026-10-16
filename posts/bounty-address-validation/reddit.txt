@@ -6,7 +6,8 @@ does not and shows them literally, which is legible either way.
 ---------------------------------------------------------------
 
 A reader outside this project found the mining pool refusing valid addresses,
-and he has been paid for it.
+and he has been paid for it — the fourth time somebody has done real work for
+WAM and taken the coin as the payment for it.
 
 `addressToScript` in `pool/lib/util.js` tested whether an address *looked
 like* bech32 before decoding it as base58. That test is a guess: it asks
@@ -23,16 +24,13 @@ A miner whose address matched was refused at `mining.authorize` and
 disconnected, told his own address belonged to another chain. An operator whose
 `poolAddress` matched could not start his pool at all.
 
-He also found what makes this more than one file's mistake: the
-identical fault was fixed in the miner on 19 September, in
-`miner/src/address.h`. The pool was never updated with it, and carried its
-original commit for twenty-six days.
+He also found what makes this more than one file's mistake: the identical fault
+was fixed in the miner on 19 September, in `miner/src/address.h`, and the pool
+was never updated with it. It carried its original commit for twenty-six days.
 
 Fixed by decoding first. base58check carries a checksum, so it decides instead
-of guessing, and a real segwit address cannot survive it. The message naming a
-Bitcoin or Litecoin address is kept, and now runs after the decoder has refused
-the address rather than before it. `pool/test/address-validation.test.js` holds
-the order down.
+of guessing, and a real segwit address cannot survive it.
+`pool/test/address-validation.test.js` holds the order down.
 
 250 WAM, the hardening rung — where he classified it himself. txid
 `2ba6139518819ffeee0a15d4075680f04fa00a4730859cbe206ea4b1c57c2d12`, block
@@ -53,6 +51,10 @@ The same decision — which script pays this address — is written in JavaScrip
 in the pool and in C++ in the miner, and a fix to one had no way of reaching
 the other. That is now a check of its own, which reads both and the node, and
 fails if any two of them answer differently about any address.
+
+The three before this one are in the same policy, with the same arithmetic
+behind each amount: 10,000 for pool accounting in September, 10,000 for share
+accounting and 1,000 for the maturation path in October. 21,250 WAM in all.
 
 Reported by ahten.
 

@@ -233,8 +233,8 @@ Then check it as a stranger would — clean directory, empty keyring, nothing
 but what the announcement says to fetch:
 
 ```
-curl -LO https://wamcoin.org/downloads/v0.1.11/SHA256SUMS
-curl -LO https://wamcoin.org/downloads/v0.1.11/SHA256SUMS.asc
+curl -LO https://wamcoin.org/downloads/v0.1.12/SHA256SUMS
+curl -LO https://wamcoin.org/downloads/v0.1.12/SHA256SUMS.asc
 curl -LO https://wamcoin.org/verify_release.sh
 curl -LO https://wamcoin.org/SIGNING-KEY.asc
 bash verify_release.sh .

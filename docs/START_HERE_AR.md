@@ -116,14 +116,14 @@ WAM نقودٌ لا تُصدرها شركة ولا يحفظها مصرف.
 ### التنزيل
 
 ```bash
-curl -LO https://wamcoin.org/downloads/v0.1.11/wam-coin-v0.1.11-x86_64-linux-gnu.tar.gz
-curl -LO https://wamcoin.org/downloads/v0.1.11/SHA256SUMS
+curl -LO https://wamcoin.org/downloads/v0.1.12/wam-coin-v0.1.12-x86_64-linux-gnu.tar.gz
+curl -LO https://wamcoin.org/downloads/v0.1.12/SHA256SUMS
 ```
 
 ### تأكّد أنه ملفّنا فعلاً
 
 ```bash
-curl -LO https://wamcoin.org/downloads/v0.1.11/SHA256SUMS.asc
+curl -LO https://wamcoin.org/downloads/v0.1.12/SHA256SUMS.asc
 curl -LO https://wamcoin.org/verify_release.sh
 curl -LO https://wamcoin.org/SIGNING-KEY.asc
 bash verify_release.sh .
@@ -136,8 +136,8 @@ bash verify_release.sh .
 ### الفكّ والتشغيل
 
 ```bash
-tar -xzf wam-coin-v0.1.11-x86_64-linux-gnu.tar.gz
-cd wam-coin-v0.1.11/bin
+tar -xzf wam-coin-v0.1.12-x86_64-linux-gnu.tar.gz
+cd wam-coin-v0.1.12/bin
 ./wamd -printtoconsole
 ```
 
@@ -368,13 +368,13 @@ cp /path/to/your/backup.dat ~/.wam/wallets/mine/wallet.dat
 
 | الأرشيف | ما فيه |
 |---|---|
-| `wam-coin-v0.1.11-…` | `wamd` و`wam-cli` — العقدة |
-| `wam-miner-v0.1.11-…` | `wam-miner` — المعدّن وحده |
+| `wam-coin-v0.1.12-…` | `wamd` و`wam-cli` — العقدة |
+| `wam-miner-v0.1.12-…` | `wam-miner` — المعدّن وحده |
 
 ```bash
-curl -LO https://wamcoin.org/downloads/v0.1.11/wam-miner-v0.1.11-x86_64-linux-gnu.tar.gz
-tar -xzf wam-miner-v0.1.11-x86_64-linux-gnu.tar.gz
-cd wam-miner-v0.1.11
+curl -LO https://wamcoin.org/downloads/v0.1.12/wam-miner-v0.1.12-x86_64-linux-gnu.tar.gz
+tar -xzf wam-miner-v0.1.12-x86_64-linux-gnu.tar.gz
+cd wam-miner-v0.1.12
 chmod +x wam-miner
 ```
 

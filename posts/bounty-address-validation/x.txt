@@ -10,11 +10,11 @@ links sit under the thing they belong to.
 ---------------------------------------------------------------
 POST 1
 
-The WAM pool was refusing about one valid address in twenty — this project's
-own treasury address among them — because it guessed at an address's format
-instead of decoding it.
+The fourth time somebody has done real work for WAM and taken the coin as
+payment: a reader outside the project found the pool refusing about one valid
+address in twenty — our own treasury address among them.
 
-Found from outside. Fixed, tested, and paid at the published rung.
+Fixed, tested, paid at the published rung.
 
 wamcoin.org/security
 
