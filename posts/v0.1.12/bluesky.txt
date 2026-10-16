@@ -25,3 +25,18 @@ node RWE. Found with readelf by somebody who had to build Core from source
 to get around it.
 
 wamcoin.org/security
+
+---------------------------------------------------------------
+POST 3 - a reply to post 2. The links, and where people actually talk.
+
+WAM's source lives in three places, at three companies:
+
+gitlab.com/WAMCoin/wam-coin
+github.com/wamcoin-core-dev/wam-coin
+gitea.com/WAMCoin/wam-coin
+
+wamcoin.org
+wamcoin.net
+
+Questions and the technical discussion are on Discord:
+discord.gg/Gxvmrjy9Qb
