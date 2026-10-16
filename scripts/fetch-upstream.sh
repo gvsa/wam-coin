@@ -158,7 +158,19 @@ RANDOMX_ARCH="${WAM_RANDOMX_ARCH:-x86-64}"
 RANDOMX_PATCHED=0
 for _s in "$RANDOMX_DIR"/src/*.S; do
     [ -f "$_s" ] || continue
-    _mine="$(grep -nE 'WAM:note\.GNU-stack|Added by WAM' "$_s" | head -1 | cut -d: -f1)"
+    # `|| true` because this script runs under `set -euo pipefail` and grep
+    # returns 1 when it matches nothing -- which is the normal case, on every
+    # clean clone, for every file. pipefail made that 1 the status of the
+    # whole pipeline, the assignment inherited it, and -e killed the script
+    # one line after "1/4 RandomX", printing nothing.
+    #
+    # So from the commit that added this block until 2026-10-16, fetching
+    # upstream from a fresh checkout failed for everybody, and the only trees
+    # it worked on were ones that had already been patched once. Both of my
+    # tests were upgrades of an existing tree, so neither touched it, and the
+    # last platform-build before it was 27 September. The workflow found it in
+    # 35 seconds on the first run after.
+    _mine="$(grep -nE 'WAM:note\.GNU-stack|Added by WAM' "$_s" | head -1 | cut -d: -f1 || true)"
     if [ -n "$_mine" ]; then
         # Ours. Guarded already means there is nothing to do; unguarded means
         # a tree that cannot build for Windows or macOS and must be rewritten.
