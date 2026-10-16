@@ -69,8 +69,15 @@ def bot_text(tag_message: pathlib.Path) -> str:
     console.log(toDiscord(A.releaseMessage({ tag: 'v0.0.0', name: 'render',
       url: 'https://wamcoin.org/downloads/', body, prerelease: true })));
     """
+    # encoding is named, because text=True alone decodes with the platform's
+    # preferred encoding -- cp1252 on Windows, which cannot represent an em
+    # dash. This check therefore passed on Linux and died on a Windows
+    # console with a UnicodeDecodeError from inside subprocess, two frames
+    # away from anything that looks like a release note. Found on
+    # 2026-10-16, verifying a tag message that was itself fine.
     out = subprocess.run(["node", "-e", script, str(tag_message)],
-                         cwd=ROOT, capture_output=True, text=True)
+                         cwd=ROOT, capture_output=True, text=True,
+                         encoding="utf-8", errors="replace")
     if out.returncode != 0:
         print(f"  {RED}could not render{OFF}  {out.stderr.strip()[:200]}")
         sys.exit(2)

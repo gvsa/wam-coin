@@ -1,5 +1,7 @@
 WAM Coin v0.1.12 — the miner stops telling good machines to stop, and nothing we ship has an executable stack
 
+MANDATORY: a consensus field was assigned by no network, so which rule a node enforces was left to its compiler, and a node somebody built himself may already be on a different rule than the chain.
+
 If you mine solo, update. Until this release the miner read three of the
 node's answers as refusals when each of them means a race you lost, and then
 told you real money was at stake and not to leave it running. Two people shut

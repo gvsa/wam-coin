@@ -12,16 +12,27 @@ it in between.
 So the first two paragraphs below have to make sense on their own, to somebody
 who sees nothing else. Everything after them is for the release page.
 
-There is no MANDATORY: line, and that is a judgement, not an omission. This
-release changes no consensus rule on mainnet. `enforce_BIP94` was declared
-with no default and assigned by no network, so three consensus paths read an
-indeterminate value; it is now assigned explicitly — false on mainnet and
-testnet, which is the behaviour every released binary already had, and true
-on regtest. A v0.1.11 node validates exactly the same blocks and is in no
-danger. But every solo miner should update, for the reason below.
+There IS a MANDATORY: line. It must stay the first non-empty line under the
+title, and it must stay ONE PHYSICAL LINE however long: the bot takes that
+line and nothing else. Wrapped over three lines it published a sentence cut
+in half, with the remainder orphaned under the title -- caught by rendering
+it before tagging, which is why docs/RELEASING.md says to render it. The release workflow refuses to publish without it, and it is
+right to: consensus_floor.py derives from the tags themselves that this is
+the first release since v0.1.5 to touch a consensus value.
+
+The first draft of this file argued the opposite -- that assigning
+`enforce_BIP94` changes nothing, because every binary this project released
+read it as false. That reasoning is invalid and SECURITY.md already said so
+in its own words: an indeterminate read is not a promise. The field was
+declared with no default, read in three consensus paths, and assigned by no
+network, so what rule a node enforces was decided by its compiler and its
+allocator. Ours read false. A node somebody built himself may not have, and
+he has no way to find out except by forking.
 
 Delete everything above this line before tagging.
 ------------------------------------------------------------------------------
+
+MANDATORY: a consensus field was assigned by no network, so which rule a node enforces was left to its compiler, and a node somebody built himself may already be on a different rule than the chain.
 
 If you mine solo, update. Until this release the miner read three of the
 node's answers as refusals when each of them means a race you lost, and then
