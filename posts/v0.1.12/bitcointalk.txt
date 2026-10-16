@@ -103,17 +103,9 @@ every file against SHA256SUMS. A signature covers the files and never the
 place they are hosted, so where you fetched them from changes nothing about
 what you can check.
 
-Downloads, and the signature over them:
+All nine, with SHA256SUMS and SHA256SUMS.asc beside them:
 
 https://wamcoin.org/downloads/v0.1.12/
-
-The signed list is SHA256SUMS with SHA256SUMS.asc beside it. Verify before
-you run anything:
-
-    bash verify_release.sh .
-
-A signature covers the files and never the place they are hosted, so where
-you fetch them from changes nothing about what you can check.
 
 Source, in three places, at three companies:
 https://gitlab.com/WAMCoin/wam-coin
