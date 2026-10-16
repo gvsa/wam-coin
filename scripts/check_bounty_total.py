@@ -57,6 +57,9 @@ import pathlib
 import re
 import sys
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / "lib"))
+import quoted  # noqa: E402
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 for _stream in (sys.stdout, sys.stderr):
@@ -116,7 +119,11 @@ def main() -> int:
                   f"compared.{OFF}\n")
             return 2
 
-    sec_text = sec.read_text(encoding="utf-8", errors="replace")
+    # Quotation marks are honoured, as in every other text-scanning check
+    # here: this file quotes the wording it replaced more than once, and a
+    # quoted "21,000 WAM" is a record of what the page used to say, not a
+    # claim the page is making now.
+    sec_text = quoted.strip_quoted(sec.read_text(encoding="utf-8", errors="replace"))
     entries = paid_entries(sec_text)
     if not entries:
         print(f"  {YEL}no PAID entry was found in SECURITY.md -- either the "
@@ -150,7 +157,8 @@ def main() -> int:
         print(f"  {GRN}ok{OFF}    SECURITY.md says {want_people[0]}")
 
     # 3. The front page, both languages. Its own digits may be Arabic-Indic.
-    page = index.read_text(encoding="utf-8", errors="replace").translate(ARABIC_DIGITS)
+    page = quoted.strip_quoted(
+        index.read_text(encoding="utf-8", errors="replace")).translate(ARABIC_DIGITS)
     found = (re.findall(r"([\d,]+) WAM has been paid", page)
              + re.findall(r"([\d,]+) WAM[،,]? بكلّ مبلغ", page))
     stated = set(found)
