@@ -96,6 +96,37 @@ NOT_A_VALIDITY_RULE = (
     "nMinimumChainWork",
 )
 
+# A VALIDITY RULE THAT WAS ASSIGNED THE VALUE IT ALREADY HAD.
+#
+# NOT_A_VALIDITY_RULE above is for fields that never decide whether a block
+# is valid. This is the other case, and it is not the same: the field IS a
+# validity rule, and the release did not change what it decides.
+#
+# enforce_BIP94 was declared with no default initialiser, read in three
+# consensus paths, and assigned by no network. Consensus::Params is
+# heap-allocated, so every read was indeterminate -- and read false on every
+# binary this project has released, which SECURITY.md records. v0.1.12
+# assigns false on mainnet and testnet. A v0.1.11 node and a v0.1.12 node
+# accept exactly the same blocks.
+#
+# Without this, the floor moved to v0.1.12 and release.yml demanded a
+# MANDATORY line. It was written, and every channel was told that a node on
+# an earlier version "will be rejected by the network and fork" -- which was
+# false for 49 of the 50 independent operators then on the network, all of
+# them on one chain with a v0.1.12 node at the time the notice went out.
+# That is the cry-wolf failure this file's own comments describe, reached
+# from the other direction: the guard could not distinguish a line changing
+# from behaviour changing, and a human agreed with it against the evidence.
+#
+# KEYED BY TAG, deliberately. If enforce_BIP94 is ever genuinely changed --
+# false to true on a live network -- that is a hard fork and the floor must
+# move. An exemption that covered the field forever would hide it. This one
+# covers one field in one release, and the next release carrying a different
+# value for it fingerprints differently and moves the floor as it should.
+ASSIGNED_NOT_CHANGED = {
+    "v0.1.12": ("enforce_BIP94",),
+}
+
 
 def git(*args):
     r = subprocess.run(["git", "-C", str(REPO), *args],
@@ -113,7 +144,7 @@ def tags():
                   key=ver_tuple)
 
 
-def fingerprint_text(chainparams, params):
+def fingerprint_text(chainparams, params, tag=None):
     """Every consensus value in those two files, normalised, in a stable
     order. Separated from the git plumbing so the same definition serves the
     local walk below and the over-the-network comparison install.sh makes --
@@ -137,6 +168,11 @@ def fingerprint_text(chainparams, params):
             # regular expression was tightened to exclude a different one.
             if any(("." + f) in v for f in NOT_A_VALIDITY_RULE):
                 continue
+            # The field is a validity rule; this release did not change what
+            # it decides. Scoped to one tag, so a later release that really
+            # changes it still moves the floor. See ASSIGNED_NOT_CHANGED.
+            if any(("." + f) in v for f in ASSIGNED_NOT_CHANGED.get(tag, ())):
+                continue
             values.append(v)
 
     text = re.sub(r"/\*.*?\*/", " ", params, flags=re.S)
@@ -151,7 +187,7 @@ def fingerprint_text(chainparams, params):
 def fingerprint(tag):
     """Every consensus value at that tag, read from this repository."""
     return fingerprint_text(git("show", f"{tag}:{CHAINPARAMS}"),
-                            git("show", f"{tag}:{PARAMS}"))
+                            git("show", f"{tag}:{PARAMS}"), tag)
 
 
 def fetch_tag(tag, repo="wamcoin-core-dev/wam-coin"):
@@ -210,8 +246,12 @@ def main():
     # marker is missing.
     if args.compare_remote:
         a, b = args.compare_remote
-        fa = fingerprint_text(*fetch_tag(a))
-        fb = fingerprint_text(*fetch_tag(b))
+        # The tag is passed here too, or install.sh's over-the-network
+        # comparison and the local walk would answer differently about the
+        # same pair -- which is the one thing fingerprint_text exists to
+        # prevent.
+        fa = fingerprint_text(*fetch_tag(a), tag=a)
+        fb = fingerprint_text(*fetch_tag(b), tag=b)
         if fa is None or fb is None:
             print("unreadable")
             return 1

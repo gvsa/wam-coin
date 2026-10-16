@@ -244,6 +244,33 @@ It must print `ok` twice and exit 0. If it does not, the release is public and
 broken: **Edit release → Save as draft** puts it back out of reach while you
 find out why.
 
+## 4b. Upload to our own hosts BEFORE publishing
+
+The release page is not where readers are sent. Every page this project
+publishes sends them to `wamcoin.org/downloads/<version>/`, which is
+`/var/www/wam-downloads/<version>/` on the two machines that serve the site.
+
+```
+for h in 169.58.159.165 13.140.33.187; do
+    ssh "root@$h" "mkdir -p /var/www/wam-downloads/<version>"
+    scp SHA256SUMS SHA256SUMS.asc wam-*.tar.gz wam-*.zip         "root@$h:/var/www/wam-downloads/<version>/"
+done
+bash scripts/check_release_ready.sh <version>
+```
+
+That check fetches every file named in the published SHA256SUMS over the
+network, as a stranger fetches it, and verifies the signature against the
+fingerprint in SECURITY.md. It exits 1 if anything a reader is sent to is
+missing and 2 if it could not look.
+
+On 16 October 2026 v0.1.12 was published before this step and the directory
+answered 404 for four minutes. Eight things had been verified first -- the
+checksums, the signature, the fingerprint, the tag object, the rendered
+announcement, the clean tree, the three mirrors, the bot's own code -- and
+not the URL a stranger follows. `release_watch` held the announcement and
+alarmed, which is why nothing incomplete reached the channels. The guard is
+the net; this step is so the net is never needed.
+
 ## 5. Afterwards
 
 ```

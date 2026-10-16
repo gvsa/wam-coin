@@ -398,6 +398,18 @@ run "DNS seeds answer x9."    bash scripts/check_dns_seeds.sh
 # when this page was last checked" is a claim with no checker behind it.
 run "published endpoints answer" "$PY" scripts/check_published_endpoints.py
 
+# Every page sends a reader to wamcoin.org/downloads/<newest>/. On
+# 2026-10-16 that directory answered 404 for four minutes after v0.1.12 was
+# published, because the archives had not been uploaded to our own hosts
+# yet. Eight things were verified before publishing, and not the one URL a
+# stranger actually follows. release_watch caught it and held the
+# announcement; this is so the net is not the thing that catches it.
+newest_tag="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+if [ -n "$newest_tag" ]; then
+    run "the newest release is downloadable" \
+        bash scripts/check_release_ready.sh "$newest_tag"
+fi
+
 if command -v curl >/dev/null 2>&1; then
     run "published download is this network" bash scripts/check_release_matches.sh
 
