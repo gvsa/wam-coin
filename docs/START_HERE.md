@@ -122,6 +122,17 @@ Said plainly, because it is four days old: it has been opened by hand on Linux
 and Windows, and on macOS it has been built, started and synced from genesis by
 the build machine, with no person yet sitting in front of it.
 
+**If you already run `wamd` and want to move to the window, read
+[the move, in docs/MINE.md](MINE.md#moving-from-the-terminal-node-to-the-graphical-wallet)
+first.** Three things stop people on the way across and none of them says so
+at the time: the wallet does not open the RPC port that `wamd` opens for
+itself, so a solo miner stops without a message; an installation older than
+v0.1.10 on Windows or macOS keeps its chain and wallet in a folder called
+`Bitcoin`, so a wallet started without `-datadir` opens an empty one and a
+wallet that is perfectly safe looks lost; and the *Receive* tab shows a new
+address every time it is pressed, which is one wallet with many addresses
+rather than a new wallet. The page has the whole move in five commands.
+
 The rest of this page is the terminal. Everything in it still applies.
 
 ### Download it

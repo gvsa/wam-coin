@@ -192,6 +192,70 @@ Start-Process -FilePath .\wamd.exe `
 program is `C:\WINDOWS\system32\curl.exe`, which is why every download
 above says `curl.exe` rather than `curl`.
 
+### Moving from the terminal node to the graphical wallet
+
+`wam-qt` is the same node with a window on it, so it replaces `wamd` rather
+than running beside it. Three things stop people on the way across, and all
+three were walked through with a miner on 16 October 2026 — every one of them
+cost a step that nothing on this page had warned about.
+
+**1. The wallet does not open the RPC port, and `wamd` does.** `bitcoind.cpp`
+says it in a comment: *-server defaults to true for bitcoind but not for the
+GUI*. So the moment you switch, your solo miner stops — and nothing explains
+why, because from the wallet's side everything is working. Put this in your
+`wam.conf`, in the data directory, before you start:
+
+```
+server=1
+```
+
+**2. If you installed before v0.1.10 on Windows or macOS, your chain and your
+wallet are in a folder called `Bitcoin`.** Until v0.1.10 the rename that gave
+Linux `~/.wam` changed one branch of `GetDefaultDataDir` and left the other
+two alone. The new default is `WAM`, so a wallet started without `-datadir`
+opens an empty directory and a wallet that is perfectly safe looks lost.
+
+Stop the node first — `wam-cli.exe stop`, and wait for the window to close,
+because copying a chain mid-write produces a copy that is not a chain — then:
+
+```
+robocopy %LOCALAPPDATA%\Bitcoin %LOCALAPPDATA%\WAM /E /R:1 /W:1
+```
+
+It ends with exit code 1, which means *files were copied*. Failure starts at
+8. Nothing is deleted: the old folder stays as a third copy of your keys.
+
+The node does warn about this by itself, but only when the old folder
+contains a `wam.conf` — and a node that has always been started with
+command-line flags has never written one. The warning did not fire for the
+one person it was written for, which is why it is on this page as well.
+
+**3. Pressing *Receive* shows a new address every time, and that is not a new
+wallet.** One wallet holds thousands of addresses, all derived from one seed,
+and a fresh one per payment is the point rather than an accident. Your mining
+address is untouched and still yours — the dialog that shows the new address
+names the wallet it came from, and it is the same one. Do not change what the
+miner is pointed at.
+
+A complete move, in order, with nothing left out:
+
+```
+wam-cli.exe listwallets                     # which wallet is open
+wam-cli.exe -rpcwallet=NAME backupwallet C:\wam-backup.dat
+wam-cli.exe stop                            # and wait for the window to close
+robocopy %LOCALAPPDATA%\Bitcoin %LOCALAPPDATA%\WAM /E /R:1 /W:1
+echo server=1> %LOCALAPPDATA%\WAM\wam.conf
+```
+
+Then start `wam-qt.exe`. It opens with no wallet loaded, because the node it
+replaces had none loaded either; **File → Open Wallet → your wallet**, and do
+not take the *Create a new wallet* button that is offered beside it. Then the
+miner, unchanged except for the one word in its cookie path:
+
+```
+wam-miner.exe --solo -u YOUR_ADDRESS -t 4 --rpccookie "%LOCALAPPDATA%\WAM\.cookie"
+```
+
 and the miner, from the folder it unpacked into. Alone against your own node,
 which is the better way — it needs `server=1` in `wam.conf` and the node
 running:

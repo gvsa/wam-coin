@@ -22,8 +22,8 @@ the first release since v0.1.5 to touch a consensus value.
 
 The first draft of this file argued the opposite -- that assigning
 `enforce_BIP94` changes nothing, because every binary this project released
-read it as false. That reasoning is invalid and SECURITY.md already said so
-in its own words: an indeterminate read is not a promise. The field was
+read it as false. That reasoning is invalid and the security policy already said
+so in its own words: an indeterminate read is not a promise. The field was
 declared with no default, read in three consensus paths, and assigned by no
 network, so what rule a node enforces was decided by its compiler and its
 allocator. Ours read false. A node somebody built himself may not have, and

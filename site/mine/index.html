@@ -135,6 +135,25 @@ powershell -ExecutionPolicy Bypass -File verify_release.ps1</code></pre>
 <pre><code>Start-Process -FilePath .\wamd.exe `
   -ArgumentList '-datadir=C:\wam\data' -WindowStyle Minimized</code></pre>
 <p><strong><code>curl</code> in PowerShell is not curl.</strong> It is an alias for <code>Invoke-WebRequest</code>, which does not understand <code>-LO</code> and fails. The real program is <code>C:\WINDOWS\system32\curl.exe</code>, which is why every download above says <code>curl.exe</code> rather than <code>curl</code>.</p>
+<h3 id="moving-from-the-terminal-node-to-the-graphical-wallet">Moving from the terminal node to the graphical wallet</h3>
+<p><code>wam-qt</code> is the same node with a window on it, so it replaces <code>wamd</code> rather than running beside it. Three things stop people on the way across, and all three were walked through with a miner on 16 October 2026 — every one of them cost a step that nothing on this page had warned about.</p>
+<p><strong>1. The wallet does not open the RPC port, and <code>wamd</code> does.</strong> <code>bitcoind.cpp</code> says it in a comment: <em>-server defaults to true for bitcoind but not for the GUI</em>. So the moment you switch, your solo miner stops — and nothing explains why, because from the wallet's side everything is working. Put this in your <code>wam.conf</code>, in the data directory, before you start:</p>
+<pre><code>server=1</code></pre>
+<p><strong>2. If you installed before v0.1.10 on Windows or macOS, your chain and your wallet are in a folder called <code>Bitcoin</code>.</strong> Until v0.1.10 the rename that gave Linux <code>~/.wam</code> changed one branch of <code>GetDefaultDataDir</code> and left the other two alone. The new default is <code>WAM</code>, so a wallet started without <code>-datadir</code> opens an empty directory and a wallet that is perfectly safe looks lost.</p>
+<p>Stop the node first — <code>wam-cli.exe stop</code>, and wait for the window to close, because copying a chain mid-write produces a copy that is not a chain — then:</p>
+<pre><code>robocopy %LOCALAPPDATA%\Bitcoin %LOCALAPPDATA%\WAM /E /R:1 /W:1</code></pre>
+<p>It ends with exit code 1, which means <em>files were copied</em>. Failure starts at</p>
+<ol><li>Nothing is deleted: the old folder stays as a third copy of your keys.</li></ol>
+<p>The node does warn about this by itself, but only when the old folder contains a <code>wam.conf</code> — and a node that has always been started with command-line flags has never written one. The warning did not fire for the one person it was written for, which is why it is on this page as well.</p>
+<p>**3. Pressing <em>Receive</em> shows a new address every time, and that is not a new wallet.** One wallet holds thousands of addresses, all derived from one seed, and a fresh one per payment is the point rather than an accident. Your mining address is untouched and still yours — the dialog that shows the new address names the wallet it came from, and it is the same one. Do not change what the miner is pointed at.</p>
+<p>A complete move, in order, with nothing left out:</p>
+<pre><code>wam-cli.exe listwallets                     # which wallet is open
+wam-cli.exe -rpcwallet=NAME backupwallet C:\wam-backup.dat
+wam-cli.exe stop                            # and wait for the window to close
+robocopy %LOCALAPPDATA%\Bitcoin %LOCALAPPDATA%\WAM /E /R:1 /W:1
+echo server=1&gt; %LOCALAPPDATA%\WAM\wam.conf</code></pre>
+<p>Then start <code>wam-qt.exe</code>. It opens with no wallet loaded, because the node it replaces had none loaded either; <strong>File → Open Wallet → your wallet</strong>, and do not take the <em>Create a new wallet</em> button that is offered beside it. Then the miner, unchanged except for the one word in its cookie path:</p>
+<pre><code>wam-miner.exe --solo -u YOUR_ADDRESS -t 4 --rpccookie "%LOCALAPPDATA%\WAM\.cookie"</code></pre>
 <p>and the miner, from the folder it unpacked into. Alone against your own node, which is the better way — it needs <code>server=1</code> in <code>wam.conf</code> and the node running:</p>
 <pre><code>.\wam-miner.exe --solo -u YOUR_ADDRESS -t 4</code></pre>
 <p>or in a pool, if you would rather be paid a little often than a lot rarely:</p>
