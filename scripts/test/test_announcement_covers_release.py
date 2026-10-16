@@ -119,6 +119,28 @@ def main() -> int:
         print(f"\n{BLD}{version}{OFF}  what the bot sends is "
               f"{len(sent.splitlines())} lines")
 
+        # A NOTE THAT NAMES NO FILE PROVES NOTHING, AND USED TO PASS.
+        #
+        # "Shipped" is decided by finding an artefact's file name in the
+        # notes, because the file names are the evidence and the prose is
+        # not. The consequence went unnoticed until 2026-10-16: a release
+        # note that mentions no file name at all matches nothing, so the
+        # loop below runs zero times and the check reports success over a
+        # note that could have announced nothing whatsoever.
+        #
+        # The first draft of v0.1.12's note was exactly that, and this said
+        # "everything shipped is named" about it while the paragraph the bot
+        # would actually send named neither the wallet nor the node. A check
+        # that cannot see the thing it is checking has not checked it.
+        if not any(re.search(rf"{re.escape(p)}-v[0-9]", whole) for p, _ in KINDS):
+            print(f"  {YLW}no artefact file name appears in this note, so "
+                  f"there is nothing to check it against.{OFF}")
+            print(f"        A release note names the files it releases. "
+                  f"Until it does,")
+            print(f"        this check cannot tell a complete announcement "
+                  f"from an empty one.")
+            return 2
+
         for prefix, words in KINDS:
             shipped = re.search(rf"{re.escape(prefix)}-v[0-9]", whole)
             if not shipped:
