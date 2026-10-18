@@ -115,6 +115,25 @@ DENIALS = [
      "what a miner does with what he mined is his business"),
     (r"لم تنطلق (الشبكة|السلسلة)",
      "mainnet opened at 00:00 UTC on 15 September 2026"),
+    # THESE FOUR WERE MISSED, AND THE FRONT PAGE CARRIED ONE FOR TWO DAYS
+    # AFTER THIS FILE WAS WRITTEN TO CATCH EXACTLY THEM.
+    #
+    # Under the heading "Trading", first screen, in both languages: WAM has
+    # no price and cannot be bought with money on an exchange. A claim about
+    # other people's venues and other people's money, on the page a newcomer
+    # reads first, two days after six others like it were taken out.
+    #
+    # The patterns above were written from the sentences that were in front
+    # of me rather than from the shape they share, so the shape got through
+    # in words I had not happened to see.
+    (r"\bthere is no price\b",
+     "whether anyone prices it is not ours to state"),
+    (r"\bcannot be bought\b|\bnot bought with money\b",
+     "what somebody buys with his own money is his business"),
+    (r"سعر لها\b",
+     "whether anyone prices it is not ours to state"),
+    (r"لا تُشترى|لا يُشترى|لا تُباع",
+     "what somebody buys or sells with his own money is his business"),
 ]
 
 COMPILED = [(re.compile(p, re.IGNORECASE), why) for p, why in DENIALS]
@@ -126,6 +145,16 @@ COMPILED = [(re.compile(p, re.IGNORECASE), why) for p, why in DENIALS]
 # rests on is which side of the sentence the subject is on, and a promise is
 # always on ours.
 RULE_FORM = re.compile(r"\b(promis\w*|undertak\w*|guarantee\w*|يَعِد|وعد)\b",
+                       re.IGNORECASE)
+
+# AND A SENTENCE SCOPED TO OUR OWN PAGE IS A RULE TOO, NOT A CLAIM.
+#
+# "There is no price on this page and there never will be" is something this
+# project keeps, and keeping it costs nothing but silence. Losing a true
+# sentence to a check written for the false ones would be the same error in
+# the other direction. The test does not change: whose behaviour does the
+# sentence describe?
+OUR_SCOPE = re.compile(r"(on this page|in this file|هذه الصفحة|هذا الملفّ)",
                        re.IGNORECASE)
 
 
@@ -148,7 +177,7 @@ def main() -> int:
         text = quoted.strip_quoted(
             path.read_text(encoding="utf-8", errors="replace"))
         for n, line in enumerate(text.splitlines(), 1):
-            if RULE_FORM.search(line):
+            if RULE_FORM.search(line) or OUR_SCOPE.search(line):
                 continue
             for rx, why in COMPILED:
                 m = rx.search(line)
