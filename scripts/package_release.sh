@@ -220,11 +220,19 @@ larger for people who never open a window:
 
     # WHAT IT NEEDS, READ OUT OF THE BINARY RATHER THAN REMEMBERED.
     #
-    # The node and the miner are self-contained: the portability gate below
-    # holds them to a bare glibc and that is the whole of their requirement.
-    # The wallet is not. It is linked against the system's Qt 5, so it needs
-    # Qt installed -- and a user whose machine has none gets a loader error
-    # naming a file, which is the least helpful failure a program can have.
+    # This comment used to say: "The node and the miner are self-contained:
+    # the portability gate below holds them to a bare glibc and that is the
+    # whole of their requirement." That was not true and the gate below never
+    # tested it -- it reads symbol versions, which cannot see a DT_NEEDED. The
+    # node loaded libevent and sqlite from the system the whole time, and on
+    # 2026-10-18 it failed to start for Jeeves for exactly that reason. The
+    # sentence was the most confident thing in the file and the only false one.
+    #
+    # check_shared_deps.sh asks the question the sentence assumed, and
+    # build_linux.sh makes the answer true by running depends. The wallet is
+    # still the one that can need Qt -- a user whose machine has none gets a
+    # loader error naming a file, which is the least helpful failure a program
+    # can have, and it is the failure the whole release just made.
     #
     # The list is taken from the binary with ldd, so it cannot drift away from
     # what was actually built. If Qt is ever linked statically this produces
@@ -485,9 +493,38 @@ if [ "$PORTABLE" = "0" ]; then
 fi
 ok "glibc <= $BASELINE_GLIBC (needs $REQ_GLIBC), GLIBCXX <= $BASELINE_GLIBCXX (needs $REQ_GLIBCXX)"
 
+# THE OTHER HALF OF PORTABILITY, WHICH THIS GATE COULD NEVER HAVE SEEN.
+#
+# Everything above reads symbol versions out of objdump -T. That is a real
+# check and it passed on every release -- including the ones that could not
+# start. DT_NEEDED is not a symbol version, so no amount of running the code
+# above would ever have noticed that wamd asks a stranger's machine for
+# libevent-2.1.so.7, or that wam-qt asks for that and five Qt libraries.
+#
+# Jeeves found it on 2026-10-18 by downloading v0.1.12 onto Ubuntu 26, which
+# is the most expensive way for this project to learn anything.
+printf '\n'
+if ! bash "$REPO/scripts/check_shared_deps.sh" $PORT_BINS; then
+    fail "a shipped binary links a library it does not carry. Build through
+      scripts/build_linux.sh, which runs depends the way the Windows and
+      macOS builds already do."
+fi
+
 # The tarball says what it needs, in the file people open first -- and it says
 # it from measurement. A hand-written compatibility line is a claim nobody
 # rechecks; this one cannot be wrong without the build failing above.
+#
+# IT WAS WRONG ANYWAY, UNTIL 2026-10-18. This file listed glibc and libstdc++,
+# called itself measured, and was read by people deciding whether the download
+# would run -- while wamd also loaded libevent and sqlite from the system. It
+# measured one thing honestly and presented it as the whole answer. So the
+# sonames are read out too now, and if the gate above ever has to allow one,
+# the person opening this file learns it from the same place.
+NODE_SONAMES="$(for b in "$WORK/stage/wam-coin-$VERSION/bin"/*; do
+                    [ -f "$b" ] && readelf -d "$b" 2>/dev/null
+                done | sed -n 's/.*Shared library: \[\(.*\)\].*/\1/p' \
+                | sort -u | tr '\n' ' ')"
+
 cat > "$WORK/stage/wam-coin-$VERSION/DEPENDENCIES.txt" <<DEPS
 WAM Coin $VERSION -- what this needs to run
 ===========================================
@@ -496,6 +533,8 @@ Measured from this exact binary, not assumed:
 
     glibc     $REQ_GLIBC or newer
     libstdc++  GLIBCXX_$REQ_GLIBCXX or newer  (GCC 12 and up)
+
+    it loads: $NODE_SONAMES
 
 That is Ubuntu 22.04 LTS or newer, Debian 12 or newer, and anything of a
 similar age. If your system is older than that, build from source -- no flag

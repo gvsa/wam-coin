@@ -442,6 +442,14 @@ if command -v curl >/dev/null 2>&1; then
     # this project verified what it SAID about a release and never what the
     # release WAS.
     run "the published binaries are hardened" bash scripts/check_binary_hardening.sh
+
+    # "This project verified what it SAID about a release and never what the
+    # release WAS" -- and after that was written, it still only read half of
+    # what the release was. Hardening is a property of the file; what the file
+    # DEMANDS of the machine running it is another, and v0.1.12 could not
+    # start on a clean Ubuntu because of it. Same artefacts, same readelf, one
+    # more question, found by Jeeves on 2026-10-18 instead of by this line.
+    run "the published binaries carry their libraries" bash scripts/check_shared_deps.sh
 else
     skip "published download is this network" "curl is not installed"
 fi

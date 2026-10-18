@@ -38,7 +38,19 @@ jobs:
     # `latest` silently becomes a newer distro one day and quietly drops
     # everyone still on 22.04.
     runs-on: ubuntu-22.04
-    timeout-minutes: 180
+    # 180 was right while this configured against apt packages that were
+    # already installed. depends builds boost, libevent, sqlite and -- for the
+    # wallet -- Qt from source before Core is compiled at all, which is the
+    # price of a tarball that carries its own libraries. Qt is the long pole
+    # and can take an hour on its own.
+    #
+    # Raised rather than discovered: a release that dies at minute 180 wastes
+    # the whole build and says nothing useful about why. 330 leaves room under
+    # the 360 ceiling for hosted runners. If this ever becomes the slow part
+    # worth fixing, depends/built is cacheable by HOST and package versions --
+    # which is a real optimisation and not something to attempt during a
+    # release.
+    timeout-minutes: 330
 
     steps:
       - name: Check out the tag
@@ -80,48 +92,76 @@ jobs:
             exit 1
           fi
 
-      - name: Build node, RandomX and miner
-        run: |
-          # The same script a user runs. --build-only stops before starting
-          # services; --node-only leaves out the pool, which is not shipped in
-          # the release tarball.
-          bash install.sh --build-only --node-only --network testnet --jobs "$(nproc)"
-
-      # THE WALLET, WHICH THIS WORKFLOW HAS NEVER BUILT.
+      # THE SAME SCRIPT A USER RUNS IS THE WRONG SCRIPT FOR A RELEASE.
       #
-      # install.sh configures with --without-gui, written into the line and not
-      # optional, because the node, the seed, the pool and the miner need
-      # nothing from Qt and it roughly doubles the build. Every Linux release
-      # so far inherited that: package_release.sh looked for src/qt/wam-qt,
-      # never found one, and wrote "no GUI in this build" into a log nobody
-      # read. Its whole wallet path -- the separate archive, its README, its
-      # line in SHA256SUMS -- has therefore never run once since it was
-      # written.
+      # This step was `install.sh --build-only --node-only`, and the comment
+      # here said "the same script a user runs" as though that were a virtue.
+      # It is, for a user: install.sh pulls build dependencies from apt and
+      # configures against them, which is exactly right for compiling WAM for
+      # the computer in front of you. It is wrong for producing a file for
+      # strangers, because the result then demands the build machine's
+      # libraries from every machine that runs it.
       #
-      # Windows and macOS grew a graphical wallet on 2026-09-26 and 09-27.
-      # Shipping v0.1.11 without this step would put a wallet on the two
-      # platforms this project owns no machine of, and none on the one every
-      # server here runs.
-      # continue-on-error, deliberately, and only on this step.
+      # It shipped that way, for every Linux release this project has made.
+      # On 2026-10-18, one day after v0.1.12, Jeeves downloaded the node onto
+      # Ubuntu 26 and got a loader error for libevent-2.1.so.7. Debian and
+      # Ubuntu split libevent into four packages and a stock image installs
+      # libevent_core alone, so the library our binaries asked for is absent
+      # on an ordinary desktop. It reproduces on a clean Ubuntu 24.04.
       #
-      # v0.1.11 carries the fix for a defect that loses a solo miner about two
-      # blocks in three. People are waiting for it. The wallet is new, its
-      # build pulls Qt from apt, and the first time anything runs on a runner
-      # is the time it breaks -- so it is not allowed to hold the miner's fix
-      # hostage.
-      #
-      # Nothing is hidden if it fails: the step goes red, package_release.sh
-      # says "no GUI in this build", SHA256SUMS lists no wallet and the notes
-      # offer none. The release is then a node release, which is what every
-      # release before it was.
-      - name: The graphical wallet
-        continue-on-error: true
+      # Windows and macOS never had this: both go through upstream's depends,
+      # which builds boost, libevent and sqlite and links them in. Linux was
+      # the only platform with no release build of its own. It has one now.
+      - name: Dependencies for depends
         run: |
           set -euo pipefail
           sudo apt-get update -qq
+          # Upstream's depends/README.md for Linux, plus bison for Qt.
           sudo apt-get install -y --no-install-recommends \
-              qtbase5-dev qttools5-dev qttools5-dev-tools libqrencode-dev
-          bash scripts/build_qt.sh
+              build-essential cmake autoconf automake libtool pkg-config \
+              curl patch python3 xz-utils bison
+
+      - name: Fetch and patch Bitcoin Core
+        run: bash scripts/fetch-upstream.sh
+
+      # WAM_WITH_GUI=1 asks depends for Qt as well, so the wallet carries its
+      # toolkit the way the Windows and macOS wallets already do.
+      #
+      # The wallet still cannot hold the node's release hostage -- that was a
+      # deliberate property of this workflow and it was not given up, it moved.
+      # build_linux.sh builds Qt FIRST, because it is the slow and fragile
+      # half, and on failure says so loudly and carries on with a node-only
+      # build. So there is one configure and one make instead of two, and a Qt
+      # problem still costs the wallet rather than the release.
+      - name: Build the node and the wallet, carrying their libraries
+        run: WAM_WITH_GUI=1 bash scripts/build_linux.sh
+
+      # THE WALLET USED TO BE A STEP OF ITS OWN HERE, and the reasoning that
+      # put it there is kept because it is still true and still governs:
+      #
+      #   install.sh configured with --without-gui, so package_release.sh
+      #   looked for src/qt/wam-qt, never found one, and wrote "no GUI in this
+      #   build" into a log nobody read -- the whole wallet path had never run
+      #   once since it was written. Windows and macOS grew a wallet on
+      #   2026-09-26 and 09-27, and shipping without this would have put a
+      #   wallet on the two platforms this project owns no machine of and none
+      #   on the one every server here runs. It was continue-on-error,
+      #   deliberately, because v0.1.11 carried a fix for a defect that loses
+      #   a solo miner about two blocks in three and the wallet was not
+      #   allowed to hold that hostage.
+      #
+      # It was folded into the build step above on 2026-10-18. It had to be:
+      # build_qt.sh reconfigures this same tree with no config.site, so it
+      # silently relinked the node against the runner's own libraries after
+      # the node had been built -- which is why wamd and wam-qt shipped with
+      # the identical set of missing libraries. Two configures over one tree,
+      # where the second quietly undid the first.
+      #
+      # Nothing is hidden if Qt fails: build_linux.sh warns, builds the node
+      # anyway, package_release.sh says "no GUI in this build", SHA256SUMS
+      # lists no wallet and the notes offer none. build_qt.sh itself stays
+      # for developers, as CONTRIBUTING.md documents; it is simply no longer
+      # the path a release takes.
 
       - name: Package
         run: bash scripts/package_release.sh --version "${{ steps.v.outputs.version }}"
@@ -213,6 +253,54 @@ jobs:
           done
           chmod +x "$work/bin"/*
           bash scripts/test/test_platform_check.sh "$work/bin"
+
+      # ON A MACHINE THAT NEVER BUILT IT, WHICH IS THE ONLY KIND THAT COUNTS.
+      #
+      # The step above unpacks the published archives and runs them -- and it
+      # passed for every release that could not start, because it runs on the
+      # builder. The builder has libevent, sqlite and Qt installed; that is
+      # how it built them. Testing a binary on the machine that compiled it
+      # proves it compiled.
+      #
+      # So the same archives are run again here with nothing installed. The
+      # container gets no apt-get, deliberately: the moment anything is
+      # installed to make this pass, it has stopped being the test. Ubuntu
+      # 24.04 and Debian 12 are two different library layouts, and Jeeves was
+      # on Ubuntu 26 -- newer than the runner, which is the ordinary case for
+      # a user and was never once exercised before today.
+      - name: Run the published archives where nothing is installed
+        run: |
+          set -euo pipefail
+          for image in ubuntu:24.04 debian:12; do
+            echo "::group::$image"
+            docker run --rm -v "$PWD/out/release:/rel:ro" "$image" bash -s <<'SANDBOX'
+          set -euo pipefail
+          work=$(mktemp -d)
+          for a in /rel/wam-coin-*.tar.gz /rel/wam-miner-*.tar.gz /rel/wam-qt-*.tar.gz; do
+            [ -e "$a" ] || continue
+            tar -xzf "$a" -C "$work"
+          done
+          found=0
+          for n in wamd wam-cli wam-miner wam-qt; do
+            f=$(find "$work" -name "$n" -type f -perm -u+x | head -1)
+            [ -n "$f" ] || continue
+            found=$((found+1))
+            # -version is answered before Qt starts, so the wallet needs no
+            # display. offscreen is set anyway rather than relied upon.
+            if QT_QPA_PLATFORM=offscreen "$f" -version >/dev/null 2>&1 \
+               || QT_QPA_PLATFORM=offscreen "$f" --version >/dev/null 2>&1; then
+              echo "  ok    $n starts"
+            else
+              echo "  FAIL  $n does not start here:"
+              QT_QPA_PLATFORM=offscreen "$f" -version 2>&1 | head -3 | sed 's/^/        /'
+              exit 1
+            fi
+          done
+          [ "$found" -gt 0 ] || { echo "  no binary was found to run -- not a pass"; exit 1; }
+          echo "  $found binaries start with nothing installed"
+          SANDBOX
+            echo "::endgroup::"
+          done
 
       - name: Publish the release
         if: steps.v.outputs.publish == 'yes'
