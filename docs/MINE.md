@@ -433,7 +433,6 @@ There is more than one, and they are not run by us:
 
 ```
 pool.wamcoin.org:3333             run by this project, 1% operator fee
-wam.ariabrain.com:3333
 stratum.cryptopickaxe.co.uk:6040
 wampool.vslabs.co.in:3333
 veinpool.fr:3310                  and :3311 for servers, a higher start
@@ -444,6 +443,25 @@ theirs to state, not ours to state for them. A check in this repository
 dials every address on this page on every sweep, so if one stops answering
 we find out rather than hearing it from a miner. If one does not answer for
 you, try another.
+
+**One is not answering, and it is listed here anyway so that nobody wonders
+where it went.**
+
+<!-- wam:quote-begin -->
+    wam.ariabrain.com:3333
+<!-- wam:quote-end -->
+
+On 2026-10-08 it refused the connection, measured from this laptop and from
+all three seeds, in three countries, so it was not a block on one address.
+On 2026-10-18 it had become worse: the name does not resolve at all. Its
+website is up and the pool is still listed there, which is why nobody
+noticed — the page a reader sees is not the port a miner dials.
+
+It is out of the block above rather than deleted from the page. The pool is
+its operator's to run and the page is ours, and a stranger following our
+instructions should not meet a dead address first. If it answers again it
+goes back up, and that is the operator's call to tell us rather than ours to
+keep testing forever.
 
 **Ours charges the same as the others on purpose.** It ran at 0% while it was
 the only pool in existence, and a pool charging nothing is not competing with
