@@ -47,6 +47,8 @@ import urllib.error
 import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "scripts" / "lib"))
+import quoted  # noqa: E402  -- needs the path above
 
 for _stream in (sys.stdout, sys.stderr):
     try:
@@ -87,7 +89,11 @@ def main() -> int:
         print(f"  {YLW}README.md is not here, so nothing was checked.{OFF}\n")
         return 2
 
-    text = readme.read_text(encoding="utf-8", errors="replace")
+    # Quotation marks are honoured, as in every other text-scanning check
+    # here. A document that QUOTES a badge line -- this one does, in its own
+    # header -- must not be read as carrying that badge.
+    text = quoted.strip_quoted(readme.read_text(encoding="utf-8",
+                                                errors="replace"))
     badges = BADGE.findall(text.split("\n##", 1)[0])
     if not badges:
         print(f"  {YLW}no badge was found at the top of README.md -- this is "

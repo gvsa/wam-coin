@@ -183,6 +183,12 @@ run "the 3 code copies of vesting agree"  "$PY" scripts/check_vesting_sync.py
 # validation.cpp, node/miner.cpp and pow.cpp, assigned by no network at all,
 # and indeterminate because the params object is heap-allocated. Found from
 # outside on 2026-10-11, not by us.
+# scripts/lib/components.py is where "what does this project ship, and on
+# whose version" is answered once. set_version.py and the announcement check
+# read it instead of each knowing the answer by heart. A central file that
+# has drifted is wrong everywhere that trusts it, at the same moment, so it
+# is asked whether it is still describing this repository.
+run "the manifest describes the repository" "$PY" scripts/check_components.py
 run "no consensus field is unset" "$PY" scripts/check_consensus_params.py
 run "supply arithmetic"          "$PY" scripts/verify_supply.py
 

@@ -52,11 +52,15 @@ for _s in (sys.stdout, sys.stderr):
 # An artefact a reader acts on, and the words that would tell him it is there.
 # The archive prefix is what package_release.sh and package_platform.sh name
 # the file, so this list cannot drift away from what is actually shipped.
-KINDS = [
-    ("wam-qt",    ("wallet", "wam-qt", "graphical")),
-    ("wam-miner", ("miner", "mine", "wam-miner")),
-    ("wam-coin",  ("node", "wamd", "wam-coin")),
-]
+# Asked for, not listed here. A fourth thing to ship would otherwise have to
+# be remembered in this file as well as built, and the failure this check
+# exists for is precisely something shipping that nobody was told about.
+# scripts/lib/components.py names what this project ships and what a reader
+# would call each one.
+sys.path.insert(0, str(ROOT / "scripts" / "lib"))
+import components  # noqa: E402
+
+KINDS = components.recognise_pairs()
 
 
 def bot_text(tag_message: pathlib.Path) -> str:
