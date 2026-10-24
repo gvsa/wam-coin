@@ -394,11 +394,26 @@ async function renderConcentration() {
   // number.
   const line = (label, span, top, distinct) => {
     if (top === null || top === undefined) return `${label}: reading…`;
-    const rule = top >= 50
-      ? 'above the 50% line \u2014 no exchange application is made at this level'
-      : (top >= 35 ? 'below 50%, above the 35% target' : 'below the 35% target');
+    // THIS LINE USED TO JUDGE THE NUMBER. NOW IT ONLY REPORTS IT.
+    //
+    // It carried a threshold ladder, and the top rung carried a promise:
+    // "above the 50% line \u2014 no exchange application is made at this
+    // level", written 2026-09-17 on launch week. By 2026-10-24 it was false.
+    // Block DX #199, BasicSwap #743 and NBitcoin #1362 were all opened above
+    // that line, and the coin has traded on Komodo's DEX since 22 September.
+    // A stranger on Bitcointalk quoted the sentence back at us as our policy,
+    // which is what any sentence on a live page eventually becomes.
+    //
+    // The thresholds went with it. "The 35% target" is an intention too, and
+    // an intention on a page nobody revisits is a promise waiting to expire.
+    // check_stale_denials.py exempts sentences about our own conduct as
+    // "a rule we keep", and that exemption is only sound while we keep it.
+    //
+    // What is left cannot go stale: a measurement, and how many parties it
+    // was spread across. A number changes, which is what numbers are for.
+    // Whoever reads it can judge it themselves, which was always their job.
     return `${label} (${span}): largest finder ${top.toFixed(1)}%, `
-         + `${distinct} distinct \u2014 ${rule}`;
+         + `${distinct} distinct`;
   };
 
   // THE SPAN IS MEASURED NOW, NOT MULTIPLIED OUT.
