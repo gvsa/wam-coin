@@ -94,6 +94,10 @@ JOBS="${JOBS:-$(nproc 2>/dev/null || echo 4)}"
 # What every release's node must be able to do, for all three platforms, in
 # one file. See its header for why it is not three lines in three scripts.
 . "$HERE/scripts/lib/release_capabilities.sh"
+# What a stranger's machine may be assumed to have, and the code that carries
+# everything outside it into the build. Shared with check_shared_deps.sh and
+# package_release.sh so the rule has one home.
+. "$HERE/scripts/lib/shared_deps.sh"
 HOST_TRIPLET="x86_64-pc-linux-gnu"
 
 echo
@@ -317,6 +321,34 @@ done
 if [ "${#BUILT[@]}" -eq 0 ]; then
     die "no executable was produced and make reported success.
           Look in $CORE_DIR/src for what was actually built."
+fi
+
+# CARRY BEFORE JUDGING, OR THE GATE FAILS THE BUILD FOR A LACK THE NEXT STEP
+# WOULD HAVE FILLED.
+#
+# The node binaries need nothing: depends builds boost, libevent and sqlite
+# as static archives and they are swallowed whole. The wallet cannot, because
+# upstream's depends/packages/libxcb.mk sets --disable-static, so the X11
+# stack is shared by that project's decision and wam-qt names seventeen .so
+# files it linked from depends.
+#
+# They were carried at packaging time first. That is the right place for the
+# archive and the wrong place for this: the gate below runs here, minutes
+# after make, long before any archive exists -- so on 2026-10-29 it judged a
+# bare binary and killed a twenty-eight minute build for asking after
+# libraries that package_release.sh was about to hand it. Both steps carry
+# now, independently, and the RPATH names both layouts.
+if [ "$WITH_GUI" = "1" ] && [ -f src/qt/wam-qt ]; then
+    if carry_libs src/qt/wam-qt \
+                  "$CORE_DIR/depends/$HOST_TRIPLET/lib" \
+                  src/qt/lib; then
+        ok "wallet carries $(find src/qt/lib -name '*.so*' -type f 2>/dev/null | wc -l) library/libraries of its own"
+    else
+        die "wam-qt needs shared libraries that are not in
+          $CORE_DIR/depends/$HOST_TRIPLET/lib, so the wallet would ask a
+          stranger's machine for them -- which is the failure v0.1.12
+          shipped with. Nothing is kept. See scripts/lib/shared_deps.sh."
+    fi
 fi
 
 bash "$HERE/scripts/check_shared_deps.sh" "${BUILT[@]}" \

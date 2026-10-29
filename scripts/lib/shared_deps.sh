@@ -75,10 +75,20 @@ needed_sonames() {
 #   discovered later.
 #
 #   $ORIGIN is the directory of the file being loaded, resolved at run time by
-#   the loader, so the archive works wherever it is unpacked and whatever the
-#   user's LD_LIBRARY_PATH says. The binary sits in bin/ and the libraries in
-#   lib/, hence $ORIGIN/../lib for the binary and $ORIGIN for the libraries,
-#   which find each other side by side.
+#   the loader, so it works wherever the archive is unpacked and whatever the
+#   user's LD_LIBRARY_PATH says.
+#
+#   TWO PATHS, BECAUSE THE BINARY IS CHECKED IN TWO PLACES.
+#
+#   build_linux.sh gates the freshly built binary where it lies, in
+#   src/qt/wam-qt, so the libraries go in src/qt/lib -- $ORIGIN/lib.
+#   package_release.sh stages it as bin/wam-qt with the libraries at lib/ --
+#   $ORIGIN/../lib. Carrying them at packaging alone was the first attempt and
+#   it failed on 2026-10-29: the gate inside build_linux.sh runs before
+#   packaging exists, judged the bare binary, and killed the build at minute
+#   twenty-eight for asking after libraries that the next step would have
+#   given it. One RPATH naming both layouts is true in both, and neither step
+#   has to know what the other did.
 carry_libs() {
     local binary="$1" search="$2" dest="$3"
     local missing=0 queue=() seen=" " soname src
@@ -124,6 +134,6 @@ carry_libs() {
         done < <(needed_sonames "$dest/$soname")
     done
 
-    patchelf --set-rpath '$ORIGIN/../lib' "$binary" || return 1
+    patchelf --set-rpath '$ORIGIN/lib:$ORIGIN/../lib' "$binary" || return 1
     [ "$missing" -eq 0 ]
 }
