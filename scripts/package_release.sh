@@ -463,8 +463,15 @@ EOF
 step "4b. runtime dependencies"
 
 BASE_LIBS='linux-vdso|ld-linux|libc\.so|libm\.so|libgcc_s|libstdc\+\+|libpthread|libdl|librt|libanl|libresolv'
+# `|| true`, and this one is the clearest case of the three. An empty NEEDED
+# is the SUCCESS message four lines down -- "no dependencies beyond the C
+# library -- this runs anywhere" -- and grep exits 1 when it filters
+# everything away, so under pipefail the script died exactly when the answer
+# was the one this whole release exists to produce. Third time today: the Qt
+# sonames, the glibc symbol floor, and now this. One shape, three places, and
+# every one of them fired on good news.
 NEEDED="$(ldd "$WORK/stage/wam-coin-$VERSION/bin/wamd" 2>/dev/null \
-          | awk '/=>/ {print $1}' | grep -vE "$BASE_LIBS" | sort -u)"
+          | awk '/=>/ {print $1}' | grep -vE "$BASE_LIBS" | sort -u || true)"
 
 if [ -z "$NEEDED" ]; then
     ok "no dependencies beyond the C library -- this runs anywhere"
@@ -612,19 +619,30 @@ That is Ubuntu 22.04 LTS or newer, Debian 12 or newer, and anything of a
 similar age. If your system is older than that, build from source -- no flag
 on this binary will make it start.
 
-If the node exits with
+The node carries its own libraries. boost, libevent, sqlite and ZeroMQ are
+built from source into the binary, so there is nothing to install and no
+package name to look up: the list above is the whole of what it loads from
+your system, and it is the C library and its companions.
 
-    error while loading shared libraries: ...
-
-install the shared libraries it asks for:
+That changed in v0.1.13. Until v0.1.12 this file told you to run
 
     sudo apt-get install -y libevent-2.1-7t64 libsqlite3-0
 
-On Ubuntu 22.04 the libevent package is named libevent-2.1-7 instead.
+because the binary really did ask for them -- and on a clean Ubuntu the
+first of those two is not installed, so the node stopped with "error while
+loading shared libraries: libevent-2.1.so.7" and named a file rather than a
+package. That is the least helpful failure a program can have, and it is
+why this build is made differently.
 
-Nothing else is required. This build has ZMQ disabled, which is why it does
-not ask for libzmq, libsodium, libpgm, libnorm or Kerberos -- none of which
-this project uses.
+ZeroMQ is compiled in, not left out: a node can publish block and
+transaction notifications over it, which is how an indexer learns a block
+arrived without polling for it. It is linked statically, so it adds no
+library for you to find.
+
+If the node still exits with "error while loading shared libraries", the
+missing file is named in the message and something is wrong with this
+archive rather than with your machine -- please say so, with the line it
+printed.
 
 Verify what your copy actually wants:
 
