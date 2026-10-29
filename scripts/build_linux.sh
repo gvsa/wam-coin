@@ -102,12 +102,36 @@ echo " ${BLD}building the WAM node for Linux${OFF}  ($HOST_TRIPLET)"
 echo "=================================================================="
 echo
 
-for t in cmake autoconf automake libtool pkg-config make curl patch python3; do
+# libtoolize, and NOT libtool, and the difference is the whole of a failed
+# release build.
+#
+# This list said `libtool`, and the message under it said to run
+# `apt install ... libtool`. On Debian and Ubuntu that package installs
+# libtoolize and does not install /usr/bin/libtool -- that binary lives in a
+# separate package, libtool-bin. So the check demanded a program, named the
+# package that does not contain it, and a reader doing exactly what it said
+# would watch it fail again.
+#
+# It got as far as a release run: 2026-10-29, ubuntu-22.04, with release.yml
+# installing every package the message asks for. Forty-four seconds, and the
+# first thing this file has ever been asked to do, it refused.
+#
+# libtoolize is also the right question. autogen.sh runs `autoreconf
+# --install`, which invokes libtoolize; each depends package generates its
+# own libtool script rather than using a system one. Nothing here needs the
+# binary that is missing.
+#
+# build_macos.sh carries the same line with `libtool` and is correct there:
+# Homebrew's libtool formula does install the binary, and that path built
+# clean on a real Mac runner the same morning. The trap is Debian's packaging
+# alone, so the fix is here alone.
+for t in cmake autoconf automake libtoolize pkg-config make curl patch python3; do
     command -v "$t" >/dev/null || die "$t is not installed. On Debian/Ubuntu:
           sudo apt install build-essential cmake autoconf automake libtool \\
                            pkg-config curl patch python3
-          (boost, libevent and sqlite come from depends, not apt -- that is
-           the entire point of this script, see the header)"
+          (libtoolize comes from the libtool package. boost, libevent and
+           sqlite come from depends, not apt -- that is the entire point of
+           this script, see the header)"
 done
 ok "build tools present"
 
