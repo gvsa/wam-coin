@@ -102,17 +102,21 @@ function renderStats(s) {
   // block header -- so it is shown next to the estimate, and says plainly when
   // the estimate has stopped meaning anything.
   //
-  // AND IT IS THE TOTAL, WHICH CONTAINS THIS POOL.
+  // AND IT IS THE EXPLORER'S NUMBER, NOT ONE OF OURS THAT RESEMBLES IT.
   //
-  // net.hashPerSecond is built from what this pool measures and the share it
-  // counts, so it can never come out below its own part. net.networkHashPerSecond
-  // -- the node's getnetworkhashps -- stays in the payload as a second opinion
-  // and is no longer what this tile shows: on 29 October it read 566 kH/s while
-  // this pool alone measured 556 and was finding 78% of the blocks, which puts
-  // the real total near 715 and leaves 159 kH/s of other people's miners off
-  // the panel entirely.
+  // A miner here should not have to open a second page to see how strong the
+  // chain is; that is what this tile is for. So it asks the same node the
+  // same question over the same 720-block window the explorer uses, and the
+  // two agree by construction. For an afternoon this tile carried a total of
+  // its own -- our measured hashrate over our counted share -- which read
+  // 615.7 while the explorer read 608.3: one quantity, two headlines, and no
+  // way for a reader to choose between them.
+  //
+  // The share below the pool's own hashrate is what had to stop being a
+  // division, and it has: it is counted off the ledger now. The total never
+  // needed to be.
   const stale = net.secondsSinceBlock != null && net.secondsSinceBlock > 600;
-  text($('netHashrate'), hashrate(net.hashPerSecond ?? net.networkHashPerSecond));
+  text($('netHashrate'), hashrate(net.networkHashPerSecond));
   // Two decimal places round WAM's difficulty to "0". At the floor it is
   // 0.00024414, and the floor is exactly when somebody is reading this tile
   // to find out what happened -- the page said "difficulty 0" on the evening
@@ -195,48 +199,6 @@ function renderStats(s) {
         `The ${poolFeePct}% operator fee stays in the pool wallet; no separate ` +
         'address is configured for it.');
     }
-  }
-
-  // The payout policy, said here because here is the only place that knows it.
-  // A miner asked on 29 October why his unpaid balance barely moved while his
-  // hashrate was right there on this page, and every number that answers him
-  // -- the window, the threshold, the interval, the maturity -- was written in
-  // a guide instead of being reported by the pool running them. The guide can
-  // go stale. This cannot: it is read out of the live configuration.
-  //
-  // Maturity is the part that surprises people, so it is stated in hours as
-  // well as blocks. A block's payouts are computed when it is found and held
-  // against the block until it matures, so an unpaid balance lags the work
-  // that earned it by about that long and then moves in steps.
-  const policy = $('payoutPolicy');
-  if (policy) {
-    const cfg = s.config || {};
-    const mode = (cfg.rewardMode || '').toUpperCase();
-    const mult = cfg.pplnsMultiplier;
-    const minPay = cfg.minimumPayoutWam;
-    const interval = cfg.paymentIntervalSec;
-    const maturity = cfg.coinbaseMaturity;
-    const spacing = net.targetSpacing;
-
-    const parts = [];
-    if (mode === 'PPLNS' && mult != null) {
-      parts.push(`Blocks are split ${mode} across the last ${mult} × network ` +
-                 'difficulty of work submitted here');
-    } else if (mode) {
-      parts.push(`Blocks are split ${mode}`);
-    }
-    if (maturity != null) {
-      const hrs = spacing ? ((maturity + 1) * spacing) / 3600 : null;
-      parts.push(`a block's payouts reach your balance once it matures at ` +
-                 `${maturity + 1} confirmations` +
-                 (hrs ? ` (about ${hrs.toFixed(1)} hours at ${spacing}s blocks)` : '') +
-                 ', which is a consensus rule and applies to solo miners too');
-    }
-    if (minPay != null && interval != null) {
-      parts.push(`payment runs every ${Math.round(interval / 60)} minutes and ` +
-                 `pays anyone at or above ${minPay} WAM`);
-    }
-    text(policy, parts.length ? parts.join('; ') + '.' : '');
   }
 
   // ---- ports -------------------------------------------------------------
