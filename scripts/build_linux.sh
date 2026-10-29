@@ -90,6 +90,10 @@ BUILD_DIR="${BUILD_DIR:-$HERE/build}"
 CORE_DIR="$BUILD_DIR/wam-core"
 RANDOMX_DIR="$BUILD_DIR/randomx"
 JOBS="${JOBS:-$(nproc 2>/dev/null || echo 4)}"
+
+# What every release's node must be able to do, for all three platforms, in
+# one file. See its header for why it is not three lines in three scripts.
+. "$HERE/scripts/lib/release_capabilities.sh"
 HOST_TRIPLET="x86_64-pc-linux-gnu"
 
 echo
@@ -158,7 +162,20 @@ log "boost, libevent, sqlite -- 20 to 60 minutes the first time"
 WITH_GUI="${WAM_WITH_GUI:-0}"
 
 # NO_BDB=1 is a decision, not a default. See the header.
-DEPENDS_COMMON=("HOST=$HOST_TRIPLET" NO_BDB=1 NO_ZMQ=1 NO_UPNP=1 NO_NATPMP=1 NO_USDT=1)
+#
+# ZMQ IS BUILT, AND THAT IS ALSO A DECISION.
+#
+# It was off in all three build scripts, inherited rather than chosen, and
+# it closes a door nobody noticed: an indexer takes block notifications over
+# ZMQ, and every bitcoin-type coin in Trezor's Blockbook carries a message
+# queue port -- checked against Litecoin, Dogecoin, Dash and Vertcoin. A node
+# built with /* #undef ENABLE_ZMQ */ cannot drive one, so submitting WAM
+# there would have been submitting a coin whose own node fails their backend.
+#
+# depends/packages/zeromq.mk is upstream's and already here. The cost is the
+# minutes depends spends building it; the gain is that the node can tell
+# other software a block arrived without being polled.
+DEPENDS_COMMON=("HOST=$HOST_TRIPLET" NO_BDB=1 NO_UPNP=1 NO_NATPMP=1 NO_USDT=1)
 
 build_depends() {  # $1 = extra make variables, "" for a Qt build
     make -C "$CORE_DIR/depends" "${DEPENDS_COMMON[@]}" $1 \
@@ -210,7 +227,6 @@ CONFIG_SITE="$CONFIG_SITE_PATH" ./configure \
     "$GUI_FLAG" \
     --without-bdb \
     --with-sqlite=yes \
-    --disable-zmq \
     --disable-tests-fuzz-binary \
     CPPFLAGS="$RANDOMX_CFLAGS" \
     LIBS="$RANDOMX_LIBS" \
@@ -220,6 +236,16 @@ $(tail -30 "$BUILD_DIR/configure-linux.log" | sed 's/^/          /')
           Full log: $BUILD_DIR/configure-linux.log
           Core's own: $CORE_DIR/config.log"
 ok "configured"
+
+# A CAPABILITY CAME AND WENT ONCE WITHOUT ANYBODY CHOOSING IT, SO THEY ARE
+# ASSERTED NOW -- AND FOR ALL THREE PLATFORMS, NOT THIS ONE.
+#
+# --disable-zmq sat in all three build scripts, inherited rather than
+# decided, and the cost only showed up when an indexer needed block
+# notifications the node could not send. The first repair put the assertion
+# here alone, which would have let a single release ship ZMQ on Linux and
+# not on Windows or macOS. The list lives in one file now and binds all three.
+assert_release_capabilities linux "$BUILD_DIR/configure-linux.log"
 
 log "compiling with $JOBS jobs"
 make -j"$JOBS" > "$BUILD_DIR/make-linux.log" 2>&1 \
