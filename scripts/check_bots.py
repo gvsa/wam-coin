@@ -154,7 +154,7 @@ def main():
     # confidently about a chain with nothing on it.
     ap.add_argument("--network", default="mainnet",
                     choices=["mainnet", "testnet", "regtest"])
-    ap.add_argument("--repo", default="wamcoin-core-dev/wam-coin")
+    ap.add_argument("--repo", default="wamcoin-Project/wam-coin")
     # Not a tuning knob. It is what makes the silence check testable without
     # waiting a day for a bot to go quiet, and a check nobody has watched fail
     # is a check nobody knows works. Default: the heartbeat interval plus two

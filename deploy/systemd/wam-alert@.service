@@ -28,7 +28,7 @@
 
 [Unit]
 Description=Report that %i failed
-Documentation=https://github.com/wamcoin-core-dev/wam-coin/blob/main/scripts/unit_alert.py
+Documentation=https://github.com/wamcoin-Project/wam-coin/blob/main/scripts/unit_alert.py
 
 [Service]
 Type=oneshot

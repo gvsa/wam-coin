@@ -84,7 +84,7 @@ test('a stall, and the recovery', () => {
 test('a release', () => {
     const out = toTelegram(A.releaseMessage({
         tag: 'v0.1.0', name: 'WAM Coin v0.1.0',
-        url: 'https://github.com/wamcoin-core-dev/wam-coin/releases/tag/v0.1.0',
+        url: 'https://github.com/wamcoin-Project/wam-coin/releases/tag/v0.1.0',
         body: 'first line\nsecond line'
     }));
     assert.ok(out.startsWith('\u{1F680} <b>WAM Coin v0.1.0</b>'), out.slice(0, 60));

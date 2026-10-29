@@ -28,7 +28,7 @@
 >
 > **The link is fixed.** The live entry's `links.github` pointed at
 > `wam-coin-official`, which is locked. It now reads
-> `wamcoin-core-dev/wam-coin`, checked against the raw file on 2026-10-01.
+> `wamcoin-Project/wam-coin`, checked against the raw file on 2026-10-01.
 > Nothing in the live entry is outstanding.
 
 **`KomodoPlatform/coins` is not a second platform, and nothing should be sent

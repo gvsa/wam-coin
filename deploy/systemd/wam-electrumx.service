@@ -17,7 +17,7 @@
 
 [Unit]
 Description=ElectrumX server for WAM Coin
-Documentation=https://github.com/wamcoin-core-dev/wam-coin/blob/main/integration/electrumx/README.md
+Documentation=https://github.com/wamcoin-Project/wam-coin/blob/main/integration/electrumx/README.md
 After=network-online.target wamd.service
 Wants=network-online.target
 Requires=wamd.service

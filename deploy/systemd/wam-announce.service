@@ -16,7 +16,7 @@
 
 [Unit]
 Description=WAM Coin announcement bot (Telegram, Discord)
-Documentation=https://github.com/wamcoin-core-dev/wam-coin/blob/main/bots/README.md
+Documentation=https://github.com/wamcoin-Project/wam-coin/blob/main/bots/README.md
 After=network-online.target wamd.service
 Wants=network-online.target
 # Wants, not Requires: the stall alert is the one message that matters most

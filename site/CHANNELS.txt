@@ -12,7 +12,7 @@
    website        https://wamcoin.org
    reserve name   https://wamcoin.net       (empty on purpose -- see below)
    source         https://gitlab.com/WAMCoin/wam-coin
-   source         https://github.com/wamcoin-core-dev/wam-coin
+   source         https://github.com/wamcoin-Project/wam-coin
    source         https://gitea.com/WAMCoin/wam-coin
    downloads      https://wamcoin.org/downloads/
    announcements  https://t.me/wam_coin_updates

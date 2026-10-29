@@ -12,7 +12,7 @@
 #
 #  Everything worth reading about WAM lived at addresses nobody says out loud:
 #
-#      github.com/wamcoin-core-dev/wam-coin/blob/main/docs/START_HERE_AR.md
+#      github.com/wamcoin-Project/wam-coin/blob/main/docs/START_HERE_AR.md
 #
 #  It is long, it looks like a filename, and it asks a reader to be
 #  comfortable on GitHub before anyone has told them what a node is. So the

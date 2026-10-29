@@ -19,7 +19,7 @@
 
 [Unit]
 Description=Check every five minutes for logins and key changes
-Documentation=https://github.com/wamcoin-core-dev/wam-coin/blob/main/scripts/login_watch.py
+Documentation=https://github.com/wamcoin-Project/wam-coin/blob/main/scripts/login_watch.py
 
 [Timer]
 OnBootSec=4min

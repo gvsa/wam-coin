@@ -17,7 +17,7 @@
 # ===========================================================================
 [Unit]
 Description=Watch whether the other WAM seeds are still reachable from here
-Documentation=https://github.com/wamcoin-core-dev/wam-coin/blob/main/scripts/peer_watch.py
+Documentation=https://github.com/wamcoin-Project/wam-coin/blob/main/scripts/peer_watch.py
 After=wamd.service
 OnFailure=wam-alert@%n.service
 

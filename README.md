@@ -1,8 +1,7 @@
 # WAM Coin
 
-[![platform-build](https://github.com/wamcoin-core-dev/wam-coin/actions/workflows/platform-build.yml/badge.svg)](https://github.com/wamcoin-core-dev/wam-coin/actions/workflows/platform-build.yml)
-[![release](https://img.shields.io/github/v/release/wamcoin-core-dev/wam-coin?include_prereleases&label=release&color=0a7)](https://github.com/wamcoin-core-dev/wam-coin/releases)
-[![downloads](https://img.shields.io/github/downloads/wamcoin-core-dev/wam-coin/total?label=downloads&color=0a7)](https://wamcoin.org/downloads/)
+[![release](https://img.shields.io/github/v/release/wamcoin-Project/wam-coin?include_prereleases&label=release&color=0a7)](https://github.com/wamcoin-Project/wam-coin/releases)
+[![downloads](https://img.shields.io/github/downloads/wamcoin-Project/wam-coin/total?label=downloads&color=0a7)](https://wamcoin.org/downloads/)
 [![licence MIT](https://img.shields.io/badge/licence-MIT-blue)](COPYING)
 
 **A CPU-mineable proof-of-work currency with a hard 22,000,000 cap.**
