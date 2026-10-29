@@ -30,8 +30,13 @@
       <div class="value" id="poolHashrate">—</div>
       <div class="note" id="poolShare">&nbsp;</div>
     </div>
+    <!-- "Connected here", not "Miners": this counts stratum connections to
+         THIS pool, and a pool miner runs no node at all. Read as a count of
+         people on the network it invites a comparison with the explorer's
+         peer count, which is a different population entirely -- 159 here
+         beside 93 there, and neither contains the other. -->
     <div class="tile">
-      <div class="label">Miners / workers</div>
+      <div class="label">Connected to this pool</div>
       <div class="value" id="minerCount">—</div>
       <div class="note" id="workerCount">&nbsp;</div>
     </div>
