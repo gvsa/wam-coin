@@ -117,9 +117,12 @@ jobs:
           set -euo pipefail
           sudo apt-get update -qq
           # Upstream's depends/README.md for Linux, plus bison for Qt.
+          # patchelf: the wallet carries the X11 libraries depends builds as
+          # shared objects, and they are found through an RPATH relative to
+          # the binary. See scripts/lib/shared_deps.sh.
           sudo apt-get install -y --no-install-recommends \
               build-essential cmake autoconf automake libtool pkg-config \
-              curl patch python3 xz-utils bison
+              curl patch python3 xz-utils bison patchelf
 
       - name: Fetch and patch Bitcoin Core
         run: bash scripts/fetch-upstream.sh

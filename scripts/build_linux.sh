@@ -125,10 +125,14 @@ echo
 # Homebrew's libtool formula does install the binary, and that path built
 # clean on a real Mac runner the same morning. The trap is Debian's packaging
 # alone, so the fix is here alone.
-for t in cmake autoconf automake libtoolize pkg-config make curl patch python3; do
+# patchelf is in this list although nothing here uses it: package_release.sh
+# does, to give the wallet an RPATH for the libraries it carries. Checked at
+# second one rather than at minute thirty, because a build that compiles for
+# half an hour and then cannot be packaged has wasted the half hour.
+for t in cmake autoconf automake libtoolize pkg-config make curl patch python3 patchelf; do
     command -v "$t" >/dev/null || die "$t is not installed. On Debian/Ubuntu:
           sudo apt install build-essential cmake autoconf automake libtool \\
-                           pkg-config curl patch python3
+                           pkg-config curl patch python3 patchelf
           (libtoolize comes from the libtool package. boost, libevent and
            sqlite come from depends, not apt -- that is the entire point of
            this script, see the header)"

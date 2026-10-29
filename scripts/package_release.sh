@@ -42,6 +42,7 @@ set -euo pipefail
 # Microsoft Store stub that runs nothing and exits 49.
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 . "$SCRIPTS_DIR/lib/python.sh"
+. "$SCRIPTS_DIR/lib/shared_deps.sh"
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/.." && pwd)"
@@ -200,6 +201,41 @@ cp "$MINER_OUT" "$MINER_DIR/"
 strip "$NODE_DIR"/* "$MINER_DIR"/wam-miner 2>/dev/null || true
 [ "$HAVE_GUI" = "1" ] && strip "$WALLET_DIR/bin/wam-qt" 2>/dev/null || true
 ok "stripped      symbols removed"
+
+# THE WALLET CARRIES ITS LIBRARIES, THE SAME WAY THE NODE DOES.
+#
+# The node swallows boost, libevent and sqlite whole, because depends builds
+# those as static archives. It cannot do that with the X11 stack: upstream's
+# depends/packages/libxcb.mk sets --disable-static, so libxcb, libxkbcommon,
+# fontconfig, freetype and the rest are shared objects by that project's own
+# decision, and wam-qt links them from depends and then sails without them.
+#
+# On 2026-10-29 the release build said so, at the last gate, after
+# twenty-eight minutes:
+#
+#     FAIL  wam-qt  asks for: libfontconfig.so.1 libfreetype.so.6
+#                   libxcb-icccm.so.4 ... libxkbcommon.so.0     (17 of them)
+#
+# Allowing those seventeen by name in check_shared_deps.sh was the short
+# answer and probably even defensible -- a machine with no libxcb cannot draw
+# a window for any program. It is still an exception, and an exception is a
+# hole that grows without anybody deciding, which is how --disable-zmq lived
+# in three build scripts for a year.
+#
+# So they travel in the archive, beside the binary, and wam-qt is given an
+# RPATH of $ORIGIN/../lib so it finds them wherever the user unpacks it. The
+# rule keeps no list of names: ask a stranger for nothing but glibc.
+if [ "$HAVE_GUI" = "1" ]; then
+    DEPENDS_LIB="$TREE/depends/${HOST_TRIPLET:-x86_64-pc-linux-gnu}/lib"
+    if carry_libs "$WALLET_DIR/bin/wam-qt" "$DEPENDS_LIB" "$WALLET_DIR/lib"; then
+        CARRIED_N="$(find "$WALLET_DIR/lib" -name '*.so*' -type f 2>/dev/null | wc -l)"
+        ok "wallet        carries $CARRIED_N library/libraries of its own"
+    else
+        die "wam-qt needs libraries that are not in $DEPENDS_LIB, so the
+          wallet would ask a stranger's machine for them. Nothing is kept.
+          This is the failure v0.1.12 shipped with; see scripts/lib/shared_deps.sh."
+    fi
+fi
 
 for f in COPYING README.md WHITEPAPER.md SECURITY.md; do
     [ -f "$REPO/$f" ] && cp "$REPO/$f" "$WORK/stage/wam-coin-$VERSION/"
