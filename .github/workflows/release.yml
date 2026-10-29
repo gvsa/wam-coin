@@ -599,6 +599,35 @@ jobs:
           echo "::notice::$VERSION is a DRAFT. It is not downloadable by anyone"
           echo "::notice::until it is signed and published. See docs/RELEASING.md"
 
+      # KEEP THE LOGS WHEN IT FAILS, WHICH IS THE ONLY TIME THEY MATTER.
+      #
+      # build_linux.sh writes depends-linux.log, configure-linux.log and
+      # make-linux.log, and its own failure messages tell the reader to grep
+      # them. On 2026-10-29 a run died thirty-three minutes in, at the very
+      # last gate, saying
+      #
+      #     Check that depends really produced .../share/config.site and that
+      #     configure used it:
+      #       grep -i 'boost|event|sqlite' .../build/configure-linux.log
+      #
+      # and every one of those files went with the runner. A message that
+      # points at evidence nobody can reach is the same fault as a check that
+      # reports nothing: the next step is another thirty-three minutes, spent
+      # finding out what this run already knew.
+      #
+      # if: failure() and not always(): a green build's logs are forty
+      # megabytes of nothing.
+      - name: Keep the build logs when it failed
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-logs-${{ steps.v.outputs.version }}
+          path: |
+            build/*.log
+            build/wam-core/config.log
+          retention-days: 14
+          if-no-files-found: warn
+
       - name: Keep the artifact even when this was only a test build
         if: steps.v.outputs.publish != 'yes'
         uses: actions/upload-artifact@v7
