@@ -102,17 +102,21 @@ function renderStats(s) {
   // block header -- so it is shown next to the estimate, and says plainly when
   // the estimate has stopped meaning anything.
   //
-  // AND IT IS THE TOTAL, WHICH CONTAINS THIS POOL.
+  // AND IT IS THE EXPLORER'S NUMBER, NOT ONE OF OURS THAT RESEMBLES IT.
   //
-  // net.hashPerSecond is built from what this pool measures and the share it
-  // counts, so it can never come out below its own part. net.networkHashPerSecond
-  // -- the node's getnetworkhashps -- stays in the payload as a second opinion
-  // and is no longer what this tile shows: on 29 October it read 566 kH/s while
-  // this pool alone measured 556 and was finding 78% of the blocks, which puts
-  // the real total near 715 and leaves 159 kH/s of other people's miners off
-  // the panel entirely.
+  // A miner here should not have to open a second page to see how strong the
+  // chain is; that is what this tile is for. So it asks the same node the
+  // same question over the same 720-block window the explorer uses, and the
+  // two agree by construction. For an afternoon this tile carried a total of
+  // its own -- our measured hashrate over our counted share -- which read
+  // 615.7 while the explorer read 608.3: one quantity, two headlines, and no
+  // way for a reader to choose between them.
+  //
+  // The share below the pool's own hashrate is what had to stop being a
+  // division, and it has: it is counted off the ledger now. The total never
+  // needed to be.
   const stale = net.secondsSinceBlock != null && net.secondsSinceBlock > 600;
-  text($('netHashrate'), hashrate(net.hashPerSecond ?? net.networkHashPerSecond));
+  text($('netHashrate'), hashrate(net.networkHashPerSecond));
   // Two decimal places round WAM's difficulty to "0". At the floor it is
   // 0.00024414, and the floor is exactly when somebody is reading this tile
   // to find out what happened -- the page said "difficulty 0" on the evening

@@ -354,9 +354,6 @@ class ApiServer {
                                   : (estimate > 0
                                      ? Math.min(1, hashrate.poolHashrate / estimate)
                                      : 0);
-        const networkTotal = counted
-            ? hashrate.poolHashrate / poolShare
-            : Math.max(estimate, hashrate.poolHashrate);
         const expectedBlockSeconds = poolShare > 0 ? 120 / poolShare : null;
 
         return {
@@ -378,14 +375,14 @@ class ApiServer {
             },
             network: {
                 ...network,
-                // The total, built from the part we measure and the share we
-                // count. network.networkHashPerSecond keeps the node's own
-                // estimate beside it, unchanged, as a second opinion -- it is
-                // a real number about the chain, it is simply not one our own
-                // measurement may be divided by.
-                hashPerSecond: networkTotal,
-                hashPerSecondBasis: counted ? 'measured+counted' : 'estimated',
-                othersHashPerSecond: Math.max(0, networkTotal - hashrate.poolHashrate)
+                // Everyone on the chain who is not us, from the one network
+                // figure both pages publish. Briefly this tile carried a
+                // total of its own -- measured hashrate over counted share --
+                // which was a defensible number and a second headline for a
+                // quantity that may only have one. The share is what had to
+                // stop being a division; the total never did.
+                othersHashPerSecond: Math.max(
+                    0, (network.networkHashPerSecond || 0) - hashrate.poolHashrate)
             },
             job: job.currentJob,
             randomx: {
@@ -420,9 +417,25 @@ class ApiServer {
     }
 
     async _network() {
-        const [chain, mining] = await Promise.all([
+        // THE SAME QUESTION THE EXPLORER ASKS, OF THE SAME NODE.
+        //
+        // A miner on this pool should not have to open a second page to see
+        // how strong the chain is -- that is what the third tile is for. So
+        // it has to be the explorer's number, not a number of our own that
+        // happens to be near it: 615.7 here beside 608.3 there is one
+        // quantity with two headlines, and a reader has no way to choose.
+        //
+        // getmininginfo answers over getnetworkhashps's default 120 blocks,
+        // four hours, which nobody chose -- it came with Bitcoin Core. The
+        // explorer asks for 720, a day, because four hours is too few blocks
+        // to average a Poisson process against a difficulty DGW moves every
+        // block. Asking the identical question of the identical node makes
+        // the two pages agree by construction rather than by luck.
+        const NETWORK_HASHPS_BLOCKS = 720;
+        const [chain, mining, dayHashps] = await Promise.all([
             this.daemon.getBlockchainInfo(),
-            this.daemon.getMiningInfo()
+            this.daemon.getMiningInfo(),
+            this.daemon.cmd('getnetworkhashps', [NETWORK_HASHPS_BLOCKS]).catch(() => null)
         ]);
 
         this.shares.setNetworkDifficulty(chain.difficulty);
@@ -480,7 +493,15 @@ class ApiServer {
             blocks: chain.blocks,
             headers: chain.headers,
             difficulty: chain.difficulty,
-            networkHashPerSecond: mining.networkhashps || 0,
+            // The day's window when the node could answer for it, the
+            // four-hour default when it could not -- and the window travels
+            // with the number so an average is never published with its scale
+            // hidden. Identical to explorer/lib/collector.js on purpose.
+            networkHashPerSecond: (typeof dayHashps === 'number' && dayHashps > 0)
+                ? dayHashps
+                : (mining.networkhashps || 0),
+            networkHashWindowBlocks: (typeof dayHashps === 'number' && dayHashps > 0)
+                ? NETWORK_HASHPS_BLOCKS : 120,
 
             // The tip's own timestamp, and how long ago that was.
             //
