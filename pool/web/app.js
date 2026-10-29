@@ -180,6 +180,48 @@ function renderStats(s) {
     }
   }
 
+  // The payout policy, said here because here is the only place that knows it.
+  // A miner asked on 29 October why his unpaid balance barely moved while his
+  // hashrate was right there on this page, and every number that answers him
+  // -- the window, the threshold, the interval, the maturity -- was written in
+  // a guide instead of being reported by the pool running them. The guide can
+  // go stale. This cannot: it is read out of the live configuration.
+  //
+  // Maturity is the part that surprises people, so it is stated in hours as
+  // well as blocks. A block's payouts are computed when it is found and held
+  // against the block until it matures, so an unpaid balance lags the work
+  // that earned it by about that long and then moves in steps.
+  const policy = $('payoutPolicy');
+  if (policy) {
+    const cfg = s.config || {};
+    const mode = (cfg.rewardMode || '').toUpperCase();
+    const mult = cfg.pplnsMultiplier;
+    const minPay = cfg.minimumPayoutWam;
+    const interval = cfg.paymentIntervalSec;
+    const maturity = cfg.coinbaseMaturity;
+    const spacing = net.targetSpacing;
+
+    const parts = [];
+    if (mode === 'PPLNS' && mult != null) {
+      parts.push(`Blocks are split ${mode} across the last ${mult} × network ` +
+                 'difficulty of work submitted here');
+    } else if (mode) {
+      parts.push(`Blocks are split ${mode}`);
+    }
+    if (maturity != null) {
+      const hrs = spacing ? ((maturity + 1) * spacing) / 3600 : null;
+      parts.push(`a block's payouts reach your balance once it matures at ` +
+                 `${maturity + 1} confirmations` +
+                 (hrs ? ` (about ${hrs.toFixed(1)} hours at ${spacing}s blocks)` : '') +
+                 ', which is a consensus rule and applies to solo miners too');
+    }
+    if (minPay != null && interval != null) {
+      parts.push(`payment runs every ${Math.round(interval / 60)} minutes and ` +
+                 `pays anyone at or above ${minPay} WAM`);
+    }
+    text(policy, parts.length ? parts.join('; ') + '.' : '');
+  }
+
   // ---- ports -------------------------------------------------------------
   const portTable = $('portTable');
   portTable.replaceChildren();

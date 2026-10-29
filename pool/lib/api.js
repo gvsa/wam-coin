@@ -312,6 +312,16 @@ class ApiServer {
                 poolFeePercent: pool.poolFeePercent,
                 chainDevFeePercent: 5,
                 minimumPayoutWam: this.config.minimumPayoutWam ?? 1,
+                // The rest of the payout policy, reported rather than written
+                // down somewhere else. Every one of these is a knob the
+                // operator can turn, and a knob's value written into a guide
+                // or a repository is a sentence waiting to go stale -- which
+                // is exactly what happened to the fee, carried at two
+                // different values in two files for weeks. The pool knows what
+                // it is running; it is the only thing that does.
+                paymentIntervalSec: this.config.paymentIntervalSec ?? 600,
+                pplnsMultiplier: this.config.pplnsMultiplier ?? 2,
+                coinbaseMaturity: this.config.coinbaseMaturity ?? 100,
                 ports: (this.config.ports || []).map((p) => ({
                     port: p.port,
                     difficulty: p.difficulty || this.config.startDifficulty,
