@@ -86,33 +86,41 @@ class Collector {
         try {
             const chainInfo = await this.rpc.call('getblockchaininfo');
 
-            // A DAY'S WINDOW, NOT FOUR HOURS, AND THE PAGE SAYS WHICH.
+            // THE DEFAULT WINDOW, BECAUSE IT IS WHAT THE REST OF THE CHAIN USES.
             //
             // getmininginfo's networkhashps is getnetworkhashps over its
-            // default 120 blocks -- four hours here, and far too few to
-            // average a Poisson process against a difficulty that DGW moves
-            // on every block. On 2026-10-29 the same node answered, in one
-            // second:
+            // default 120 blocks -- four hours here, and genuinely few to
+            // average a Poisson process against a difficulty DGW moves on
+            // every block. Asked in one second, the same node gave 547.0 over
+            // 120 blocks, 621.7 over 360, 610.2 over 720 and 599.1 over 1440.
+            // One quantity, four answers, and the shortest window was the
+            // lowest every time it was sampled.
             //
-            //     30 blocks    546.5 kH/s        360 blocks   621.7 kH/s
-            //     120 blocks   547.0 kH/s        720 blocks   610.2 kH/s
+            // So this asked for 720 for a few hours. The arithmetic was
+            // right and the decision was wrong, and the founder found out
+            // how within the hour. Three pool pages, within three blocks of
+            // each other:
             //
-            // One quantity, four answers. The 120-block figure went out to
-            // this page and to the pool's, and it read 566 kH/s at a moment
-            // when the pool alone measured 556 from its own miners' shares
-            // and was finding 78% of the blocks -- so the chain's hashrate
-            // was near 715, and this page was showing a network smaller than
-            // one of the things inside it.
+            //     veinpool.fr            590.5 kH/s
+            //     wampool.vslabs.co.in   590.5 kH/s
+            //     pool.wamcoin.org       620.9 kH/s
             //
-            // 720 blocks is a day. It is still an estimate -- nobody can
-            // measure strangers' machines, only infer them from how fast
-            // blocks arrive -- but it is an estimate with a stated window
-            // instead of an unstated one.
-            const NETWORK_HASHPS_BLOCKS = 720;
-            const [mining, dayHashps, mempool, netInfo, supplyRpc, randomxRpc, devfeeRpc] =
+            // Two pools run by other people agreeing exactly, and this
+            // project's own pages alone quoting a bigger network. Both of
+            // theirs call getmininginfo, so 120 is the convention on this
+            // chain whatever its statistical merit, and a stranger comparing
+            // the three does not see a better estimator. He sees the people
+            // who made the coin claiming it is stronger than everyone else
+            // says it is.
+            //
+            // That is the one thing this project cannot afford to look like,
+            // and five per cent of accuracy does not buy it back. The window
+            // is the node's default again, and it is stated rather than
+            // hidden -- which was the honest half of the change and costs
+            // nothing.
+            const [mining, mempool, netInfo, supplyRpc, randomxRpc, devfeeRpc] =
                 await Promise.all([
                     this.rpc.tryCall('getmininginfo', [], null),
-                    this.rpc.tryCall('getnetworkhashps', [NETWORK_HASHPS_BLOCKS], null),
                     this.rpc.tryCall('getmempoolinfo', [], null),
                     this.rpc.tryCall('getnetworkinfo', [], null),
                     this.rpc.tryCall('getsupplyinfo', [], null),
@@ -128,7 +136,7 @@ class Collector {
                 error: null,
                 updatedAt: Date.now(),
                 staleSeconds: 0,
-                chain: this._chain(chainInfo, mining, netInfo, dayHashps),
+                chain: this._chain(chainInfo, mining, netInfo),
                 supply: this._supply(height, supplyRpc),
                 emission: this._emission(height, supplyRpc),
                 treasury: this._treasury(height, devfeeRpc),
@@ -162,7 +170,7 @@ class Collector {
 
     // -----------------------------------------------------------------------
 
-    _chain(chainInfo, mining, netInfo, dayHashps) {
+    _chain(chainInfo, mining, netInfo) {
         const progress = chainInfo.verificationprogress;
         return {
             name: chainInfo.chain,
@@ -179,16 +187,13 @@ class Collector {
                      (progress !== undefined && progress < 0.9999),
             verificationProgress: progress,
             blocksBehind: Math.max(0, (chainInfo.headers || 0) - chainInfo.blocks),
-            // The day's window when the node could answer for it, the four-hour
-            // default when it could not -- never silently one pretending to be
-            // the other. networkHashWindowBlocks is what the page prints beside
-            // the number, because an average with no stated window is how one
-            // quantity came to have four different values on two pages.
-            networkHashPerSecond: (typeof dayHashps === 'number' && dayHashps > 0)
-                ? dayHashps
-                : (mining ? (mining.networkhashps || 0) : null),
-            networkHashWindowBlocks: (typeof dayHashps === 'number' && dayHashps > 0)
-                ? 720 : 120,
+            // getnetworkhashps over its default 120 blocks, which is what
+            // every other pool on this chain publishes. The window is carried
+            // beside the number rather than left unstated: an average with no
+            // scale is how one quantity came to have four different values
+            // across two pages, and saying so costs nothing.
+            networkHashPerSecond: mining ? (mining.networkhashps || 0) : null,
+            networkHashWindowBlocks: 120,
             connections: netInfo ? netInfo.connections : null,
             targetSpacing: POW_TARGET_SPACING
         };
