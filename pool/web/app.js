@@ -81,8 +81,15 @@ function renderStats(s) {
     `pool fee ${s.config ? s.config.poolFeePercent : '?'}% + 5% treasury`);
 
   text($('poolHashrate'), hashrate(pool.hashrate));
+  // The share is F of the last N blocks, counted off the ledger, so it says
+  // which N. It used to be this pool's measured hashrate divided by an
+  // estimate of the network's, which read "102.057% of network" on 29 October
+  // -- a part larger than the whole it is part of.
   text($('poolShare'), pool.poolSharePercent
-    ? `${pool.poolSharePercent.toFixed(3)}% of network`
+    ? (pool.shareBasis === 'counted'
+        ? `${pool.poolSharePercent.toFixed(1)}% of the last ` +
+          `${pool.shareWindowBlocks} blocks (${pool.blocksFoundInWindow} found here)`
+        : `about ${pool.poolSharePercent.toFixed(1)}% of network, estimated`)
     : 'no shares in window');
 
   text($('minerCount'), String(pool.miners ?? 0));
@@ -94,8 +101,18 @@ function renderStats(s) {
   // half an hour. The age of the tip cannot lag -- it is the clock minus the
   // block header -- so it is shown next to the estimate, and says plainly when
   // the estimate has stopped meaning anything.
+  //
+  // AND IT IS THE TOTAL, WHICH CONTAINS THIS POOL.
+  //
+  // net.hashPerSecond is built from what this pool measures and the share it
+  // counts, so it can never come out below its own part. net.networkHashPerSecond
+  // -- the node's getnetworkhashps -- stays in the payload as a second opinion
+  // and is no longer what this tile shows: on 29 October it read 566 kH/s while
+  // this pool alone measured 556 and was finding 78% of the blocks, which puts
+  // the real total near 715 and leaves 159 kH/s of other people's miners off
+  // the panel entirely.
   const stale = net.secondsSinceBlock != null && net.secondsSinceBlock > 600;
-  text($('netHashrate'), hashrate(net.networkHashPerSecond));
+  text($('netHashrate'), hashrate(net.hashPerSecond ?? net.networkHashPerSecond));
   // Two decimal places round WAM's difficulty to "0". At the floor it is
   // 0.00024414, and the floor is exactly when somebody is reading this tile
   // to find out what happened -- the page said "difficulty 0" on the evening

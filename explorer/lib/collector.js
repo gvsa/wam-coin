@@ -86,9 +86,33 @@ class Collector {
         try {
             const chainInfo = await this.rpc.call('getblockchaininfo');
 
-            const [mining, mempool, netInfo, supplyRpc, randomxRpc, devfeeRpc] =
+            // A DAY'S WINDOW, NOT FOUR HOURS, AND THE PAGE SAYS WHICH.
+            //
+            // getmininginfo's networkhashps is getnetworkhashps over its
+            // default 120 blocks -- four hours here, and far too few to
+            // average a Poisson process against a difficulty that DGW moves
+            // on every block. On 2026-10-29 the same node answered, in one
+            // second:
+            //
+            //     30 blocks    546.5 kH/s        360 blocks   621.7 kH/s
+            //     120 blocks   547.0 kH/s        720 blocks   610.2 kH/s
+            //
+            // One quantity, four answers. The 120-block figure went out to
+            // this page and to the pool's, and it read 566 kH/s at a moment
+            // when the pool alone measured 556 from its own miners' shares
+            // and was finding 78% of the blocks -- so the chain's hashrate
+            // was near 715, and this page was showing a network smaller than
+            // one of the things inside it.
+            //
+            // 720 blocks is a day. It is still an estimate -- nobody can
+            // measure strangers' machines, only infer them from how fast
+            // blocks arrive -- but it is an estimate with a stated window
+            // instead of an unstated one.
+            const NETWORK_HASHPS_BLOCKS = 720;
+            const [mining, dayHashps, mempool, netInfo, supplyRpc, randomxRpc, devfeeRpc] =
                 await Promise.all([
                     this.rpc.tryCall('getmininginfo', [], null),
+                    this.rpc.tryCall('getnetworkhashps', [NETWORK_HASHPS_BLOCKS], null),
                     this.rpc.tryCall('getmempoolinfo', [], null),
                     this.rpc.tryCall('getnetworkinfo', [], null),
                     this.rpc.tryCall('getsupplyinfo', [], null),
@@ -104,7 +128,7 @@ class Collector {
                 error: null,
                 updatedAt: Date.now(),
                 staleSeconds: 0,
-                chain: this._chain(chainInfo, mining, netInfo),
+                chain: this._chain(chainInfo, mining, netInfo, dayHashps),
                 supply: this._supply(height, supplyRpc),
                 emission: this._emission(height, supplyRpc),
                 treasury: this._treasury(height, devfeeRpc),
@@ -138,7 +162,7 @@ class Collector {
 
     // -----------------------------------------------------------------------
 
-    _chain(chainInfo, mining, netInfo) {
+    _chain(chainInfo, mining, netInfo, dayHashps) {
         const progress = chainInfo.verificationprogress;
         return {
             name: chainInfo.chain,
@@ -155,7 +179,16 @@ class Collector {
                      (progress !== undefined && progress < 0.9999),
             verificationProgress: progress,
             blocksBehind: Math.max(0, (chainInfo.headers || 0) - chainInfo.blocks),
-            networkHashPerSecond: mining ? (mining.networkhashps || 0) : null,
+            // The day's window when the node could answer for it, the four-hour
+            // default when it could not -- never silently one pretending to be
+            // the other. networkHashWindowBlocks is what the page prints beside
+            // the number, because an average with no stated window is how one
+            // quantity came to have four different values on two pages.
+            networkHashPerSecond: (typeof dayHashps === 'number' && dayHashps > 0)
+                ? dayHashps
+                : (mining ? (mining.networkhashps || 0) : null),
+            networkHashWindowBlocks: (typeof dayHashps === 'number' && dayHashps > 0)
+                ? 720 : 120,
             connections: netInfo ? netInfo.connections : null,
             targetSpacing: POW_TARGET_SPACING
         };
