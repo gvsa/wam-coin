@@ -31,7 +31,7 @@
 # ===========================================================================
 [Unit]
 Description=Does the published WAM release verify for a stranger?
-Documentation=https://github.com/wamcoin-core-dev/wam-coin/blob/main/scripts/release_watch.py
+Documentation=https://github.com/wamcoin-Project/wam-coin/blob/main/scripts/release_watch.py
 After=network-online.target
 Wants=network-online.target
 

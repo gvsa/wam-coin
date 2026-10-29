@@ -19,7 +19,7 @@
 
 [Unit]
 Description=Watch the WAM %i chain for reorganisations
-Documentation=https://github.com/wamcoin-core-dev/wam-coin/blob/main/scripts/check_reorg.py
+Documentation=https://github.com/wamcoin-Project/wam-coin/blob/main/scripts/check_reorg.py
 After=network-online.target
 
 # If this unit fails, say so. A timer stays active however often the

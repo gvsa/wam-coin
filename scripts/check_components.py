@@ -61,7 +61,7 @@ def published_assets(tag):
     """The file names a release actually carries, or None if it cannot ask."""
     try:
         out = subprocess.run(
-            ["gh", "release", "view", tag, "--repo", "wamcoin-core-dev/wam-coin",
+            ["gh", "release", "view", tag, "--repo", "wamcoin-Project/wam-coin",
              "--json", "assets"],
             capture_output=True, text=True, timeout=120, encoding="utf-8",
             errors="replace")

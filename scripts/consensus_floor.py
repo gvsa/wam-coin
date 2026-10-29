@@ -190,7 +190,7 @@ def fingerprint(tag):
                             git("show", f"{tag}:{PARAMS}"), tag)
 
 
-def fetch_tag(tag, repo="wamcoin-core-dev/wam-coin"):
+def fetch_tag(tag, repo="wamcoin-Project/wam-coin"):
     """The two consensus files at a tag, read from GitHub rather than from
     here. A checkout that is behind has tags that are behind too, so it
     cannot answer this question about itself."""

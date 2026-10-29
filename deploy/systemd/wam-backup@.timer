@@ -9,7 +9,7 @@
 
 [Unit]
 Description=Daily WAM Coin encrypted backup, %i
-Documentation=https://github.com/wamcoin-core-dev/wam-coin/blob/main/deploy/wam-backup.sh
+Documentation=https://github.com/wamcoin-Project/wam-coin/blob/main/deploy/wam-backup.sh
 
 [Timer]
 # Both instances share this hour; RandomizedDelaySec gives each its own

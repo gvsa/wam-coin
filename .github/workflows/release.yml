@@ -492,8 +492,8 @@ jobs:
           #
           # scripts/check_channels.py now reads every workflow and fails if a
           # name CHANNELS.txt disowns appears in one at all.
-          BASE="https://github.com/wamcoin-core-dev/wam-coin/releases"
-          RAW="https://raw.githubusercontent.com/wamcoin-core-dev/wam-coin/main"
+          BASE="https://github.com/wamcoin-Project/wam-coin/releases"
+          RAW="https://raw.githubusercontent.com/wamcoin-Project/wam-coin/main"
           notes="$(mktemp)"
           {
             if [ -n "$mandatory" ]; then

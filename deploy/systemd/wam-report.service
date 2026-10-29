@@ -16,7 +16,7 @@
 
 [Unit]
 Description=Send the daily WAM operations report
-Documentation=https://github.com/wamcoin-core-dev/wam-coin/blob/main/scripts/daily_report.py
+Documentation=https://github.com/wamcoin-Project/wam-coin/blob/main/scripts/daily_report.py
 After=network-online.target
 Wants=network-online.target
 

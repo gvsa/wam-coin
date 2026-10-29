@@ -322,7 +322,7 @@ const DOWNLOADS_URL = process.env.WAM_DOWNLOADS_URL
     || 'https://wamcoin.org/downloads/';
 const SOURCES = (process.env.WAM_SOURCES || [
     'https://gitlab.com/WAMCoin/wam-coin',
-    'https://github.com/wamcoin-core-dev/wam-coin',
+    'https://github.com/wamcoin-Project/wam-coin',
     'https://gitea.com/WAMCoin/wam-coin',
 ].join(',')).split(',').map((x) => x.trim()).filter(Boolean);
 

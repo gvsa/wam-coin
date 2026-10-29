@@ -44,7 +44,7 @@ SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$HERE"
 
-OWNER="wamcoin-core-dev"
+OWNER="wamcoin-Project"
 
 GRN=$'\033[32m'; RED=$'\033[31m'; YLW=$'\033[33m'; BLD=$'\033[1m'; OFF=$'\033[0m'
 ok()   { printf '  %sok%s     %s\n' "$GRN" "$OFF" "$*"; }

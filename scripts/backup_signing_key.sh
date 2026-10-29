@@ -288,7 +288,7 @@ THE FINGERPRINT, which is the only thing that identifies the real key:
   4BD4 A8D3 AFD4 3F5C BCB5  00E2 3798 462F E00A DBA4
 
 It is published in SECURITY.md at
-https://github.com/wamcoin-core-dev/wam-coin -- and nowhere else. Anything
+https://github.com/wamcoin-Project/wam-coin -- and nowhere else. Anything
 claiming a different fingerprint for WAM Coin is not WAM Coin.
 
 THE ONE RULE

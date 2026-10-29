@@ -25,7 +25,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 GRN=$'\033[32m'; RED=$'\033[31m'; YLW=$'\033[33m'; BLD=$'\033[1m'; OFF=$'\033[0m'
-REPO="${WAM_REPO:-wamcoin-core-dev/wam-coin}"
+REPO="${WAM_REPO:-wamcoin-Project/wam-coin}"
 EXPECT="4BD4A8D3AFD43F5CBCB500E23798462FE00ADBA4"
 
 fails=0
