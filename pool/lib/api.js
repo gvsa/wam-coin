@@ -425,17 +425,39 @@ class ApiServer {
         // happens to be near it: 615.7 here beside 608.3 there is one
         // quantity with two headlines, and a reader has no way to choose.
         //
-        // getmininginfo answers over getnetworkhashps's default 120 blocks,
-        // four hours, which nobody chose -- it came with Bitcoin Core. The
-        // explorer asks for 720, a day, because four hours is too few blocks
-        // to average a Poisson process against a difficulty DGW moves every
-        // block. Asking the identical question of the identical node makes
-        // the two pages agree by construction rather than by luck.
-        const NETWORK_HASHPS_BLOCKS = 720;
-        const [chain, mining, dayHashps] = await Promise.all([
+        // AND THE SAME QUESTION EVERY OTHER POOL ON THIS CHAIN ASKS.
+        //
+        // getmininginfo answers over getnetworkhashps's default 120 blocks --
+        // four hours, which nobody chose; it came with Bitcoin Core. For a few
+        // hours this asked for 720 instead, on the reasoning that four hours
+        // is too few blocks to average a Poisson process against a difficulty
+        // DGW moves every block. The reasoning is sound and the change was
+        // still wrong.
+        //
+        // On 2026-10-29, within three blocks of each other:
+        //
+        //     veinpool.fr            590.5 kH/s
+        //     wampool.vslabs.co.in   590.5 kH/s
+        //     pool.wamcoin.org       620.9 kH/s
+        //
+        // Our own node, asked both ways at one instant, gave 594.7 over 120
+        // and 622.5 over 720. So the chain data was identical to theirs and
+        // the entire difference was a window we had picked for ourselves.
+        //
+        // Every other operator calls getmininginfo, so 120 is the convention
+        // on this chain whether or not it is the better estimator. A stranger
+        // comparing three pool pages does not read ours as better reasoned.
+        // He reads the project's own pool quoting a bigger network than
+        // everybody else's -- and for a project whose only asset is being
+        // checkable, looking like we inflate our own numbers costs more than
+        // five per cent of estimator accuracy is worth.
+        //
+        // The defect this was meant to help never needed it either: a part
+        // exceeding its whole was cured by counting the pool's share off the
+        // ledger, not by changing the denominator's window.
+        const [chain, mining] = await Promise.all([
             this.daemon.getBlockchainInfo(),
-            this.daemon.getMiningInfo(),
-            this.daemon.cmd('getnetworkhashps', [NETWORK_HASHPS_BLOCKS]).catch(() => null)
+            this.daemon.getMiningInfo()
         ]);
 
         this.shares.setNetworkDifficulty(chain.difficulty);
@@ -493,15 +515,15 @@ class ApiServer {
             blocks: chain.blocks,
             headers: chain.headers,
             difficulty: chain.difficulty,
-            // The day's window when the node could answer for it, the
-            // four-hour default when it could not -- and the window travels
-            // with the number so an average is never published with its scale
-            // hidden. Identical to explorer/lib/collector.js on purpose.
-            networkHashPerSecond: (typeof dayHashps === 'number' && dayHashps > 0)
-                ? dayHashps
-                : (mining.networkhashps || 0),
-            networkHashWindowBlocks: (typeof dayHashps === 'number' && dayHashps > 0)
-                ? NETWORK_HASHPS_BLOCKS : 120,
+            // getmininginfo's own figure, which is getnetworkhashps over its
+            // default 120 blocks -- the same number every other pool on this
+            // chain publishes. The window still travels with it, because an
+            // average shown without its scale is how one quantity came to
+            // have four different values across two pages, and saying "120
+            // blocks" costs nothing and makes ours the only panel that says
+            // what it measured over.
+            networkHashPerSecond: mining.networkhashps || 0,
+            networkHashWindowBlocks: 120,
 
             // The tip's own timestamp, and how long ago that was.
             //
