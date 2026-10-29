@@ -38,6 +38,25 @@
 
 set -euo pipefail
 
+# A SCRIPT THAT DIES UNDER set -e MUST SAY WHERE, OR IT SAYS NOTHING AT ALL.
+#
+# On 2026-10-29 this printed its way happily down to
+#
+#     ok    wallet        carries 17 library/libraries of its own
+#
+# and then exited 1 with not one further word, in a release job that had
+# already spent twenty-one minutes. `set -e` kills the shell on any
+# unchecked non-zero status and prints nothing by design, so the log ends
+# mid-sentence and the next move is to guess -- which is how the previous
+# hour went.
+#
+# Every die() in this file explains itself. This is for the failures that
+# are not a die(): a cp that found no directory, a test that came out false
+# at the end of a && chain, a tool that is not installed. It names the line
+# and the command, which is all anybody needs.
+trap 'rc=$?; printf "\n  \033[31mFAIL\033[0m  package_release.sh stopped at line %s\n        command: %s\n        exit:    %d\n\n" \
+      "$LINENO" "$BASH_COMMAND" "$rc" >&2' ERR
+
 # An interpreter that is actually Python: `python3` on Windows is a
 # Microsoft Store stub that runs nothing and exits 49.
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
