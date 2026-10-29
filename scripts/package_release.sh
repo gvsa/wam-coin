@@ -292,8 +292,18 @@ larger for people who never open a window:
     # The list is taken from the binary with ldd, so it cannot drift away from
     # what was actually built. If Qt is ever linked statically this produces
     # nothing and the sentence disappears with it.
+    #
+    # AND THAT DAY CAME, AND THIS LINE KILLED THE RELEASE ON IT.
+    #
+    # grep exits 1 when it matches nothing, pipefail carries that out of the
+    # pipeline, and set -e kills the shell. So on 2026-10-29, the first build
+    # in which Qt actually came out of depends and wam-qt named no libQt5 at
+    # all, packaging died here -- at the moment the sentence above came true.
+    # The intent was right and the exit status was never handled: the block
+    # below already treats an empty list as "nothing to warn about", which is
+    # the correct behaviour it could not reach.
     QT_SONAMES="$(ldd "$WALLET_DIR/bin/wam-qt" 2>/dev/null \
-                  | grep -oE 'libQt5[A-Za-z]+\.so\.[0-9]+' | sort -u | tr '\n' ' ')"
+                  | grep -oE 'libQt5[A-Za-z]+\.so\.[0-9]+' | sort -u | tr '\n' ' ' || true)"
     if [ -n "$QT_SONAMES" ]; then
         NEEDS="
 WHAT THIS NEEDS ON YOUR MACHINE
@@ -515,10 +525,17 @@ fi
 
 REQ_GLIBC=0; REQ_GLIBCXX=0
 for b in $PORT_BINS; do
+    # `|| true` on all three, for the same reason the Qt line above needed it:
+    # grep exits 1 on no match, pipefail carries it, set -e kills the shell.
+    # The `${bg:-0}` defaults say plainly that the author expected an empty
+    # answer to be possible -- a binary with no versioned GLIBCXX symbol is an
+    # ordinary thing -- and the script would have died before reaching them.
+    # Latent only because every binary here happens to be C++; the first C one
+    # would have found it the hard way, in a release.
     bsyms="$(objdump -T "$b" 2>/dev/null \
-             | grep -oE 'GLIBCXX_[0-9.]+|GLIBC_[0-9.]+' | sort -u)"
-    bg="$(printf '%s\n' "$bsyms" | grep '^GLIBC_'   | vermax)"; bg="${bg:-0}"
-    bx="$(printf '%s\n' "$bsyms" | grep '^GLIBCXX_' | vermax)"; bx="${bx:-0}"
+             | grep -oE 'GLIBCXX_[0-9.]+|GLIBC_[0-9.]+' | sort -u || true)"
+    bg="$(printf '%s\n' "$bsyms" | grep '^GLIBC_'   | vermax || true)"; bg="${bg:-0}"
+    bx="$(printf '%s\n' "$bsyms" | grep '^GLIBCXX_' | vermax || true)"; bx="${bx:-0}"
     printf '  %-14s glibc %-8s GLIBCXX %s\n' "$(basename "$b")" "$bg" "$bx"
     [ "$(printf '%s\n%s\n' "$bg" "$REQ_GLIBC"   | sort -V | tail -1)" = "$bg" ] && REQ_GLIBC="$bg"
     [ "$(printf '%s\n%s\n' "$bx" "$REQ_GLIBCXX" | sort -V | tail -1)" = "$bx" ] && REQ_GLIBCXX="$bx"
