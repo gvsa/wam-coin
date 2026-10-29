@@ -98,6 +98,34 @@ command -v readelf >/dev/null 2>&1 || {
 . "$ROOT/scripts/lib/shared_deps.sh"
 BASE_ALLOWED="$SHARED_DEPS_BASE"
 
+# ASK THE QUESTION THE LOADER ASKS, NOT A QUESTION THAT RESEMBLES IT.
+#
+# The first version of "does the archive carry this?" searched the binary's
+# own directory. That is nearly right and fails on the one layout we ship:
+# wam-qt sits in bin/ and its seventeen libraries in lib/ beside it, so a
+# search rooted at bin/ finds none of them and the packaging step failed a
+# wallet that was correctly built -- on 2026-10-29, at the very last gate,
+# for the third time that afternoon.
+#
+# The honest question is whether the dynamic loader will find the file, and
+# the loader looks in RUNPATH/RPATH with $ORIGIN resolved to the directory
+# of the binary being loaded. So this reads that, exactly as ld.so does,
+# rather than guessing at a layout. A binary with no RPATH gets no answers
+# from it and falls through to the tree scan below, which is right for a
+# loose file with no archive around it.
+loader_finds() {
+    local f="$1" lib="$2" origin d
+    origin="$(cd "$(dirname "$f")" 2>/dev/null && pwd)" || return 1
+    while IFS= read -r d; do
+        [ -n "$d" ] || continue
+        d="${d//\$\{ORIGIN\}/$origin}"
+        d="${d//\$ORIGIN/$origin}"
+        [ -e "$d/$lib" ] && return 0
+    done < <(readelf -d "$f" 2>/dev/null \
+             | sed -n 's/.*R\(UN\)\?PATH.*\[\(.*\)\].*/\2/p' | tr ':' '\n')
+    return 1
+}
+
 # Only for wam-qt, only as a warning, and only these. See the header.
 #
 # This exists for a state that should no longer occur: Qt now comes out of
@@ -193,6 +221,8 @@ for f in "${FILES[@]}"; do
     while IFS= read -r lib; do
         [ -n "$lib" ] || continue
         if printf '%s' "$lib" | grep -qE "$BASE_ALLOWED"; then
+            carried="$carried $lib"
+        elif loader_finds "$f" "$lib"; then
             carried="$carried $lib"
         elif [ -n "$(find -L "$sibling_root" -name "$lib" -type f 2>/dev/null | head -1)" ]; then
             carried="$carried $lib"
