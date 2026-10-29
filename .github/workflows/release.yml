@@ -199,14 +199,29 @@ jobs:
           # a dependency that crept back in; something missing means a feature
           # was silently compiled out, and the wallet disappearing is not a
           # smaller problem than Kerberos reappearing.
+          # RE-PINNED FOR v0.1.13, AND THE REMOVALS ARE THE POINT.
+          #
+          # This list held libevent-2.1.so.7, libevent_core, libevent_pthreads
+          # and libsqlite3.so.0 -- correctly, because the binary really did ask
+          # a stranger's machine for them, and a clean Ubuntu does not have the
+          # first of those. That is the loader error Jeeves got on 18 October,
+          # one day after v0.1.12 was published.
+          #
+          # build_linux.sh links them from depends now, so they are gone, and
+          # the pin fired on their going: "the shared library set changed",
+          # with four minus signs and nothing added. Exactly what it is for --
+          # this check refuses a change in EITHER direction, because a library
+          # disappearing can mean a feature was silently compiled out, and that
+          # is not a smaller problem than one creeping in.
+          #
+          # What is left is the C library and its companions, which is the
+          # whole requirement now. Anything that joins this list again is a
+          # dependency that came back, and it will have to be put here by hand
+          # with a reason beside it.
           cat > /tmp/expected-libs <<'LIBS'
           libc.so.6
-          libevent-2.1.so.7
-          libevent_core-2.1.so.7
-          libevent_pthreads-2.1.so.7
           libgcc_s.so.1
           libm.so.6
-          libsqlite3.so.0
           libstdc++.so.6
           LIBS
           sed -i 's/^ *//' /tmp/expected-libs
