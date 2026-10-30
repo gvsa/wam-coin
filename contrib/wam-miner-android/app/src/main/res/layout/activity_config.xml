@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+    <!-- ========================================== -->
+    <!-- TOP BAR HEADLINE                           -->
+    <!-- ========================================== -->
+    <TextView
+        android:id="@+id/topBarTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#2196F3"
+        android:gravity="center"
+        android:padding="16dp"
+        android:text="MINER CONFIG"
+        android:textColor="#FFFFFF"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+    <TableLayout xmlns:tools="http://schemas.android.com/tools"
+        android:id="@+id/hwsection"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:padding="16dp"
+        android:stretchColumns="*">
+
+        <TableRow>
+
+            <TextView
+                android:id="@+id/config_hwinfo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="HWINFO here" />
+        </TableRow>
+    </TableLayout>
+
+    <TableLayout xmlns:tools="http://schemas.android.com/tools"
+        android:id="@+id/form"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:padding="16dp"
+        android:stretchColumns="*"
+        tools:context=".ConfigActivity"> <!-- Column 1 (Product Name) will stretch to fill extra space -->
+
+        <!-- Header Row -->
+        <TableRow
+            android:background="#DDDDDD"
+            android:padding="8dp">
+
+            <TextView
+                android:text="Parameter"
+                android:textStyle="bold" />
+
+            <TextView
+                android:text="Value"
+                android:textStyle="bold" />
+        </TableRow>
+
+        <!-- Data Row 1 -->
+        <TableRow android:padding="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:paddingEnd="16dp"
+                android:text="Stratum URL" />
+
+            <Spinner
+                android:id="@+id/poolChoices"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:dropDownWidth="wrap_content" />
+
+
+            <!--            <EditText-->
+            <!--                android:id="@+id/input_stratum"-->
+            <!--                android:layout_width="match_parent"-->
+            <!--                android:layout_height="wrap_content"-->
+            <!--                android:hint="Type something here..."-->
+            <!--                android:inputType="text" />-->
+        </TableRow>
+
+        <TableRow android:padding="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:paddingEnd="16dp"
+                android:text="Port" />
+
+            <Spinner
+                android:id="@+id/portChoices"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content" />
+
+            <!--            <EditText-->
+            <!--                android:id="@+id/input_port"-->
+            <!--                android:layout_width="match_parent"-->
+            <!--                android:layout_height="wrap_content"-->
+            <!--                android:hint="(example: 3333)"-->
+            <!--                android:inputType="text" />-->
+        </TableRow>
+
+
+        <TableRow android:padding="8dp">
+
+            <TextView
+                android:paddingEnd="16dp"
+                android:text="Wallet address" />
+
+            <EditText
+                android:id="@+id/input_address"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="wam1..."
+                android:inputType="text" />
+        </TableRow>
+
+
+        <TableRow android:padding="8dp">
+
+            <TextView
+                android:paddingEnd="16dp"
+                android:text="Worker Name/Alias" />
+
+            <EditText
+                android:id="@+id/input_worker"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="(optional)"
+                android:inputType="text" />
+        </TableRow>
+
+        <TableRow
+            android:gravity="center_vertical"
+            android:padding="8dp">
+
+            <TextView
+                android:paddingEnd="16dp"
+                android:text="No. of Cores" />
+
+            <LinearLayout
+                android:layout_width="10dp"
+                android:gravity="fill_horizontal"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/coreminus"
+                    android:layout_width="50dp"
+                    android:layout_height="wrap_content"
+                    android:text="-" />
+
+                <!-- Counter Display Box -->
+                <TextView
+                    android:id="@+id/input_cores"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="#EEEEEE"
+                    android:padding="10dp"
+                    android:text="1"
+                    android:textStyle="bold" />
+
+                <!-- Increment Button -->
+                <Button
+                    android:id="@+id/coreplus"
+                    android:layout_width="50dp"
+                    android:layout_height="wrap_content"
+                    android:text="+" />
+
+            </LinearLayout>
+            <!-- Decrement Button -->
+        </TableRow>
+
+        <!-- Divider Line using a plain View -->
+        <View
+            android:layout_height="2dp"
+            android:layout_marginVertical="8dp"
+            android:background="#CCCCCC" />
+
+        <!-- Summary Row (Spanning Columns) -->
+        <TableRow android:padding="10dp">
+
+            <Button
+                android:id="@+id/startmining"
+                android:layout_marginEnd="10dp"
+                android:text="Start Mining"
+                android:textAlignment="center" />
+
+            <Button
+                android:id="@+id/saveConfigBtn"
+                android:layout_marginStart="10dp"
+                android:text="Save Config"
+                android:textAlignment="center" />
+
+        </TableRow>
+
+        <TableRow>
+
+            <Button
+                android:id="@+id/startnativemining"
+                android:layout_weight="1"
+                android:text="Start Native Mining" />
+
+        </TableRow>
+    </TableLayout>
+</LinearLayout>
