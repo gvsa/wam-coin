@@ -102,6 +102,28 @@
  and this file does not list it, it is not us. That is the whole reason
  this file is signed: the list is what counts, never the name.
 
+ AND A SECOND NAME, SUSPENDED
+
+ github.com/wamcoin-core-dev was this project's GitHub source from
+ 2026-09-25, when revision 4 listed three copies, until 2026-10-29, when
+ GitHub suspended it. Nothing appearing under that name is this project's.
+ The source line above now reads github.com/wamcoin-Project/wam-coin, and
+ neither suspension touched the GitLab or the Gitea copy -- which is the
+ whole reason there are three.
+
+ Every post published in those thirty-four days carries the old name, and
+ they will keep carrying it. Those files are the record of what this project
+ said on the day it said it, and editing them so that a list agrees with
+ them would be the one dishonesty this file exists to prevent. A reader
+ holding one of them is holding a dead link, not an impostor's: the code is
+ at the three sources above and the downloads are at wamcoin.org.
+
+ Two accounts in five weeks. Revision 4 drew the lesson for the source code
+ and it is drawn again here, wider: a host account is not a home. The chain,
+ the site, the downloads and the signature on this file pass through none of
+ them, and the only names this project can be certain of keeping are the two
+ domains.
+
  A NAME HELD IN RESERVE
 
  wamcoin.net was registered on 27 September 2026 and serves nothing. It is
@@ -219,6 +241,30 @@
 
 
 ---------------------------------------------------------------------------
+ Revision 6 -- 2026-10-30
+   A second GitHub account lost, and named here at last.
+
+   github.com/wamcoin-core-dev was suspended on 29 October, five weeks after
+   github.com/wam-coin-official. The source line was corrected that same day
+   and this file re-signed -- and that was all. The list named the new
+   account and said nothing whatever about the old one, so the canonical
+   file sat silent about a name that thirty-four days of this project's own
+   posts still point at.
+
+   That silence is the fault revisions 2 and 3 were written for, running the
+   other way: those were channels of ours the list failed to claim, this was
+   a channel of ours the list failed to disown. Either one leaves a reader
+   unable to tell our property from an impostor's by reading the one file
+   that promises to tell him.
+
+   And it was found by hand, correcting a dead link on a mining pool's own
+   page, not by anything here. check_channels.py names one GitHub account in
+   its pattern and is blind to every other, so neither the dead name nor the
+   live one was ever visible to it, and gitea.com is absent from that pattern
+   altogether -- the third copy of the source has never been guarded at all.
+   That blindness is corrected alongside this revision, because a list this
+   file cannot check is a list that goes stale between signatures.
+
  Revision 5 -- 2026-09-27
    A second domain, wamcoin.net, named here while it is still empty.
 

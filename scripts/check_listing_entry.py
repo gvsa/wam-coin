@@ -183,13 +183,10 @@ def main():
             # One field is asked for and not ours to change, and the rest are
             # dangerous. They must not be reported the same way.
             #
-            # `links` holds the repository URL, and the live one still points
-            # at the account that was locked on 2026-09-24. It was reported to
-            # the maintainer on 2026-09-25 -- GLEECBTC/coins#2034, kept in
-            # posts/replies/cipig-2034.txt -- and only he can edit that file.
-            # A red that nobody here can clear is a red that teaches the
-            # reader to skip the line, which this project has already paid for
-            # once.
+            # `links` holds the repository URL and only that repository's
+            # maintainer can edit it. A red that nobody here can clear is a
+            # red that teaches the reader to skip the line, which this project
+            # has already paid for once.
             #
             # So it warns while it is waiting, AND STOPS WAITING. After
             # WAITING_ON_UNTIL it is a failure again, because "reported" is
@@ -197,8 +194,30 @@ def main():
             # field fails immediately: a wrong prefix, port or confirmation
             # count does not inconvenience a reader, it sends somebody's coins
             # nowhere.
+            #
+            # TWICE NOW, AND THE SECOND TIME THIS CHECK WAS THE ONLY WITNESS.
+            # The first time the live link named the account locked on
+            # 2026-09-24; it was reported in GLEECBTC/coins#2034, kept in
+            # posts/replies/cipig-2034.txt, and he changed it. On 2026-10-29
+            # that replacement account was suspended in turn, so the one venue
+            # where WAM actually trades went back to sending anyone who
+            # pressed "source" to a 404 -- and nothing but this line said so,
+            # on 2026-10-30.
+            #
+            # This time a pull request went instead of a comment:
+            # GLEECBTC/coins#2077, one line, +1/-1, approved and merged
+            # FIFTEEN MINUTES after it was opened.
+            #
+            # So the messages below name no pull request number. A number is
+            # true for one incident and a lie at the next, and this block
+            # exists because a check that lies stops being read -- it was
+            # already telling us to send a request we had just sent. What
+            # they name instead is the part that does not go stale: a
+            # one-line request to this repository has been merged twice now,
+            # the second time inside a quarter of an hour, so there is no
+            # case for sitting in a warning and asking again.
             WAITING_ON = {"links"}
-            WAITING_ON_UNTIL = "2026-10-05"
+            WAITING_ON_UNTIL = "2026-11-13"
             import datetime as _dt
             overdue = _dt.date.today().isoformat() > WAITING_ON_UNTIL
 
@@ -207,14 +226,13 @@ def main():
                     msg = (f"live entry disagrees with ours: {k} is {theirs!r} "
                            f"at GLEECBTC/coins and {ours!r} here")
                     if k in WAITING_ON and not overdue:
-                        warn(f"{msg} -- asked for on 2026-09-25 in "
-                             f"GLEECBTC/coins#2034; only that repository's "
-                             f"maintainer can change it. This becomes a "
-                             f"failure on {WAITING_ON_UNTIL}.")
+                        warn(f"{msg} -- only that repository's maintainer can "
+                             f"change it. This becomes a failure on "
+                             f"{WAITING_ON_UNTIL}.")
                     elif k in WAITING_ON:
-                        bad(f"{msg} -- asked for on 2026-09-25 and still not "
-                            f"changed. Ask again, or send the one-line pull "
-                            f"request instead of waiting.")
+                        bad(f"{msg} -- open a one-line pull request against "
+                            f"GLEECBTC/coins. Two have been merged there, the "
+                            f"second within fifteen minutes of opening.")
                     else:
                         bad(msg)
             else:

@@ -18,14 +18,14 @@ price.
 > I am asking for two things before then: people to run a node, and people to
 > read the consensus code.
 >
-> github.com/wam-coin-official/wam-coin
+> github.com/wamcoin-Project/wam-coin
 
 **Post 2**
 
 > Running a node takes about five minutes and costs nothing. The guide assumes
 > you have never done it:
 >
-> github.com/wam-coin-official/wam-coin/blob/main/docs/START_HERE.md
+> github.com/wamcoin-Project/wam-coin/blob/main/docs/START_HERE.md
 >
 > Testnet coins are worth nothing and never will be. That is the point — break
 > it now, while breaking it is free.
@@ -40,7 +40,7 @@ price.
 > cannot pay. What you get is an answer, credit, a fix, and the whole exchange
 > published:
 >
-> github.com/wam-coin-official/wam-coin/blob/main/SECURITY.md
+> github.com/wamcoin-Project/wam-coin/blob/main/SECURITY.md
 
 ---
 
@@ -55,13 +55,13 @@ price.
 >
 > وأطلب شيئين قبلها: من يُشغّل عقدة، ومن يقرأ شيفرة الإجماع.
 >
-> github.com/wam-coin-official/wam-coin
+> github.com/wamcoin-Project/wam-coin
 
 **منشور ٢**
 
 > تشغيل عقدة يأخذ خمس دقائق ولا يكلّف شيئاً. والدليل مكتوب لمن لم يفعلها قط:
 >
-> github.com/wam-coin-official/wam-coin/blob/main/docs/START_HERE_AR.md
+> github.com/wamcoin-Project/wam-coin/blob/main/docs/START_HERE_AR.md
 >
 > وعملات الاختبار لا تساوي شيئاً ولن تساوي. وهذا هو المقصود — اكسرها الآن، ما
 > دام كسرها مجانياً.
@@ -74,7 +74,7 @@ price.
 > ولم يُدفَع لأحد ليُدقّق تغييرات الإجماع. وهي الجزء الذي أريد أن يُقرأ أكثر من
 > غيره، وعليه مكافأة:
 >
-> github.com/wam-coin-official/wam-coin/blob/main/SECURITY.md
+> github.com/wamcoin-Project/wam-coin/blob/main/SECURITY.md
 
 ---
 

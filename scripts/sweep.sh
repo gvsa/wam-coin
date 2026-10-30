@@ -379,6 +379,14 @@ run "the channel list's signature is current"  bash scripts/check_channels_signe
 # our fingerprint to a shop in Moldova. Found by the founder pressing it.
 run "no filename reads as a domain"  "$PY" scripts/check_post_text.py
 
+# And whether it arrives shaped the way it was written. On 2026-10-30 a
+# correction posted to a pool operator's #wam channel came out with its
+# sentences broken in half on a phone: it was wrapped at 72 columns, like
+# everything here, and Discord keeps a single newline rather than joining it.
+# Every fact in that text was right and it still read badly. Found by the
+# founder, in the channel, after sending.
+run "the text renders as written"   "$PY" scripts/check_wrapping.py
+
 # Asked before a chain is started, not after. A consensus value that changes
 # once blocks exist invalidates every block mined under the old one, and the
 # running nodes are the last to notice.
