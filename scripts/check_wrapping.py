@@ -43,20 +43,48 @@
 #  and the wrap is the author's, so fences are skipped entirely. Commands,
 #  link blocks and hashes keep their shape.
 #
-#  WHICH CHANNELS, AND WHY NOT THE REST
+#  TWO RULES, BECAUSE THE CHANNELS DISAGREE WITH EACH OTHER
 #
-#  Discord, Telegram and X all preserve a single newline, so all three fail
-#  the same way and all three are checked.
+#  Discord, Telegram and X preserve a single newline, so a hand wrap survives
+#  and the reader gets the ragged output above. Rule: do not hand-wrap.
 #
-#  reddit.txt is NOT checked, and not because it is safe. Reddit's markdown
-#  does the OPPOSITE -- old Reddit JOINS lines separated by one newline, so a
-#  carefully wrapped paragraph arrives as one block. That is a different rule
-#  with a different fix and it needs its own measurement first; writing it
-#  here from a guess is how a check starts crying wolf.
+#  Reddit does the OPPOSITE. Old Reddit, and the markdown source itself, JOIN
+#  lines separated by one newline, the way standard markdown has always done,
+#  so a hand wrap DISAPPEARS. New Reddit's rich editor keeps it. The same
+#  bytes render two ways depending on where the reader happens to be, and
+#  that is not ours to choose.
 #
-#  bitcointalk.txt is not checked either. It is BBCode, read mostly on a
-#  desktop where a 72-column block renders as the tidy block it looks like
-#  here. The fault this script exists for is a phone fault.
+#  So Reddit's rule cannot be the inverse of the first one, because MOST of
+#  what joins ought to join: a wrapped paragraph rejoining into a paragraph
+#  is both correct markdown and the author's intent. Measured on 2026-10-30,
+#  each reddit.txt here has about thirteen runs of lines that old Reddit
+#  would join, and nearly all of them are paragraphs meant to be joined. A
+#  check that reported thirteen would be the check nobody reads.
+#
+#  What is checked is the one shape that is never a paragraph and always
+#  wrong: TWO OR MORE BARE URLS ON CONSECUTIVE LINES, with no list marker, no
+#  blank line and no two trailing spaces. Measured the same day:
+#
+# wam:quote-begin
+#      posts/bounty-address-validation/reddit.txt
+#        62-64  -> gitlab.com/... github.com/... gitea.com/...   one line
+#        66-67  -> wamcoin.org wamcoin.net                       one line
+#      posts/v0.1.10/reddit.txt
+#        none -- it put `* ` in front of each URL
+# wam:quote-end
+#
+#  One of the two got it right and the other did not, so the author decides
+#  this and not the format. And the block that collapses is the one block no
+#  post of this project is allowed to leave out -- the three homes and the
+#  two domains. The rule we never break is the one that renders wrong.
+#
+#  Any of three fixes keeps the lines apart in BOTH renderers: a list marker,
+#  a blank line, or two spaces at the end of the line.
+#
+#  bitcointalk.txt is not checked. It is BBCode, read mostly on a desktop
+#  where a 72-column block renders as the tidy block it looks like here. The
+#  first fault here is a phone fault and the second is a markdown fault, and
+#  BBCode has neither.
 #
 #  WHAT IT CANNOT CATCH, SAID PLAINLY
 #
@@ -79,9 +107,13 @@ import quoted  # noqa: E402  -- needs the path above
 
 GRN, RED, YLW, BLD, OFF = "\033[32m", "\033[31m", "\033[33m", "\033[1m", "\033[0m"
 
-# The channels that preserve a single newline. See the header for the two
-# that are deliberately absent.
-CHANNELS = ("discord.txt", "telegram.txt", "x.txt")
+# A single newline survives here, so a hand wrap reaches the reader.
+NEWLINE_KEPT = ("discord.txt", "telegram.txt", "x.txt")
+
+# A single newline is swallowed here, so lines that must stay apart merge.
+NEWLINE_JOINED = ("reddit.txt",)
+
+CHANNELS = NEWLINE_KEPT + NEWLINE_JOINED
 
 # ALREADY SENT, AND THEREFORE NOT EDITABLE.
 #
@@ -118,6 +150,16 @@ ENDS = re.compile(r"[.!?:;؟؛)\]\"'`*>]\s*$")
 LIST_MARK = re.compile(r"^\s*(?:\d+[.)]|[-*•])\s+")
 BARE_URL = re.compile(r"^\s*\S+://\S+\s*$")
 
+# A line that is nothing but a URL, with or without a scheme. `wamcoin.org`
+# alone on a line is one too, and that is half of the block that collapses.
+URL_ONLY = re.compile(r"^\s*(?:https?://)?[a-z0-9.-]+\.[a-z]{2,}(?:/\S*)?\s*$",
+                      re.I)
+
+# A list marker, a quote, an indented block and a fence all keep their line in
+# both renderers -- and so do two trailing spaces, which is markdown's own
+# hard break and the reason that is not treated as an accident here.
+KEEPS_ITS_LINE = re.compile(r"^\s*(?:[-*+>]|\d+[.)])\s+|^\s{4,}\S|^\s*```")
+
 
 def wrapped_lines(text):
     """[(line number, the line)] for every hand-wrapped prose line.
@@ -144,6 +186,33 @@ def wrapped_lines(text):
         if len(line.rstrip()) < MIN_WRAP or ENDS.search(line):
             continue
         out.append((i + 1, line.rstrip()))
+    return out
+
+
+def joined_lines(text):
+    """[(line number, the line)] for bare URLs Reddit would run together.
+
+    Runs of two or more only. One URL alone under a sentence joins onto that
+    sentence, which is ordinary markdown and ordinarily what was meant; three
+    repository URLs becoming one line is neither.
+    """
+    lines = quoted.strip_quoted(text).split("\n")
+    out, run, fence = [], [], False
+    for i, line in enumerate(lines):
+        if line.strip().startswith("```"):
+            fence = not fence
+            run = []
+            continue
+        if (not fence and URL_ONLY.match(line)
+                and not KEEPS_ITS_LINE.match(line)
+                and not line.endswith("  ")):
+            run.append((i + 1, line.strip()))
+            continue
+        if len(run) > 1:
+            out.extend(run)
+        run = []
+    if len(run) > 1:
+        out.extend(run)
     return out
 
 
@@ -191,9 +260,12 @@ def main():
             text = (ROOT / rel).read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        hits = wrapped_lines(text)
+        if rel.rsplit("/", 1)[-1] in NEWLINE_KEPT:
+            hits, kind = wrapped_lines(text), "hand-wrapped"
+        else:
+            hits, kind = joined_lines(text), "runs together"
         if hits:
-            bad[rel] = hits
+            bad[rel] = (kind, hits)
         else:
             clean += 1
 
@@ -201,20 +273,30 @@ def main():
           f"are exempt ({exempt} files)")
 
     if bad:
-        total = sum(len(v) for v in bad.values())
-        print(f"  {RED}FAIL{OFF}  {total} hand-wrapped line(s) in {len(bad)} text(s)")
-        for rel, hits in sorted(bad.items()):
-            print(f"          {rel}")
+        total = sum(len(h) for _, h in bad.values())
+        kinds = {k for k, _ in bad.values()}
+        print(f"  {RED}FAIL{OFF}  {total} line(s) in {len(bad)} text(s) would not "
+              f"reach the reader as written")
+        for rel, (kind, hits) in sorted(bad.items()):
+            print(f"          {rel}  --  {kind}")
             for n, line in hits[:3]:
                 print(f"            :{n}  {line[:58]}...")
             if len(hits) > 3:
                 print(f"            ... and {len(hits) - 3} more")
         print()
-        print("        Discord, Telegram and X keep a single newline, so these")
-        print("        go out at this width and the phone wraps them again:")
-        print("        long line, short remainder, long line.")
-        print("        One paragraph, one line. Keep the wrap inside ``` only.")
-        print()
+        if "hand-wrapped" in kinds:
+            print("        Discord, Telegram and X keep a single newline, so these")
+            print("        go out at this width and the phone wraps them again:")
+            print("        long line, short remainder, long line.")
+            print("        One paragraph, one line. Keep the wrap inside ``` only.")
+            print()
+        if "runs together" in kinds:
+            print("        Reddit joins lines one newline apart, so these URLs")
+            print("        arrive as a single line with the next one behind them.")
+            print("        Put `* ` in front of each, or a blank line between, or")
+            print("        two spaces at the end -- any of the three holds in both")
+            print("        of Reddit's renderers.")
+            print()
         return 1
 
     if clean == 0:
@@ -223,7 +305,7 @@ def main():
         print()
         return 0
 
-    print(f"  {GRN}ok{OFF}    {clean} unsent text(s) wrap nothing by hand")
+    print(f"  {GRN}ok{OFF}    {clean} unsent text(s) pass both rules")
     print()
     print(f"  {GRN}{BLD}what we wrote is what the reader will see{OFF}\n")
     return 0
