@@ -86,3 +86,22 @@ consensus source and is unchanged by v0.1.7, v0.1.8 or v0.1.9.
 The older releases are dropped from `versions` deliberately. They still sync
 mainnet — the consensus floor is v0.1.5 — but v0.1.6 predates launch, and a
 list is a recommendation to somebody deciding what to install.
+
+## Where it stands
+
+Reopened as [`#200`](https://github.com/blocknetdx/blockchain-configuration-files/pull/200)
+on 30 October 2026, from `wamcoin-Project/blockchain-configuration-files`,
+branch `add-wam-coin`.
+
+The history is three numbers for one submission. `#197` carried the v0.1.6
+files and was superseded by `#199` on 28 September, after the first account
+closed; `#199` carried the v0.1.10 files and went down with the account that
+pushed it on 29 October. `#200` is `#199`'s own two commits, fetched back out of
+`refs/pull/199/head` and verified byte for byte against the conf files here,
+plus one commit naming v0.1.11 and v0.1.12 in `versions`. Both of those
+shipped after `#199` was opened and the downloads page serves them; v0.1.13 is
+built but not released, so it is not named.
+
+Measured the day it was reopened rather than recalled: 247 conf files in
+`xbridge-confs`, 245 of them `Confirmations=0`, one `1`, and ours the only
+`15`. Actions are disabled on the fork.

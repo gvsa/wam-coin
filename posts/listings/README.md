@@ -1,18 +1,52 @@
 # Where every listing request stands
 
-Measured from the GitHub API on 2026-09-19, not recalled. Nine requests were
-opened; this is what became of them and what, if anything, is owed.
+Measured from the GitHub API on 2026-09-19, and the three rows that moved
+re-measured on 2026-10-30, not recalled. Nine requests were opened; this is
+what became of them and what, if anything, is owed.
 
 | repo | # | state | what happened |
 |---|---|---|---|
 | satoshilabs/slips | 2051 | **merged** | coin type 5718349 and prefixes wam/twam/wamrt, 26 August |
-| blocknetdx/blockchain-configuration-files | 197 | **open** | tryiou is folding it into a cleanup batch and said he will bump us |
-| KomodoPlatform/coins | 21 | **open** | no comments at all since 29 August |
+| blocknetdx/blockchain-configuration-files | 197 → 199 → **200** | **open** | 197 superseded by 199 when the first account closed; 199 went down with the account that pushed it; recovered and reopened as #200 on 30 October |
+| MetacoSA/NBitcoin | 1362 → **1369** | **open** | opened 19 October, went down with the account that pushed it, recovered and reopened as #1369 on 30 October |
+| KomodoPlatform/coins | 21, 23 | gone, not reopened | the obsolete mirror. Its maintainer confirmed on 1 October that GLEEC's registry replaced it, and WAM is already merged there |
 | GLEECBTC/coins | 1975 → **2034** | **MERGED 2026-09-22** | cipig fixed the conflicts himself, opened #2034, ran the first WAM swap and merged it. WAM is live on dex.gleec.com. #1975 closed as superseded |
 | basicswap/basicswap | 701 | closed | "Mainnet is scheduled for 2026-09-15" — a deferral, not a refusal |
 | bisq-network/bisq | 8030 | closed | he could not find the project — only the BEP-20 gaming token — and the ticker conflicts with it |
 | haveno-dex/haveno | 2528 | closed | "We only consider coins with market traction / price" — the only market condition anyone set |
 | bisq #8028, haveno #2527 | | closed | replaced by our own later PRs, no comments, not refusals |
+
+## A suspended account takes its pull requests down — and the venue keeps the commits
+
+On 29 October 2026 the account that had pushed every one of these submissions
+was suspended. A suspended account's pull requests return 404 to everyone, in
+other people's repositories, merged ones included, and GitHub's search refuses
+the author outright (HTTP 422, *the listed users cannot be searched*). Two
+reviews that were open — blocknetdx #199 and NBitcoin #1362 — simply vanished
+from the world while the maintainers were still looking at them.
+
+What survived: **a pull request's commits live in the repository it was opened
+against, not in the fork it was pushed from.** GitHub keeps them under
+`refs/pull/<n>/head`, and that ref outlives the fork's deletion and its owner's
+suspension.
+
+    git clone https://github.com/blocknetdx/blockchain-configuration-files.git
+    git fetch origin refs/pull/199/head:pr199
+
+Both came back whole — every commit, message and author — so the resubmissions
+are the same commits pushed from `wamcoin-Project`, not rewrites from memory.
+Checked before trusting them: each branch still merged cleanly onto the current
+master, and the Block DX conf files were byte for byte what `integration/blockdx/`
+holds. The only thing added was one commit naming v0.1.11 and v0.1.12 in the
+manifest, both shipped since #199 was opened.
+
+Merged work was never at risk: the lines stay in the files whatever becomes of
+the author. `slip-0044.md`, `slip-0173.md` and GLEEC's `coins` all still carry
+WAM.
+
+**Actions are disabled on both forks.** No build of this project runs on GitHub
+again, so a fork carrying somebody else's workflows gets them switched off
+before a branch is pushed to it.
 
 ## GLEEC is done — merged 2026-09-22, and WAM is live on dex.gleec.com
 

@@ -69,10 +69,10 @@ venues() {
 slips          satoshilabs/slips                          slips                           add-wam-coin  2051
 bisq           bisq-network/bisq                          bisq                            add-wam-coin  8030
 haveno         haveno-dex/haveno                          haveno                          add-wam-coin  2528
-blockdx        blocknetdx/blockchain-configuration-files   blockchain-configuration-files  add-wam-coin  197
+blockdx        blocknetdx/blockchain-configuration-files   blockchain-configuration-files  add-wam-coin  200
 basicswap      basicswap/basicswap                        basicswap                       add-wam-coin  701
 komodo         GLEECBTC/coins                             coins                           add-wam-coin-gleec  1975
-komodo-mirror  KomodoPlatform/coins                       coins                           add-wam-coin  21
+komodo-mirror  KomodoPlatform/coins                       coins                           add-wam-coin  23
 V
 }
 
@@ -91,8 +91,8 @@ WAMCoinTest.java  assets/src/test/java/haveno/asset/coins/WAMCoinTest.java
 L
         ;;
     blockdx) cat <<'L'
-xbridge-confs/wam--v0.1.6.conf      xbridge-confs/wam--v0.1.6.conf
-wallet-confs/wam--v0.1.6.conf       wallet-confs/wam--v0.1.6.conf
+xbridge-confs/wam--v0.1.10.conf     xbridge-confs/wam--v0.1.10.conf
+wallet-confs/wam--v0.1.10.conf      wallet-confs/wam--v0.1.10.conf
 L
         ;;
     basicswap) cat <<'L'
