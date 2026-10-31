@@ -159,7 +159,7 @@ public class MinerNativeService extends Service {
         return new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("WAM Native Core Active")
                 .setContentText("Connected: " + stratum + ":" + port)
-                .setSmallIcon(R.mipmap.wamcoin)
+                .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentIntent(contentPendingIntent)
                 .setOngoing(true)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
