@@ -151,6 +151,21 @@ run "repository self-agreement"  bash scripts/audit_repo.sh
 # The backlog stays until a change that rewrites history anyway; this only
 # guarantees the backlog does not grow.
 run "no assistant attribution"   "$PY" scripts/check_attribution.py
+
+# The one thing that has actually cost this project an account. On 2026-09-24
+# a step in platform-build.yml mined two regtest blocks on a GitHub runner;
+# suspended within the hour, and the repository, every download and the whole
+# site answered 404 to the public on a release day. The step was fixed the
+# same day and nothing has enforced it since. Building on CI is not the
+# fault and never was -- the line is between work and PROOF of work.
+run "nothing of ours hashes on CI" "$PY" scripts/check_ci_mining.py
+
+# And the second account, on 2026-10-29. GitHub sent no reason; the founder
+# watched the cause happen -- a workflow started, failed, and was started
+# again, once, twice, three times, with nothing changed between the runs.
+# Their fourth Actions term is the words for it: a burden "disproportionate
+# to the benefits provided to users". This counts; it cannot stop a click.
+run "a failure is read, not repeated" "$PY" scripts/check_ci_reruns.py
 run "mention is not use"         "$PY" scripts/check_mentions.py
 
 # And the library those checks lean on. A quotation mark that opens a region

@@ -137,12 +137,46 @@ fi
 names="$(printf '%s' "$index" | grep -oE 'href="[^"]+"' | cut -d'"' -f2)"
 echo "  release: $tag"
 
+# A NAME MISSING FROM THE INDEX IS NOT A FILE THAT IS NOT THERE.
+#
+# On 2026-10-31 at 11:00 UTC one of the two hosts behind wamcoin.org answered
+# this directory with 200 and a body that passed the test above -- it linked
+# archives -- and did not contain SHA256SUMS. So the watcher told Telegram
+# "the download cannot be verified by anyone" and advised setting the release
+# back to Draft.
+#
+# It was published the whole time. The other two hosts running the same
+# watcher never saw anything wrong, and this one recovered by itself on the
+# next cycle, ten minutes later. Four separate runs afterwards -- the laptop
+# and all three hosts -- verified it, and both addresses behind the domain
+# served the same twelve links.
+#
+# The index is a convenience. The file is the fact. So a name absent from the
+# listing is asked for directly before anything is said about it, and only a
+# 404 may mean absent. Anything else is exit 2, which the watcher reads as
+# "could not ask" and stays silent about -- the same distinction the index
+# fetch above already makes, carried one step further.
 for want in SHA256SUMS SHA256SUMS.asc; do
     if printf '%s\n' "$names" | grep -qx "$want"; then
         ok "$want is published"
-    else
-        bad "$want is NOT published -- the download cannot be verified by anyone"
+        continue
     fi
+    code="$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' \
+            "$DOWNLOADS/$tag/$want" 2>/dev/null)"
+    case "$code" in
+        200)
+            ok "$want is published (the directory index did not list it)"
+            ;;
+        404|410)
+            bad "$want is NOT published -- the download cannot be verified by anyone"
+            ;;
+        *)
+            warn "$want is not in the index, and asking the server for it"
+            warn "directly answered HTTP ${code:-none}. A file is not called"
+            warn "missing on that."
+            echo; exit 2
+            ;;
+    esac
 done
 [ "$fails" -gt 0 ] && { echo; printf '  %s%d problem(s)%s\n\n' "$RED" "$fails" "$OFF"; exit 1; }
 
