@@ -118,13 +118,43 @@ NOT_A_VALIDITY_RULE = (
 # from the other direction: the guard could not distinguish a line changing
 # from behaviour changing, and a human agreed with it against the evidence.
 #
-# KEYED BY TAG, deliberately. If enforce_BIP94 is ever genuinely changed --
-# false to true on a live network -- that is a hard fork and the floor must
-# move. An exemption that covered the field forever would hide it. This one
-# covers one field in one release, and the next release carrying a different
-# value for it fingerprints differently and moves the floor as it should.
+# KEYED BY THE VALUE, NOT BY THE TAG.
+#
+# It was keyed by tag -- {"v0.1.12": ("enforce_BIP94",)} -- so the field was
+# dropped from v0.1.12's fingerprint and present in v0.1.13's. Nothing about
+# the field changed between them: src/wam/chainparams.cpp is byte for byte
+# identical at the two tags. The EXEMPTION lapsing is what made the two
+# fingerprints differ, so on 2026-10-31 release.yml refused to publish
+# v0.1.13 with "changes a consensus value and its tag has no MANDATORY:
+# line", and the value it was pointing at had not moved since before v0.1.12.
+#
+# An exemption that expires after one tag reports the release AFTER it as the
+# change. That is the same cry-wolf this block was written to end, moved one
+# release later.
+#
+# So the field is dropped while it still carries the value recorded here, and
+# at no other time. `= true` is never dropped, whatever tag it is at, and
+# nothing has to be remembered at the next tag.
+#
+# AND A HOLE THIS DID NOT MAKE, FOUND WHILE PROVING IT, WHICH IS OLDER.
+#
+# chainparams.cpp assigns enforce_BIP94 three times -- false on mainnet,
+# false on testnet, true on regtest, which is upstream's own value there.
+# The fingerprint is a set of DISTINCT normalised value lines and not a value
+# per network, so `consensus.enforce_BIP94 = true` is already in it because
+# of regtest. Setting mainnet's to true would therefore add a line the set
+# already holds, and the floor would not move -- the hard fork this file
+# exists to catch, invisible to it.
+#
+# That is true with this exemption and was true without it; proved by setting
+# the mainnet line to true and watching the fingerprint not change. It is not
+# fixed here because fixing it means keying every value by the network that
+# assigns it, which is a change to the definition of a consensus fingerprint
+# and not a thing to do in the middle of cutting a release.
+# scripts/check_consensus_params.py reads the fields directly and is the
+# other guard over the same ground.
 ASSIGNED_NOT_CHANGED = {
-    "v0.1.12": ("enforce_BIP94",),
+    "enforce_BIP94": "false",
 }
 
 
@@ -168,10 +198,13 @@ def fingerprint_text(chainparams, params, tag=None):
             # regular expression was tightened to exclude a different one.
             if any(("." + f) in v for f in NOT_A_VALIDITY_RULE):
                 continue
-            # The field is a validity rule; this release did not change what
-            # it decides. Scoped to one tag, so a later release that really
-            # changes it still moves the floor. See ASSIGNED_NOT_CHANGED.
-            if any(("." + f) in v for f in ASSIGNED_NOT_CHANGED.get(tag, ())):
+            # The field is a validity rule and it still carries the value it
+            # was assigned, so no release has changed what it decides. The
+            # moment it carries a different one it falls through to the list
+            # below and the floor moves. See ASSIGNED_NOT_CHANGED.
+            if any(("." + f) in v
+                   and re.search(r"=\s*" + re.escape(val) + r"\s*;?\s*$", v)
+                   for f, val in ASSIGNED_NOT_CHANGED.items()):
                 continue
             values.append(v)
 
