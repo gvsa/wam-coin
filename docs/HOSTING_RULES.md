@@ -10,16 +10,24 @@ repository, every release download, `raw.githubusercontent.com` and
 worthless and the intent was a correctness proof. Neither is visible to an
 abuse detector.
 
-**2026-10-29.** The replacement account was suspended. **No reason was given
-and no message was sent.** That is still true.
+**2026-10-29.** The replacement account was suspended. GitHub sent no message
+and gave no reason — but the reason was watched happening. A workflow was
+started, it failed, and it was started again. Once, twice, three times, with
+nothing changed between the runs. That is the fourth item in their Actions
+list, word for word: a burden *"disproportionate to the benefits provided to
+users"*. Nothing new could come out of a repeated run, and a detector counts
+runs and cannot see an intention.
 
-And on **2026-10-31** the gap where the second reason should be was filled
-with a guess — that building on CI had caused it — a rule was built on the
-guess, and the release pipeline was nearly deleted to honour it. The answer to
-the first suspension had been sitting in this repository the whole time, in
-the comment above the step that caused it.
+And on **2026-10-31**, before that had been said aloud, the gap was filled
+here with a different guess — that building on CI had caused it — a rule was
+built on the guess, and the release pipeline was nearly deleted to honour it.
 
-So: read what they actually forbid, write it down, and stop inventing.
+**Both answers were already held by somebody.** The first was in this
+repository, in the comment above the step that caused it. The second was in
+the founder's memory, and nobody asked him.
+
+So: read what they forbid, ask what was seen, write both down, and stop
+inventing.
 
 ## What GitHub forbids in Actions
 
@@ -92,9 +100,14 @@ reason.
    forbid it, but because a burden "disproportionate to the benefits provided
    to users" is judged by them and not by us, and that is a judgement not
    worth standing under.
-7. **If an account is suspended, appeal, and write the answer here.** Both
-   suspensions were survived by guessing. A guess is how a rule gets invented
-   that costs more than the fault did.
+7. **A failing job is read, not repeated.** The log is read, the failure is
+   reproduced on a machine of ours — `build_linux.sh`, `build_windows.sh` and
+   the test scripts all run without a runner — fixed, and run again once.
+   A single retry for a genuine flake is a retry; the third run of one
+   workflow against one commit is what was being done when the second account
+   went. *Counted by `scripts/check_ci_reruns.py`, in the sweep. It cannot
+   stop the click. It reads the count before the next release instead of
+   after the next suspension.*
 
 ## The account itself
 
@@ -103,7 +116,7 @@ Measured 2026-10-31 against `wamcoin-Project`:
 | | state | |
 |---|---|---|
 | organisation 2FA requirement | **off** | should be on |
-| owners | **one** | if that account goes, the organisation goes with it |
+| owners | **one** | one pair of hands — and no defence at all against the organisation itself being suspended |
 | default repository permission | read | correct |
 | Actions on our own repository | disabled | a setting, not a guarantee — rule 1 is the guarantee |
 
@@ -111,14 +124,42 @@ Two-factor authentication on the account itself cannot be read with the token
 this project uses, which is correct: the token has `repo`, `workflow`,
 `read:org` and `gist`, and `gist` is not used by anything here.
 
-**The single owner is the same shape of fault as the single source
-repository was before revision 4 of `CHANNELS.txt`, and as the single domain
-was before revision 5.** It has not been fixed here because adding an owner is
-a decision about a person, not about infrastructure.
+**An owner is not a way back, and the first draft of this file implied that
+it was.** The failure that has happened twice is not "the person holding the
+account was lost". It is the account, and everything under it, being
+suspended in one motion. **An organisation with ten owners that is itself
+suspended is suspended.** Nothing held inside a host defends against the
+host.
 
-## What is still not known
+What does defend against it is already built, and it has now worked twice:
+the repository is published at three companies, and each suspension took one
+of the three. GitLab and Gitea were untouched on both days, and the signed
+`CHANNELS.txt` sends people to a domain rather than to any account.
 
-Why the second account was suspended. GitHub sent nothing, and the
-reinstatement and appeal form is the only thing that can answer it. Until it
-does, **nothing in this file claims to explain 2026-10-29**, and no rule here
-is justified by it.
+So a second owner is worth having for two smaller and truer reasons. One: a
+person can be unreachable, ill, or away, and a single pair of hands is a
+single point of failure in time rather than in infrastructure. Two, and
+larger: a project that says a coin must not sit in few hands cannot answer
+for a repository that sits in one.
+
+The founder's decision, 2026-10-31: **a second owner when a developer has
+built something and proved himself**, and the wallet now being written is
+that proof. Not a title handed out in advance.
+
+## What was decided, and what is not known
+
+**No appeal.** GitHub's reinstatement form exists and the founder's judgement
+on 2026-10-31 was that it returns the same letter and reopens nothing. The
+answer the appeal would have been asked for is already in this file, from
+somebody who saw it. If they reopen an account unasked, that is their
+business.
+
+**A way back exists.** There is a second account, held separately. The rule
+that matters is 5: a second account is never made to get around a suspension
+— it is there so that a lost account does not end the project, and the signed
+`CHANNELS.txt` is what says which name is ours.
+
+**Still not known:** nothing that changes a rule here. GitHub never stated a
+cause for 2026-10-29, and this file does not pretend their silence is
+agreement — it records what was observed, says who observed it, and leaves
+the two apart.
