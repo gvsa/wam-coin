@@ -146,13 +146,18 @@ NOT_A_VALIDITY_RULE = (
 # already holds, and the floor would not move -- the hard fork this file
 # exists to catch, invisible to it.
 #
-# That is true with this exemption and was true without it; proved by setting
-# the mainnet line to true and watching the fingerprint not change. It is not
-# fixed here because fixing it means keying every value by the network that
-# assigns it, which is a change to the definition of a consensus fingerprint
-# and not a thing to do in the middle of cutting a release.
-# scripts/check_consensus_params.py reads the fields directly and is the
-# other guard over the same ground.
+# That was true with this exemption and without it, and it was deferred once
+# -- "not a thing to do in the middle of cutting a release" -- which was the
+# right call for about four hours. The sweep run straight after v0.1.13
+# published then reported that 24 of 75 independent operators "will reject
+# every valid block and fork off at height 1" on MAINNET, because of that
+# regtest line. The same false sentence had already gone to every channel
+# once, in v0.1.12's MANDATORY line.
+#
+# It is fixed now, below, where the values are read: each is keyed by the
+# network class that assigns it, and regtest is left out of the floor
+# entirely. Proved both ways -- setting MAINNET's line to true changes the
+# fingerprint, and setting REGTEST's to false does not.
 ASSIGNED_NOT_CHANGED = {
     "enforce_BIP94": "false",
 }
@@ -188,9 +193,51 @@ def fingerprint_text(chainparams, params, tag=None):
     # the value itself.
     text = re.sub(r"/\*(?!nNonce=).*?\*/", " ", chainparams, flags=re.S)
     text = re.sub(r"//[^\n]*", "", text)
+    # EVERY VALUE IS KEYED BY THE NETWORK THAT ASSIGNS IT.
+    #
+    # Without this the fingerprint is a set of distinct value LINES, so one
+    # network's value hides another's. chainparams assigns enforce_BIP94
+    # false on mainnet, false on testnet and true on regtest -- upstream's own
+    # value there -- and on 2026-10-31 that single regtest line was the ONLY
+    # difference between v0.1.11's fingerprint and v0.1.12's. The floor moved
+    # to v0.1.12, and the sweep told us that 24 of 75 independent operators
+    # "will reject every valid block and fork off at height 1" on MAINNET,
+    # because of a value in a local test chain that each of them creates from
+    # scratch.
+    #
+    # That is the second telling of the same false sentence. The first went to
+    # every channel with v0.1.12's MANDATORY line and was wrong for 49 of the
+    # 50 operators then online.
+    #
+    # REGTEST IS EXCLUDED FROM THE FLOOR, and that is a decision with a reason
+    # rather than a convenience: regtest has no shared history. Whoever runs
+    # it mines block 1 himself, so no rule there can put him on the wrong side
+    # of a chain somebody else is already on -- which is the only thing this
+    # floor exists to measure. Mainnet and testnet both stay in; both are
+    # shared, and a node can be forked off either.
+    #
+    # A regtest-only consensus change is therefore invisible here, and must
+    # be: scripts/check_consensus_params.py reads the fields directly and is
+    # the guard over that ground.
+    bounds = [(m.start(), m.group(1))
+              for m in re.finditer(r"class\s+(C\w*Params)\b", text)]
+
+    def network_of(pos):
+        name = "?"
+        for start, cls in bounds:
+            if start <= pos:
+                name = cls
+            else:
+                break
+        return name
+
     for pat in CHAINPARAMS_PATTERNS:
-        for m in re.findall(pat, text):
-            v = re.sub(r"\s+", " ", m).strip()
+        for mo in re.finditer(pat, text):
+            net = network_of(mo.start())
+            if net in ("CRegTestParams", "CUnusedNetParams"):
+                continue
+            m = mo.group(1) if mo.groups() else mo.group(0)
+            v = net + ": " + re.sub(r"\s+", " ", m).strip()
             # See NOT_A_VALIDITY_RULE. Dropped after matching rather than by
             # narrowing the pattern, so that `consensus.` still catches every
             # field by default and an exception has to be named and argued
