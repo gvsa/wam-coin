@@ -300,36 +300,6 @@ public class ConfigActivity extends AppCompatActivity {
             }
         });
 
-        findViewById(R.id.startmining).setOnClickListener(view -> {
-            Intent intent = new Intent(ConfigActivity.this, MinerActivity.class);
-            intent.putExtra("CONFIG", configObject);
-            startActivity(intent);
-        });
-
-        // ========================================================
-        // ADD THIS: 3rd Button Trigger for Launching Native Mining
-        // ========================================================
-//        findViewById(R.id.startnativemining).setOnClickListener(view -> {
-//            if (configObject == null) {
-//                Toast.makeText(ConfigActivity.this, "Please configure/save settings before launching native engine.", Toast.LENGTH_SHORT).show();
-//                return;
-//            }
-//
-//            // Target the new service interface cleanly
-//            Intent serviceIntent = new Intent(ConfigActivity.this, MinerNativeService.class);
-//            serviceIntent.setAction(MinerNativeService.ACTION_START_NATIVE);
-//            serviceIntent.putExtra("CONFIG", configObject);
-//
-//            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-//                startForegroundService(serviceIntent);
-//            } else {
-//                startService(serviceIntent);
-//            }
-//
-//            // Redirect view loops smoothly to your log viewing screen
-//            Intent activityIntent = new Intent(ConfigActivity.this, MinerActivity.class);
-//            startActivity(activityIntent);
-//        });
         findViewById(R.id.startnativemining).setOnClickListener(view -> {
             if (configObject == null) return;
 
@@ -339,11 +309,7 @@ public class ConfigActivity extends AppCompatActivity {
             serviceIntent.setAction(MinerNativeService.ACTION_START_NATIVE);
             serviceIntent.putExtra("CONFIG", configObject);
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(serviceIntent);
-            } else {
-                startService(serviceIntent);
-            }
+            startForegroundService(serviceIntent);
 
             // 2. Open the newly added dedicated Logs Terminal canvas view instantly
             Intent logsIntent = new Intent(ConfigActivity.this, LogsActivity.class);
