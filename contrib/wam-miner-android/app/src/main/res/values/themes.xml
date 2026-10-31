@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources xmlns:android="http://android.com" xmlns:tools="http://android.com">
+<resources>
 
     <!-- Base application theme inheriting from backport-safe layout grids -->
     <style name="Base.Theme.WAMMiner" parent="Theme.AppCompat.Light.NoActionBar">

@@ -8,6 +8,7 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.Build;
 import android.os.IBinder;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
@@ -29,7 +30,6 @@ public class MinerNativeService extends Service {
     private Timer statReportingTimer;
     private long lastHashCount = 0;
 
-    // FIX: Decoupled independent private object lock to isolate text buffer updates from thread block contention
     private final Object logBufferLock = new Object();
     private final StringBuilder logBuffer = new StringBuilder();
 
@@ -51,7 +51,6 @@ public class MinerNativeService extends Service {
 
     @androidx.annotation.Keep
     public void dispatchNativeLogToUI(String rawMessage) {
-        // FIX: Synchronize strictly on the local variable object block instead of the parent service context
         synchronized (logBufferLock) {
             logBuffer.append(rawMessage).append("\n");
         }
@@ -84,9 +83,15 @@ public class MinerNativeService extends Service {
 
             executeNativeMinerPipeline(config);
         } else if (action.equalsIgnoreCase(ACTION_STOP_NATIVE)) {
+            Log.i(TAG, "Termination request processed. Broadcasting system signals down to windows.");
+
+            // 1. Broadcast the quit message so LogsActivity drops closed automatically if running
+            Intent syncQuitIntent = new Intent(ACTION_STOP_NATIVE);
+            sendBroadcast(syncQuitIntent);
+
+            // 2. Tear down the persistent notification canvas
             stopForeground(true);
             stopSelf();
-            android.os.Process.killProcess(android.os.Process.myPid());
         }
 
         return START_NOT_STICKY;
@@ -123,7 +128,6 @@ public class MinerNativeService extends Service {
                         hashrate, accepted, rejected, totalHashes);
 
                 String combinedPayload;
-                // FIX: Swap class-wide structural monitoring monitor loop with local context access hook
                 synchronized (logBufferLock) {
                     logBuffer.append(statsLine).append("\n");
                     combinedPayload = logBuffer.toString();
@@ -138,11 +142,8 @@ public class MinerNativeService extends Service {
     }
 
     private Notification buildForegroundNotification(String stratum, int port) {
-        Intent notificationIntent = new Intent(this, MinerNativeActivity.class);
+        Intent notificationIntent = new Intent(this, LogsActivity.class);
         notificationIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-
-        Intent quitIntent = new Intent(this, MinerNativeService.class);
-        quitIntent.setAction(ACTION_STOP_NATIVE);
 
         int pendingIntentFlags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -150,7 +151,10 @@ public class MinerNativeService extends Service {
         }
 
         PendingIntent contentPendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, pendingIntentFlags);
-        PendingIntent quitPendingIntent = PendingIntent.getService(this, 1, quitIntent, pendingIntentFlags);
+
+        // Map notification quit click directly into the system broadcast target engine
+        Intent broadcastQuitIntent = new Intent(ACTION_STOP_NATIVE);
+        PendingIntent quitPendingIntent = PendingIntent.getBroadcast(this, 1, broadcastQuitIntent, pendingIntentFlags);
 
         return new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("WAM Native Core Active")
@@ -175,24 +179,19 @@ public class MinerNativeService extends Service {
 
     @Override
     public void onDestroy() {
-        // 1. Instantly kill the UI timer loop to prevent concurrent buffer access
         if (statReportingTimer != null) {
             statReportingTimer.cancel();
             statReportingTimer = null;
         }
 
-        // 2. Clear out remaining logs safely
         synchronized (logBufferLock) {
             logBuffer.setLength(0);
         }
 
-        // 3. Execute termination safely. Since your C++ terminate handles its own internal
-        // thread joins smoothly, calling it on the main thread ensures that the JNI Environment
-        // mapping parameters (env) match a valid, surviving thread lifecycle frame.
         try {
             terminateNativeEngine();
         } catch (Exception e) {
-            android.util.Log.e(TAG, "Error cleaning native execution context: " + e.getMessage());
+            Log.e(TAG, "Error cleaning native execution context: " + e.getMessage());
         }
 
         super.onDestroy();

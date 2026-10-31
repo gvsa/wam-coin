@@ -1,7 +1,6 @@
 package org.vslabs.wam_miner;
 
 import android.content.Intent;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -143,7 +142,7 @@ public class ConfigActivity extends AppCompatActivity {
         }
 
 
-        txt = (TextView) findViewById(R.id.input_cores);
+        txt = findViewById(R.id.input_cores);
         txt.setText("1");
 
         // Add the text change listener
@@ -305,7 +304,8 @@ public class ConfigActivity extends AppCompatActivity {
 
             // 1. Kick off the background high-priority Native Foreground Service tree pass
             Intent serviceIntent = new Intent(ConfigActivity.this, MinerNativeService.class);
-            if(configObject.name!=null && !configObject.name.isEmpty()) configObject.address = configObject.address+"."+configObject.name;
+            if (configObject.name != null && !configObject.name.isEmpty())
+                configObject.address = configObject.address + "." + configObject.name;
             serviceIntent.setAction(MinerNativeService.ACTION_START_NATIVE);
             serviceIntent.putExtra("CONFIG", configObject);
 

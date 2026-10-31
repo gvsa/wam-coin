@@ -5,7 +5,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
-import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -62,8 +61,8 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.getStartedBtn).setEnabled(false);
 
         hwinfo = getIntent().getStringExtra("HWINFO");
-        ((TextView) findViewById(R.id.hwinfo)).setText(hwinfo);
-        Toast.makeText(MainActivity.this, "hwinfo loaded", Toast.LENGTH_LONG).show();
+        ((TextView) findViewById(R.id.hwinfo)).setText(device_id + "\n" + hwinfo);
+//        Toast.makeText(MainActivity.this, "hwinfo loaded", Toast.LENGTH_LONG).show();
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
             getWindow().setDecorFitsSystemWindows(false);
@@ -74,7 +73,7 @@ public class MainActivity extends AppCompatActivity {
             );
         }
 
-// 2. Push the network call to a background thread
+        // 2. Push the network call to a background thread
         executorService.execute(new Runnable() {
             @Override
             public void run() {
@@ -92,7 +91,7 @@ public class MainActivity extends AppCompatActivity {
                         } else {
                             // FAILURE: Show an error message to the user
                             // Example: Toast.makeText(MainActivity.this, "Network error", Toast.LENGTH_LONG).show();
-                            Toast.makeText(MainActivity.this, "One or more of the API calls failed!!!\npool=" + String.valueOf(pool) + "\tconfig=" + String.valueOf(config), Toast.LENGTH_LONG).show();
+                            Toast.makeText(MainActivity.this, "Network error! Recheck Internet and start the app again!", Toast.LENGTH_LONG).show();
                         }
                     }
                 });

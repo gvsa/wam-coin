@@ -27,6 +27,7 @@ material = "1.4.0"             # Downgraded from 1.6.1 (Strictly supports SDK 30
 activityKtx = "1.3.1"          # Downgraded from 1.4.0 (Strictly supports SDK 30)
 constraintlayout = "2.1.1"
 ndkVersionTarget = "23.1.7779620"
+cardview = "1.0.0"
 #constraintlayoutVersion = "2.2.2"     # Downgraded from 2.1.4 (Strictly supports SDK 30)
 
 [libraries]
@@ -38,6 +39,8 @@ material = { group = "com.google.android.material", name = "material", version.r
 activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "activityKtx" }
 constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
+cardview = { group = "androidx.cardview", name = "cardview", version.ref = "cardview" }
+
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

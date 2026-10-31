@@ -37,10 +37,18 @@ public class MinerNativeActivity extends NativeActivity {
     private final BroadcastReceiver nativeLogReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (intent != null && MinerNativeService.ACTION_NATIVE_LOG_BROADCAST.equals(intent.getAction())) {
-                String logLine = intent.getStringExtra("LOG_LINE");
-                if (logLine != null) {
-                    appendConsoleLog(logLine);
+            if (intent != null) {
+                String action = intent.getAction();
+
+                if (MinerNativeService.ACTION_NATIVE_LOG_BROADCAST.equals(action)) {
+                    String logLine = intent.getStringExtra("LOG_LINE"); //
+                    if (logLine != null) {
+                        appendConsoleLog(logLine); //
+                    }
+                } else if (MinerNativeService.ACTION_STOP_NATIVE.equals(action)) {
+                    Log.i("WAM_APK_UI", "Quit intent intercepted. Finishing Native Activity canvas.");
+                    // Safely close this activity so it drops back to ConfigActivity
+                    finish();
                 }
             }
         }
@@ -110,17 +118,18 @@ public class MinerNativeActivity extends NativeActivity {
 
     private synchronized void registerLogReceiverSafely() {
         if (!isReceiverRegistered) {
-            IntentFilter filter = new IntentFilter(MinerNativeService.ACTION_NATIVE_LOG_BROADCAST);
+            IntentFilter filter = new IntentFilter();
+            filter.addAction(MinerNativeService.ACTION_NATIVE_LOG_BROADCAST); // Catch logs
+            filter.addAction(MinerNativeService.ACTION_STOP_NATIVE);         // Catch quit click
 
-            // Fixed: Registered universally to allow cross-process intent capture from the service
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                registerReceiver(nativeLogReceiver, filter, Context.RECEIVER_EXPORTED);
+                registerReceiver(nativeLogReceiver, filter, Context.RECEIVER_EXPORTED); //
             } else {
-                registerReceiver(nativeLogReceiver, filter);
+                registerReceiver(nativeLogReceiver, filter); //
             }
 
             isReceiverRegistered = true;
-            Log.i("WAM_APK_UI", "Broadcast log monitoring subsystem mapped universally.");
+            Log.i("WAM_APK_UI", "Broadcast log monitoring subsystem mapped universally."); //
         }
     }
 
@@ -157,6 +166,7 @@ public class MinerNativeActivity extends NativeActivity {
             }
         });
     }
+
     @Override
     protected void onDestroy() {
         unregisterLogReceiverSafely();
