@@ -20,20 +20,25 @@ of patch_upstream.py moving WAM_CLIENT_VERSION to 0.1.13. A node on v0.1.12
 stays on the chain, and saying otherwise would spend the word on a release
 that does not need it.
 
-TWO CLAIMS IN HERE ARE NOT TRUE UNTIL THE BUILD PROVES THEM, and neither is
-to be published before it does: that ZMQ is on for all three platforms, and
-that the example configuration lists its options. The first is proved by the
-three archives existing with it compiled in; the second by running
-gen_wam_conf.sh against the newly built wamd, which nothing does for you.
+TWO CLAIMS IN HERE WERE NOT TRUE UNTIL THE BUILD PROVED THEM, and they are
+proved for Linux and not yet for the other two:
+
+    the Linux node built on 2026-10-31 answers `wamd -help` with all ten ZMQ
+    options -- five publishers and five high-water marks -- and
+    gen_wam_conf.sh run against that binary wrote 761 lines and 152 options,
+    ten of them zmqpub, where v0.1.12 had 126 and none.
+
+Windows and macOS are claimed by the same sentence and are built by
+platform-build, not by this one. Do not publish while that is still pending.
 
 Delete everything above this line before tagging.
 ------------------------------------------------------------------------------
 
 This release turns ZMQ on, and it is the reason the release exists. A node
-can now say the moment it has something — `-zmqpubhashblock`,
-`-zmqpubrawblock`, `-zmqpubrawtx`, `-zmqpubsequence` — instead of being asked
-every few seconds whether anything happened. An explorer, a pool, a wallet or
-something you write yourself can stop polling this chain.
+can now say the moment it has something — five publishers, `-zmqpubhashblock`
+through `-zmqpubsequence`, each with its own high-water mark — instead of
+being asked every few seconds whether anything happened. An explorer, a pool,
+a wallet or something you write yourself can stop polling this chain.
 
 And every archive now carries the libraries it needs — the `wam-coin` node,
 the `wam-miner` and the `wam-qt` wallet alike. The wallet had been excused
@@ -47,6 +52,12 @@ below is for whoever wants it.
 
 WHAT ELSE IS IN IT
 ------------------
+
+**The example configuration lists every option the node accepts**, generated
+from `wamd -help` rather than written by hand, so it cannot drift from the
+binary. 761 lines and 152 options, ten of them the ZMQ ones this release is
+for. v0.1.12's had 126 and named none of them — an operator reading it to
+find the setting he needed would have concluded the node could not do it.
 
 **The check that says a binary carries its libraries now asks what the
 loader asks.** It resembled the question before rather than being it, which
