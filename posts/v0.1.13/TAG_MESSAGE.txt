@@ -1,0 +1,104 @@
+WAM Coin v0.1.13 — the node can tell you about a block the moment it has one, and every archive carries its own libraries
+
+THIS IS THE FILE THE ANNOUNCEMENT BOT READS. Read the warning before editing.
+
+    git tag -a v0.1.13 -F posts/v0.1.13/TAG_MESSAGE.txt
+
+The annotated tag message becomes the release notes, and bots/announce.js
+posts the FIRST WHOLE PARAGRAPHS THAT FIT IN TWELVE LINES to Telegram and
+Discord, automatically, the moment the release is published. Nobody reviews
+it in between.
+
+So the first two paragraphs below have to make sense on their own, to somebody
+who sees nothing else. Everything after them is for the release page.
+
+There is NO MANDATORY: line in this release, and one must not be added out of
+habit because the last one had it. v0.1.12 carried it because a consensus
+field had been left assigned by no network. Nothing here touches consensus:
+the whole diff against v0.1.12 is scripts, packaging, the site, and one line
+of patch_upstream.py moving WAM_CLIENT_VERSION to 0.1.13. A node on v0.1.12
+stays on the chain, and saying otherwise would spend the word on a release
+that does not need it.
+
+TWO CLAIMS IN HERE ARE NOT TRUE UNTIL THE BUILD PROVES THEM, and neither is
+to be published before it does: that ZMQ is on for all three platforms, and
+that the example configuration lists its options. The first is proved by the
+three archives existing with it compiled in; the second by running
+gen_wam_conf.sh against the newly built wamd, which nothing does for you.
+
+Delete everything above this line before tagging.
+------------------------------------------------------------------------------
+
+This release turns ZMQ on, and it is the reason the release exists. A node
+can now say the moment it has something — `-zmqpubhashblock`,
+`-zmqpubrawblock`, `-zmqpubrawtx`, `-zmqpubsequence` — instead of being asked
+every few seconds whether anything happened. An explorer, a pool, a wallet or
+something you write yourself can stop polling this chain.
+
+And every archive now carries the libraries it needs — the `wam-coin` node,
+the `wam-miner` and the `wam-qt` wallet alike. The wallet had been excused
+from the check that enforces that, and the excuse was the fault: unpacked on
+a machine that has never compiled anything it stopped on a missing shared
+object, which reads as a broken download rather than as a library you lack.
+
+That is the short of it. Nothing here is urgent and nothing here touches
+consensus — a node on v0.1.12 is on the same chain and stays on it. The rest
+below is for whoever wants it.
+
+WHAT ELSE IS IN IT
+------------------
+
+**The check that says a binary carries its libraries now asks what the
+loader asks.** It resembled the question before rather than being it, which
+is how the wallet passed while being broken. It is also no longer confused by
+having nothing to report, and `DEPENDENCIES.txt` has stopped claiming a
+dependency list it did not have.
+
+**Packaging says where it died.** `set -e` ends a script without a word about
+which line ended it, and a release build that fails silently at two in the
+morning is a build nobody can fix before the morning. It now names the step,
+and the release build keeps its logs when it fails instead of discarding the
+one thing worth reading.
+
+**Packaging survives finding no system Qt**, which was the point of the
+change that broke it.
+
+**The pool states its own fee and payout rates, and the pages stop guessing
+at them.** Two places described the same numbers and only one of them was
+the pool.
+
+**The network hash rate total contains this pool** instead of being estimated
+alongside it, so the figure on the page is the figure the chain has.
+
+**`check_nodes_agree.sh` asks each server once** and reads every answer from
+that one connection, instead of opening a handshake per question. On three
+hosts that was dozens of logins a run.
+
+DOWNLOADS
+---------
+
+Node, miner and wallet, for Linux, Windows and macOS:
+
+    wam-coin-v0.1.13-x86_64-linux-gnu.tar.gz
+    wam-coin-v0.1.13-x86_64-w64-mingw32.zip
+    wam-coin-v0.1.13-arm64-apple-darwin.tar.gz
+
+    wam-miner-v0.1.13-x86_64-linux-gnu.tar.gz
+    wam-miner-v0.1.13-x86_64-w64-mingw32.zip
+    wam-miner-v0.1.13-arm64-apple-darwin.tar.gz
+
+    wam-qt-v0.1.13-x86_64-linux-gnu.tar.gz
+    wam-qt-v0.1.13-x86_64-w64-mingw32.zip
+    wam-qt-v0.1.13-arm64-apple-darwin.tar.gz
+
+The wallet is a separate download so that a node is not several times larger
+for the people who never open a window.
+
+Check what you downloaded before you run it:
+
+    bash verify_release.sh .
+
+It verifies the signature over SHA256SUMS against the published key and then
+every file against SHA256SUMS. A signature covers the files and never the
+place they are hosted, so where you fetched them from changes nothing about
+what you can check.
