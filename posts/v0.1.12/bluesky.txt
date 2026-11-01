@@ -16,7 +16,8 @@ its bare Discord hostname was written out in full on 1 November, the same fault
 check_post_text.py caught in a DM on 3 October.
 
 ---------------------------------------------------------------
-POST 1  <!-- wam:quote-begin -->
+POST 1
+<!-- wam:quote-begin -->
 
 WAM v0.1.12.
 

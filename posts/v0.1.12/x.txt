@@ -27,7 +27,8 @@ went out, so its bare Discord hostname was written out in full on 1 November,
 like any other draft's.
 
 ---------------------------------------------------------------
-POST 1  <!-- wam:quote-begin -->
+POST 1
+<!-- wam:quote-begin -->
 
 WAM v0.1.12.
 
