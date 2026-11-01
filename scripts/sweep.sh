@@ -425,7 +425,8 @@ run "DNS seeds answer x9."    bash scripts/check_dns_seeds.sh
 # 2026 it was naming a third-party pool whose stratum port refuses the
 # connection from four different countries. The sentence "all three answered
 # when this page was last checked" is a claim with no checker behind it.
-run "published endpoints answer" "$PY" scripts/check_published_endpoints.py
+run "published endpoints answer, and will next month" \
+    "$PY" scripts/check_published_endpoints.py
 
 # Every page sends a reader to wamcoin.org/downloads/<newest>/. On
 # 2026-10-16 that directory answered 404 for four minutes after v0.1.12 was
