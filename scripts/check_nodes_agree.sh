@@ -125,6 +125,22 @@ CLI="wam-cli $(wam_cli_flags "$NETWORK")" || exit 2
 # known until every node has answered. So it stays a second round trip, and
 # two is the floor rather than an oversight.
 
+# WHAT THIS FILE CANNOT ANSWER, so nobody reads a green here as more than it is.
+#
+# It compares the hosts TO EACH OTHER. A fleet that is uniformly wrong is
+# therefore the one case it is blind to, and it is not an exotic case -- it is
+# what a deploy that silently did nothing produces, on every machine at once.
+#
+# On 2026-11-01 this printed "byte-identical binaries" about France and
+# Singapore while wam-tx, wam-util and wam-wallet on both were pinned at
+# v0.1.7, six releases back, since 11 September. They agreed perfectly, so it
+# said so, correctly and uselessly.
+#
+# scripts/check_running_version.py asks the other question: does every machine
+# run the version we PUBLISH -- compared against the newest signed release in
+# our own download directory, which is outside the fleet. The two are not
+# alternatives; neither one covers the other.
+
 # THE FIVE CONSENSUS PROGRAMS, and deliberately not everything named wam*.
 #
 # Every wam-* executable, not just wamd: a wam-cli that disagrees with its

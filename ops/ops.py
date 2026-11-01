@@ -559,6 +559,14 @@ CHECKS = [
                                        "--node", "169.58.159.165",
                                        "--network", "mainnet"], 600),
     ("nodes agree", ["bash", "scripts/check_nodes_agree.sh"] + ALL_IPS, 150),
+    # Added 2026-11-01, the day "nodes agree" went red and said less than it
+    # looked like it was saying. It compares the hosts to each other, so a
+    # fleet that is uniformly behind reads as perfect agreement -- and on that
+    # day it was: wam-tx, wam-util and wam-wallet were v0.1.7 on all three
+    # machines, six releases back since 11 September, byte-identical and
+    # therefore silent. This one asks a question from outside the fleet.
+    ("machines run the version we publish",
+     [sys.executable, "scripts/check_running_version.py"] + ALL_IPS, 300),
     # 300, not 150. Measured at 55 seconds for three hosts on a quiet link,
     # and it reads a git log from each of them over ssh -- so it is one slow
     # host away from the old limit. On 2026-09-27 it hit it, and the panel

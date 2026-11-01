@@ -504,6 +504,26 @@ else
     else
         run "nodes agree with each other" bash scripts/check_nodes_agree.sh $NODES
 
+        # AND AGREE WITH THE RELEASE, which is a different question.
+        #
+        # The check above compares the hosts to each other, so the one case it
+        # cannot see is a fleet that is uniformly wrong -- which is exactly what
+        # a deploy that silently did nothing produces, on every machine at once.
+        #
+        # On 1 November 2026 it called France and Singapore "byte-identical"
+        # while wam-tx, wam-util and wam-wallet on both were pinned at v0.1.7,
+        # six releases back, since 11 September. They agreed perfectly. The
+        # third host had COPIES of the same v0.1.7 tools, and a v0.1.9 wamd its
+        # testnet node had been running for seventeen days, through four
+        # releases -- while "deployed code is origin/main" said ok about the
+        # git checkout beside it, truthfully, because a checkout is not what
+        # systemd executes.
+        #
+        # So this one compares against something outside the fleet: the newest
+        # signed release in our own download directory, which is what a
+        # stranger gets when he follows our instructions.
+        run "machines run the version we publish"             "$PY" scripts/check_running_version.py $NODES
+
         # A node that cannot say who connected is not unhealthy -- it answers
         # every other question correctly. It simply stops being able to tell
         # an operator from a port scanner, and the founder asks that more
