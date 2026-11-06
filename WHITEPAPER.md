@@ -37,8 +37,8 @@ binary ever disagree, that script fails.
 > **This coin may be worth nothing.** The overwhelming majority of new
 > cryptocurrencies fail, and there is no reason to assume this one is different.
 > **Nobody will buy it back from you** — the founder does not sell WAM and does
-> not buy it. Treat anything you acquire as money you can afford to lose
-> entirely. Section 9 says the rest.
+> not support its price. Treat anything you acquire as money you can afford to
+> lose entirely. Section 9 says the rest.
 
 ---
 
@@ -464,7 +464,9 @@ wrong about it at some future halving. Handing the raw coinbase value to the rew
 calculator throws an exception rather than silently over-distributing by 5%.
 
 The pool operator's own fee, if any, is taken *after* the treasury output and is entirely
-separate from it. A miner on a 1% pool sees 5% + 1%.
+separate from it: a miner on a pool sees the consensus 5% plus whatever that operator
+charges. The 5% is a consensus rule and is stated here. An operator's rate is a setting
+they can change, so it is not stated here — each pool publishes its own.
 
 ---
 
@@ -515,9 +517,9 @@ person who ends up holding WAM.
 no guarantee that anyone will want to buy WAM, use it, or list it anywhere. Nothing in this
 document is a prediction, and no figure in it is a price.
 
-**Nobody will buy it back.** The founder does not sell WAM and does not buy it. There is no
-buyback, no market maker, no price floor and no reserve standing behind it. If a price exists
-it is whatever two strangers agree on, and it can be zero.
+**Nobody will buy it back.** The founder does not sell WAM and does not support its price.
+There is no buyback, no market maker, no price floor and no reserve standing behind it. If a
+price exists it is whatever two strangers agree on, and it can be zero.
 
 **A secondary market is outside anyone's control.** If you buy WAM from a miner or another
 holder and the price then falls, the loss is yours. The project makes no representation about

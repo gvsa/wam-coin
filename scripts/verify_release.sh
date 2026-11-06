@@ -45,7 +45,7 @@ GRN=$'\033[32m'; RED=$'\033[31m'; YLW=$'\033[33m'; BLD=$'\033[1m'; OFF=$'\033[0m
 # $0 is whatever the caller typed, and the caller is not standing in the repo:
 # the command published in the announcement is
 #
-#     git clone https://github.com/wamcoin-core-dev/wam-coin
+#     git clone https://github.com/wamcoin-Project/wam-coin
 #     bash wam-coin/scripts/verify_release.sh ~/Downloads
 #
 # so $0 is the relative path `wam-coin/scripts/verify_release.sh`. Resolving it
@@ -97,7 +97,7 @@ if [ ! -f SHA256SUMS ]; then
     bad "SHA256SUMS is not in $(pwd) -- nothing has been downloaded yet"
     V="$(sed -n 's/^WAM_CLIENT_VERSION *= *"\([0-9.]*\)".*/\1/p' \
          "${SELF_DIR:-.}/patch_upstream.py" 2>/dev/null | head -1)"
-    B="https://github.com/wamcoin-core-dev/wam-coin/releases"
+    B="https://github.com/wamcoin-Project/wam-coin/releases"
     say ""
     say "Fetch the release into this directory first:"
     say ""

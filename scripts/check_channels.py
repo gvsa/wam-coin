@@ -106,11 +106,37 @@ SOURCES += [str(p.relative_to(ROOT))
 
 # Hosts and handles that are ours. A URL is "ours" if it sits on one of
 # these, which is what makes the omission direction checkable at all.
+#
+# THE REPOSITORY IS IDENTIFIED BY THE REPOSITORY, NOT BY THE ACCOUNT.
+#
+# This pattern named github.com/wam-coin-official and nothing else. So when
+# the GitHub home moved to wamcoin-core-dev on 2026-09-25 and again to
+# wamcoin-Project on 2026-10-29, it saw neither of them -- not the dead name
+# sitting in twelve published posts, not the live name in the very list it is
+# checking. It printed ok through both suspensions, and posts/ALL_LINKS.txt
+# handed readers a 404 while it did. The check whose entire subject is which
+# names are ours had nothing to say about the name changing twice.
+#
+# It was found by hand on 2026-10-30, correcting a dead link on a mining
+# pool's own page, which is not a way to find things.
+#
+# A repository called wam-coin is ours whoever hosts it, and no third party
+# has one, so that alternative needs no maintenance and survives the next
+# move. The two bare names are the accounts already lost: they appear in
+# prose with no repository path -- which is how the disown section has to
+# name them -- and a dead name never changes again. That list grows only
+# when an account dies, and the day one dies this file gets a revision
+# anyway.
+#
+# gitea.com was missing altogether. The third copy of the source has not been
+# visible to this check since revision 4 created it on 2026-09-25.
 OURS = re.compile(
     r"""(?xi)
-    (?: https?://(?:[a-z0-9-]+\.)*wamcoin\.org [^\s"'<>)\]]*
+    (?: https?://(?:[a-z0-9-]+\.)*wamcoin\.(?:org|net) [^\s"'<>)\]]*
+      | https?://(?:www\.)?(?:github|gitlab|gitea)\.com/[A-Za-z0-9._-]+/wam-coin [^\s"'<>)\]]*
       | https?://(?:www\.)?gitlab\.com/WAMCoin [^\s"'<>)\]]*
-      | https?://(?:www\.)?github\.com/wam-coin-official [^\s"'<>)\]]*
+      | https?://(?:www\.)?gitea\.com/WAMCoin [^\s"'<>)\]]*
+      | https?://(?:www\.)?github\.com/(?:wam-coin-official|wamcoin-core-dev) [^\s"'<>)\]]*
       | https?://t\.me/wam_coin[^\s"'<>)\]]*
       | https?://(?:www\.)?x\.com/WAMCoinCore[^\s"'<>)\]]*
       | https?://discord\.gg/[A-Za-z0-9]+
@@ -279,13 +305,20 @@ def main():
         # first version of this found nothing it was looking for and reported
         # wamcoin.org, which is mentioned in the same paragraph. The scheme is
         # supplied here so the same matcher can be used on prose.
-        tail = re.sub(r"(?<![/@.\w])((?:www\.)?(?:github|gitlab)\.com/[A-Za-z0-9._-]+)",
+        tail = re.sub(r"(?<![/@.\w])((?:www\.)?(?:github|gitlab|gitea)\.com/[A-Za-z0-9._-]+)",
                       r"https://\1", tail)
         for u in find(tail):
             disowned.add(u)
-        if disowned:
-            print(f"  {GRN}ok{OFF}    {len(disowned)} name(s) the list disowns "
-                  f"by name: {', '.join(sorted(disowned))}")
+        # Reported as the names it actually disowns, which is not the same as
+        # every name found in that section. The section has to say where the
+        # downloads are and what the home is NOW, so wamcoin.org and the live
+        # GitHub account are quoted inside it -- and this row announced both
+        # as names we disown. A sweep line saying our own home is disowned is
+        # a line that teaches its reader to skip the output.
+        shown = sorted(set(disowned) - set(listed))
+        if shown:
+            print(f"  {GRN}ok{OFF}    {len(shown)} name(s) the list disowns "
+                  f"by name: {', '.join(shown)}")
 
     # ---- 2. nothing of ours is missing from it ----------------------
     missing = {}

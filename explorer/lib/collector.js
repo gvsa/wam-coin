@@ -86,6 +86,38 @@ class Collector {
         try {
             const chainInfo = await this.rpc.call('getblockchaininfo');
 
+            // THE DEFAULT WINDOW, BECAUSE IT IS WHAT THE REST OF THE CHAIN USES.
+            //
+            // getmininginfo's networkhashps is getnetworkhashps over its
+            // default 120 blocks -- four hours here, and genuinely few to
+            // average a Poisson process against a difficulty DGW moves on
+            // every block. Asked in one second, the same node gave 547.0 over
+            // 120 blocks, 621.7 over 360, 610.2 over 720 and 599.1 over 1440.
+            // One quantity, four answers, and the shortest window was the
+            // lowest every time it was sampled.
+            //
+            // So this asked for 720 for a few hours. The arithmetic was
+            // right and the decision was wrong, and the founder found out
+            // how within the hour. Three pool pages, within three blocks of
+            // each other:
+            //
+            //     veinpool.fr            590.5 kH/s
+            //     wampool.vslabs.co.in   590.5 kH/s
+            //     pool.wamcoin.org       620.9 kH/s
+            //
+            // Two pools run by other people agreeing exactly, and this
+            // project's own pages alone quoting a bigger network. Both of
+            // theirs call getmininginfo, so 120 is the convention on this
+            // chain whatever its statistical merit, and a stranger comparing
+            // the three does not see a better estimator. He sees the people
+            // who made the coin claiming it is stronger than everyone else
+            // says it is.
+            //
+            // That is the one thing this project cannot afford to look like,
+            // and five per cent of accuracy does not buy it back. The window
+            // is the node's default again, and it is stated rather than
+            // hidden -- which was the honest half of the change and costs
+            // nothing.
             const [mining, mempool, netInfo, supplyRpc, randomxRpc, devfeeRpc] =
                 await Promise.all([
                     this.rpc.tryCall('getmininginfo', [], null),
@@ -155,7 +187,13 @@ class Collector {
                      (progress !== undefined && progress < 0.9999),
             verificationProgress: progress,
             blocksBehind: Math.max(0, (chainInfo.headers || 0) - chainInfo.blocks),
+            // getnetworkhashps over its default 120 blocks, which is what
+            // every other pool on this chain publishes. The window is carried
+            // beside the number rather than left unstated: an average with no
+            // scale is how one quantity came to have four different values
+            // across two pages, and saying so costs nothing.
             networkHashPerSecond: mining ? (mining.networkhashps || 0) : null,
+            networkHashWindowBlocks: 120,
             connections: netInfo ? netInfo.connections : null,
             targetSpacing: POW_TARGET_SPACING
         };

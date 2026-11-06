@@ -307,7 +307,24 @@ def main():
     if not a.dry_run:
         save(state)
 
+    # THE MACHINE KEEPS WHAT IT SHOUTED.
+    #
+    # notify() delivers to Telegram or parks the line for another host to
+    # forward, and it prints nothing. So an alarm existed only in a chat
+    # application: on 8 October 2026 the founder asked about a port notice
+    # from this watcher, and the machine that raised it had no record of
+    # raising it. `journalctl -u wam-login-watch` held 21 days of "nothing
+    # new" and not one alarm. Nothing could say WHEN it fired, and the only
+    # copy was a message a person happened to still have on a telephone.
+    #
+    # Printing costs a line. It gives the host that saw the thing a durable,
+    # searchable, local record of what it saw -- which is the first question
+    # anybody asks afterwards, and the one this watcher could not answer.
+    # Not under --dry-run: send() already prints there, and two copies of an
+    # alarm in the output is how a reader learns to skim it.
     for line in alarms:
+        if not a.dry_run:
+            print(line, flush=True)
         notify(line, a.dry_run)
     if not alarms:
         print("nothing new")

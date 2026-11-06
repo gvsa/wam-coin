@@ -463,6 +463,55 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+step "9. every quotation mark is closed"
+
+# An opening mark with no closing one runs to the end of its file. quoted.py
+# chose that deliberately -- a region that silently stops covering what the
+# author meant is worse -- but the other end of that choice is this: one
+# forgotten closing mark exempts the whole rest of a file from EVERY text
+# check in this repository, and nothing says a word.
+#
+# Written on 8 October 2026, an hour after doing exactly that: a mark was
+# opened above a rehearsal log in docs/REHEARSALS.md and never closed, so the
+# rest of that file went invisible to every check that honours the
+# convention. It was found by accident, reading the output of a different
+# check.
+#
+# It asks the library rather than counting with grep. The first version here
+# did count with grep, and disagreed with quoted.py within the hour: grep
+# matched the words in a sentence ABOUT the convention, the library does not,
+# and a rule with two implementations is a rule that will be wrong in one of
+# them. scripts/test/test_quoted.py holds the library to the same question.
+UNBALANCED="$("$PY" - <<'PYEOF' 2>/dev/null
+import pathlib, subprocess, sys
+root = pathlib.Path(__file__).resolve().parent if False else pathlib.Path(".")
+sys.path.insert(0, str(root / "scripts" / "lib"))
+import quoted
+out = subprocess.run(["git", "ls-files"], capture_output=True, text=True)
+for rel in out.stdout.split():
+    if rel.startswith(("depends/", "build/")):
+        continue
+    p = root / rel
+    if not p.is_file():
+        continue
+    try:
+        lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        continue
+    o = sum(1 for ln in lines if quoted.BEGIN.search(ln))
+    c = sum(1 for ln in lines if quoted.END.search(ln))
+    if o != c:
+        print(f"{rel}: {o} opened, {c} closed")
+PYEOF
+)"
+if [ -n "$UNBALANCED" ]; then
+    fail "a quotation region is left open, and silences the rest of its file:"
+    printf '%s\n' "$UNBALANCED" | head -8 | sed 's/^/          /'
+else
+    ok "every wam:quote-begin has its end"
+fi
+
+# ---------------------------------------------------------------------------
 printf '\n%s\n' "$(printf '=%.0s' {1..70})"
 if [ "$FAILURES" = 0 ]; then
     printf ' %sthe repository agrees with itself%s\n' "$GRN" "$OFF"

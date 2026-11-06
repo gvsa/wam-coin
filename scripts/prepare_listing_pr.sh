@@ -44,7 +44,7 @@ SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$HERE"
 
-OWNER="wamcoin-core-dev"
+OWNER="wamcoin-Project"
 
 GRN=$'\033[32m'; RED=$'\033[31m'; YLW=$'\033[33m'; BLD=$'\033[1m'; OFF=$'\033[0m'
 ok()   { printf '  %sok%s     %s\n' "$GRN" "$OFF" "$*"; }
@@ -64,15 +64,32 @@ step() { printf '\n%s%s%s\n' "$BLD" "$*" "$OFF"; }
 #
 # So `komodo` now means the repository that is actually reviewing us, and the
 # mirror is a separate target that has to be named.
+#
+# 2026-11-02: the komodo branch is `add-third-electrum` and its pull request
+# column is empty, on purpose. The coin entry is merged -- cipig did it himself
+# in GLEECBTC/coins#2034 -- and #1975 is closed. This script updates a branch
+# that already exists rather than replacing it, so leaving `add-wam-coin-gleec`
+# here would have pushed a new commit onto the head of a closed pull request:
+# GitHub shows it there, the dead conversation wakes up, and the change nobody
+# is reviewing is the one that matters. A new submission to the same
+# repository gets a new branch, and an empty column is honest about a pull
+# request that does not exist yet -- verify_target says so and continues,
+# rather than checking a number that describes something else.
+#
+# It was opened the same day as GLEECBTC/coins#2085, so the column is filled
+# again and verify_target has something true to check: that #2085 really reads
+# wamcoin-Project/coins:add-third-electrum before anything is pushed there. A
+# corrected file reaches the review by running this script again, which is the
+# whole reason it exists.
 venues() {
     cat <<'V'
 slips          satoshilabs/slips                          slips                           add-wam-coin  2051
 bisq           bisq-network/bisq                          bisq                            add-wam-coin  8030
 haveno         haveno-dex/haveno                          haveno                          add-wam-coin  2528
-blockdx        blocknetdx/blockchain-configuration-files   blockchain-configuration-files  add-wam-coin  197
+blockdx        blocknetdx/blockchain-configuration-files   blockchain-configuration-files  add-wam-coin  200
 basicswap      basicswap/basicswap                        basicswap                       add-wam-coin  701
-komodo         GLEECBTC/coins                             coins                           add-wam-coin-gleec  1975
-komodo-mirror  KomodoPlatform/coins                       coins                           add-wam-coin  21
+komodo         GLEECBTC/coins                             coins                           add-third-electrum  2085
+komodo-mirror  KomodoPlatform/coins                       coins                           add-wam-coin  23
 V
 }
 
@@ -91,8 +108,8 @@ WAMCoinTest.java  assets/src/test/java/haveno/asset/coins/WAMCoinTest.java
 L
         ;;
     blockdx) cat <<'L'
-xbridge-confs/wam--v0.1.6.conf      xbridge-confs/wam--v0.1.6.conf
-wallet-confs/wam--v0.1.6.conf       wallet-confs/wam--v0.1.6.conf
+xbridge-confs/wam--v0.1.10.conf     xbridge-confs/wam--v0.1.10.conf
+wallet-confs/wam--v0.1.10.conf      wallet-confs/wam--v0.1.10.conf
 L
         ;;
     basicswap) cat <<'L'

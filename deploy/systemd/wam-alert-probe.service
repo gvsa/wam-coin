@@ -34,7 +34,7 @@
 # ===========================================================================
 [Unit]
 Description=Deliberate failure, to prove this machine can be heard
-Documentation=https://github.com/wamcoin-core-dev/wam-coin/blob/main/deploy/systemd/wam-alert-probe.service
+Documentation=https://github.com/wamcoin-Project/wam-coin/blob/main/deploy/systemd/wam-alert-probe.service
 OnFailure=wam-alert@%n.service
 
 [Service]

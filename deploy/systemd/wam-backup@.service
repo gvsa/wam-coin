@@ -38,7 +38,7 @@
 
 [Unit]
 Description=WAM Coin encrypted backup, %i (wallets, share ledger, config)
-Documentation=https://github.com/wamcoin-core-dev/wam-coin/blob/main/deploy/wam-backup.sh
+Documentation=https://github.com/wamcoin-Project/wam-coin/blob/main/deploy/wam-backup.sh
 
 # Wants, not Requires: if the node is down the script refuses to take a
 # wallet copy and says why, which is the correct outcome and should be

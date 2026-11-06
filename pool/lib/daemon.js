@@ -300,14 +300,81 @@ class DaemonInterface extends EventEmitter {
         // otherwise -- an inverted convention that is very easy to misread.
         const accepted = results.filter((r) => r.ok && (r.result === null || r.result === undefined));
         const rejected = results.filter((r) => !accepted.includes(r));
+        const reasons = rejected.map((r) => `${r.daemon}: ${r.error || r.result}`);
 
         return {
             accepted: accepted.length > 0,
-            reasons: rejected.map((r) => `${r.daemon}: ${r.error || r.result}`),
+            verdict: classifySubmit(accepted.length > 0, reasons, results),
+            reasons,
             results
         };
     }
 }
+
+// ===========================================================================
+//  WHAT THE NODE MEANT, DECIDED IN ONE PLACE
+// ===========================================================================
+//
+// `submitblock` reports four different situations down one string channel,
+// and two of them are not failures at all. src/rpc/mining.cpp:
+//
+// <!-- wam:quote-begin -->
+//     if (!new_block && accepted) return "duplicate";
+//     if (!sc->found)             return "inconclusive";
+//     return BIP22ValidationResult(sc->state);
+// <!-- wam:quote-end -->
+//
+// So "duplicate" means the node already had this block, and "inconclusive"
+// means it processed it and reported NO validation failure -- a real refusal
+// always comes back with a named reason. Neither is the pool doing anything
+// wrong, and neither costs anybody a coin.
+//
+// This has now been read wrongly in three separate places. The miner's alarm
+// counted a lost race as a block that went missing and told solo miners to
+// stop, which they did. drainSpool was fixed when dang150296 found it losing
+// a payout. And the live submit path went on logging
+//
+// <!-- wam:quote-begin -->
+//     block 17169 REJECTED: inconclusive
+//         the block is kept for inspection ... the node read it and refused it
+// <!-- wam:quote-end -->
+//
+// at ERROR until 10 October 2026 -- for two of our OWN miners solving height
+// 17169 seventy milliseconds apart. The first was accepted, recorded and paid
+// to 36 workers; the second arrived 28ms later and was told the node already
+// had it. Nothing was lost, and the log said the node refused our block.
+//
+// Fixing the third site would have left a fourth. The vocabulary lives here,
+// every caller asks for a verdict, and test_submit_verdict.js refuses the
+// words anywhere else.
+const SUBMIT = {
+    ACCEPTED:    'accepted',     // a node took it and it is the new tip
+    ALREADY_HAVE: 'already',     // the node has it, or it is valid but not
+                                 // best: a lost race. Nothing to retry.
+    REFUSED:     'refused',      // a node looked and named a fault. Final.
+    UNANSWERED:  'unanswered'    // nobody answered. We learned nothing.
+};
+
+// `duplicate-invalid` contains the word "duplicate" and is the one case in
+// the family that IS a fault, so it has to be tested first. Getting this
+// order wrong turns a known-bad block into "nothing to worry about".
+// wam:quote-begin
+const INVALID_RE = /duplicate-invalid/i;
+const HARMLESS_RE = /\b(duplicate|inconclusive|duplicate-inconclusive|inconclusive-not-best-prevblk)\b/i;
+// wam:quote-end
+
+function classifySubmit(accepted, reasons, results) {
+    if (accepted) return SUBMIT.ACCEPTED;
+    const answered = results.some((r) => r.ok || r.error === null);
+    if (!answered) return SUBMIT.UNANSWERED;
+    const text = reasons.join(' | ');
+    if (INVALID_RE.test(text)) return SUBMIT.REFUSED;
+    if (HARMLESS_RE.test(text)) return SUBMIT.ALREADY_HAVE;
+    return SUBMIT.REFUSED;
+}
+
+DaemonInterface.SUBMIT = SUBMIT;
+DaemonInterface.classifySubmit = classifySubmit;
 
 // Calls that create a NEW spend, and so must never be repeated blindly. Not a
 // list of wallet RPCs: `getbalance` and `listtransactions` are wallet calls

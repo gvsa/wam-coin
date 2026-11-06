@@ -29,6 +29,7 @@
 const assert = require('assert');
 const ShareProcessor = require('../lib/shareProcessor');
 const { COINBASE_MATURITY } = require('../lib/constants');
+const { attachAtomic, attachUnsupported } = require('./fakeAtomic');
 
 let pass = 0;
 const fail = [];
@@ -58,6 +59,18 @@ function fakeRedis() {
         async ltrim() { return 'OK'; },
         async lrem() { return 1; },
         async decrby() { return 0; },
+        // blocks:confirmed:hashes -- the set recordBlock asks before
+        // paying, so a recovered block cannot be paid a second time.
+        _sets: new Map(),
+        async sadd(k, v) {
+            if (!ops._sets.has(k)) ops._sets.set(k, new Set());
+            const before = ops._sets.get(k).size;
+            ops._sets.get(k).add(v);
+            return ops._sets.get(k).size > before ? 1 : 0;
+        },
+        async sismember(k, v) {
+            return ops._sets.has(k) && ops._sets.get(k).has(v) ? 1 : 0;
+        },
         async incr(k) {
             const cur = Number(counters.get(k) || 0) + 1;
             counters.set(k, cur);
@@ -73,7 +86,7 @@ function fakeRedis() {
             // the code under test calls does not fail that command; it fails the
             // test, with "pipe.incr is not a function", and these two are payout
             // tests.
-            for (const n of ['hincrby', 'hdel', 'hset', 'lpush', 'ltrim', 'lrem', 'decrby', 'incr']) {
+            for (const n of ['hincrby', 'hdel', 'hset', 'lpush', 'ltrim', 'lrem', 'decrby', 'incr', 'sadd']) {
                 api[n] = (...args) => { queued.push([n, args]); return api; };
             }
             api.exec = async () => {
@@ -84,6 +97,7 @@ function fakeRedis() {
         },
         _dump: { h, l }
     };
+    attachAtomic(ops, hash, list);
     return ops;
 }
 

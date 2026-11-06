@@ -286,9 +286,74 @@ class ApiServer {
         const miners = this.stratum.getConnectedMiners();
         const job = this.jobManager.getStatus();
 
-        // Expected time to a block, given the pool's share of network hashrate.
-        const networkHashrate = network.networkHashPerSecond || 0;
-        const poolShare = networkHashrate > 0 ? hashrate.poolHashrate / networkHashrate : 0;
+        // THE POOL'S SHARE IS COUNTED, NOT A MEASUREMENT DIVIDED BY AN ESTIMATE.
+        //
+        // It was:
+        //     poolShare = hashrate.poolHashrate / network.networkHashPerSecond
+        //
+        // The numerator is MEASURED -- every share the pool's miners actually
+        // submitted in the last ten minutes, proven work. The denominator is
+        // ESTIMATED -- getnetworkhashps infers a rate from how fast the last
+        // 120 blocks arrived. Two numbers from two sources that know nothing
+        // of each other, and dividing them crosses 100% whenever they drift.
+        //
+        // On 2026-10-29 this page read:
+        //
+        //     POOL HASHRATE     560.6 kH/s    102.057% of network
+        //     NETWORK HASHRATE  549.3 kH/s
+        //
+        // A part larger than the whole it belongs to. The network hashrate is
+        // the sum of everyone mining -- this pool, other pools, people mining
+        // alone -- so a pool contributes to it and cannot exceed it, whatever
+        // either number says. The founder watches this panel and said so.
+        //
+        // The fault was always here. It was hidden while the pool found half
+        // the blocks, because an understated estimate was still larger than
+        // our measurement. At 78% of blocks it stopped being larger. The
+        // pool's growth did not cause this; it exposed it.
+        //
+        // WHAT IS COUNTED
+        //
+        // blocks:pending holds every block this pool found that has not yet
+        // reached COINBASE_MATURITY confirmations -- which is exactly the
+        // pool's blocks inside the last `maturity` blocks of chain, complete
+        // by construction, with nothing sliced or trimmed. So F of the last N
+        // blocks are ours, and F/N is the share: a count off the public
+        // ledger, incapable of exceeding 1.
+        //
+        // The total is then built from the part we can actually measure:
+        //
+        //     network = our measured hashrate / our counted share
+        //
+        // which equals our hashrate when we find every block and grows as our
+        // share falls. It cannot come out below its own part. That is the
+        // whole point, and it is also the better number: the estimate read
+        // 566 kH/s while this construction read 715, and 159 kH/s of other
+        // people's miners -- who were demonstrably finding 32 blocks in every
+        // 144 -- were missing from the panel.
+        const maturity = this.config.coinbaseMaturity ?? 100;
+        const tip = network.blocks || 0;
+        const windowBlocks = Math.max(1, Math.min(maturity, tip));
+        const lowest = tip - windowBlocks + 1;
+        const ours = new Set();
+        for (const b of pool.pendingBlocks || []) {
+            if (b.height >= lowest && b.height <= tip && !b.orphanReason) {
+                ours.add(b.height);
+            }
+        }
+        const foundByPool = ours.size;
+        const estimate = network.networkHashPerSecond || 0;
+
+        // Below ten blocks the count is too thin to divide by: at F=2 of 100 a
+        // single lucky block moves the implied total by half. The estimate is
+        // the better answer there, floored at our own hashrate so that the
+        // part still cannot exceed the whole while we wait for the count.
+        const COUNT_FLOOR = 10;
+        const counted = foundByPool >= COUNT_FLOOR;
+        const poolShare = counted ? foundByPool / windowBlocks
+                                  : (estimate > 0
+                                     ? Math.min(1, hashrate.poolHashrate / estimate)
+                                     : 0);
         const expectedBlockSeconds = poolShare > 0 ? 120 / poolShare : null;
 
         return {
@@ -298,9 +363,27 @@ class ApiServer {
                 miners: miners.length,
                 workers: Object.keys(hashrate.workers).length,
                 poolSharePercent: poolShare * 100,
-                expectedBlockSeconds
+                expectedBlockSeconds,
+                // How the share was arrived at, so the page can say so and a
+                // reader is never asked to trust a number whose provenance is
+                // hidden. "counted" is F of N blocks off the ledger;
+                // "estimated" is the old inference, used only until the count
+                // is thick enough to divide by.
+                shareBasis: counted ? 'counted' : 'estimated',
+                shareWindowBlocks: windowBlocks,
+                blocksFoundInWindow: foundByPool
             },
-            network,
+            network: {
+                ...network,
+                // Everyone on the chain who is not us, from the one network
+                // figure both pages publish. Briefly this tile carried a
+                // total of its own -- measured hashrate over counted share --
+                // which was a defensible number and a second headline for a
+                // quantity that may only have one. The share is what had to
+                // stop being a division; the total never did.
+                othersHashPerSecond: Math.max(
+                    0, (network.networkHashPerSecond || 0) - hashrate.poolHashrate)
+            },
             job: job.currentJob,
             randomx: {
                 seedHeight: job.currentJob ? job.currentJob.seedHeight : null,
@@ -334,6 +417,44 @@ class ApiServer {
     }
 
     async _network() {
+        // THE SAME QUESTION THE EXPLORER ASKS, OF THE SAME NODE.
+        //
+        // A miner on this pool should not have to open a second page to see
+        // how strong the chain is -- that is what the third tile is for. So
+        // it has to be the explorer's number, not a number of our own that
+        // happens to be near it: 615.7 here beside 608.3 there is one
+        // quantity with two headlines, and a reader has no way to choose.
+        //
+        // AND THE SAME QUESTION EVERY OTHER POOL ON THIS CHAIN ASKS.
+        //
+        // getmininginfo answers over getnetworkhashps's default 120 blocks --
+        // four hours, which nobody chose; it came with Bitcoin Core. For a few
+        // hours this asked for 720 instead, on the reasoning that four hours
+        // is too few blocks to average a Poisson process against a difficulty
+        // DGW moves every block. The reasoning is sound and the change was
+        // still wrong.
+        //
+        // On 2026-10-29, within three blocks of each other:
+        //
+        //     veinpool.fr            590.5 kH/s
+        //     wampool.vslabs.co.in   590.5 kH/s
+        //     pool.wamcoin.org       620.9 kH/s
+        //
+        // Our own node, asked both ways at one instant, gave 594.7 over 120
+        // and 622.5 over 720. So the chain data was identical to theirs and
+        // the entire difference was a window we had picked for ourselves.
+        //
+        // Every other operator calls getmininginfo, so 120 is the convention
+        // on this chain whether or not it is the better estimator. A stranger
+        // comparing three pool pages does not read ours as better reasoned.
+        // He reads the project's own pool quoting a bigger network than
+        // everybody else's -- and for a project whose only asset is being
+        // checkable, looking like we inflate our own numbers costs more than
+        // five per cent of estimator accuracy is worth.
+        //
+        // The defect this was meant to help never needed it either: a part
+        // exceeding its whole was cured by counting the pool's share off the
+        // ledger, not by changing the denominator's window.
         const [chain, mining] = await Promise.all([
             this.daemon.getBlockchainInfo(),
             this.daemon.getMiningInfo()
@@ -394,7 +515,15 @@ class ApiServer {
             blocks: chain.blocks,
             headers: chain.headers,
             difficulty: chain.difficulty,
+            // getmininginfo's own figure, which is getnetworkhashps over its
+            // default 120 blocks -- the same number every other pool on this
+            // chain publishes. The window still travels with it, because an
+            // average shown without its scale is how one quantity came to
+            // have four different values across two pages, and saying "120
+            // blocks" costs nothing and makes ours the only panel that says
+            // what it measured over.
             networkHashPerSecond: mining.networkhashps || 0,
+            networkHashWindowBlocks: 120,
 
             // The tip's own timestamp, and how long ago that was.
             //

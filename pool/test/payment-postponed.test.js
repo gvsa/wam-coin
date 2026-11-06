@@ -24,6 +24,7 @@
 
 const assert = require('assert');
 const ShareProcessor = require('../lib/shareProcessor');
+const { attachAtomic, attachUnsupported } = require('./fakeAtomic');
 
 let pass = 0;
 const fail = [];
@@ -79,18 +80,42 @@ function fakeRedis(balances = {}) {
             return p;
         }
     };
+    attachUnsupported(r, 'it models balances and the payment batch, not block maturation');
     return r;
 }
 
 /** balanceWam is what the wallet can actually spend right now. */
 function fakeDaemon(balanceWam) {
+    // The real sequence since 2026-10-04: the transaction is built and signed
+    // so that it HAS a txid before it is broadcast, and only the broadcast can
+    // leave the outcome unknown. A fake that still answers `sendmany` would be
+    // testing a protocol the pool no longer speaks.
     return {
         sent: [],
+        calls: [],
         async getBalance() { return balanceWam; },
         async cmd(method, params) {
-            if (method !== 'sendmany') return null;
-            this.sent.push(params[1]);
-            return `txid-${this.sent.length}`;
+            this.calls.push(method);
+            switch (method) {
+                case 'createrawtransaction':
+                    this.sent.push(params[1]);          // the outputs, as before
+                    return 'raw' + this.sent.length;
+                case 'fundrawtransaction':
+                    return { hex: 'funded' + this.sent.length };
+                case 'signrawtransactionwithwallet':
+                    return { complete: true, hex: 'signed' + this.sent.length };
+                case 'decoderawtransaction':
+                    return { txid: `txid-${this.sent.length}` };
+                case 'sendrawtransaction':
+                    return `txid-${this.sent.length}`;
+                case 'getrawtransaction': {
+                    const e = new Error('No such mempool or blockchain transaction');
+                    e.ambiguous = false;
+                    throw e;
+                }
+                default:
+                    return null;
+            }
         }
     };
 }

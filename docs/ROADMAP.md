@@ -290,6 +290,49 @@ months after launch. Weekly notes, monthly releases, a public treasury spending 
 The consensus layer enforces that the 5% is *collected*; only disclosure shows what it was
 *used for*, and that gap is where trust is won or lost.
 
+**Decided by the founder on 16 October 2026: a release should carry something the
+software can now do, and not only a list of what it had wrong.** His reasoning was that a
+community which only ever sees defects concludes the thing is breaking, and that what
+raises a coin's standing is the software built around it rather than anything said about
+it. He is right, and the reason is not presentation.
+
+*A release process exercised only in emergencies is untested at the moment it matters.*
+The platform-build workflow sat unrun between 27 September and 16 October. Its first run
+after that found, in thirty-five seconds, that nobody could build this project from a
+clean clone — a `grep` matching nothing had been killing `fetch-upstream.sh` through
+`pipefail` since the commit that introduced it. Three weeks in which any developer who
+tried would have concluded the project did not compile. A cadence runs the machinery
+while it is calm.
+
+**But frequency is a risk here in a way it is not for an application.** Every node
+release is consensus-critical software that strangers run. Bitcoin Core ships roughly
+twice a year, not for lack of work, but because a chain that moves slowly makes fewer
+chances to ship a disagreement about which blocks are valid.
+
+**So the two must be separated, and today they are not.** The node, the miner, the
+wallet, the pool, the explorer, the tools and the documentation all ship under one
+version number, so improving a tool forces a node release. That coupling is the reason
+this cannot be done yet, and undoing it is the work:
+
+| what | how often |
+|---|---|
+| the node — consensus | rarely, and deliberately |
+| miner, wallet, pool, explorer, tools, site | whenever each is ready |
+
+**And not everything built raises standing.** The test is one question: *does this let
+somebody outside do something they could not do before, without asking us?*
+`verify_release.sh` passes it — anyone can check our binaries without believing us.
+`share/examples/wam.conf` passes it. The route for an operator to list his own pool by
+pull request passes it. The sixty-odd check scripts in `scripts/` do not: they make this
+project reliable and no stranger has ever run one. That is maintenance, it is necessary,
+and it is not the same thing.
+
+The cheapest items on that list are the ones already finished and never announced. The
+graphical wallet shipped in v0.1.11 and the channels were never told it existed — see
+`scripts/test/test_announcement_covers_release.py` for what that cost. An Electrum server
+has been running since before launch. Announcing what exists is worth more than building
+a fourth thing nobody hears about either.
+
 ### 5. Track upstream Bitcoin Core security releases
 
 WAM inherits Core's codebase and its vulnerabilities. A fork that stops merging upstream

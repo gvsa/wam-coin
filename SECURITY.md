@@ -88,8 +88,13 @@ bounty" — while three other places in the repository said "there is a bounty"
 and linked here. A reviewer followed our own sentence to our own file and found
 it contradicted. He was right and the file was wrong.
 
-**Nothing has been paid yet.** Between 14 and 15 September this paragraph
-claimed the opposite: that 1,000 WAM had already been paid to the reviewer who
+**What has been paid is in the ledger, and nothing else has.** 10,000 WAM went
+to chovy on 1–2 October 2026, 10,000 to Alboy on 11 October, 1,000 to
+Smooth Jazz Crypto on 13 October, and 250 to ahten on 15 October — 21,250 WAM
+to four people. The 1,000 for the pool API leak is the one still unpaid. Until 2 October this paragraph opened
+"nothing has been paid yet", which stayed after it stopped being true and
+contradicted the line further down this same file. Between 14 and 15 September
+it claimed the opposite error: that 1,000 WAM had already been paid to the reviewer who
 found the pool API leaking payout addresses, bought from a miner at a price the
 miners set in public, with the offers, the price and the transaction published.
 None of that had happened. Mainnet did not exist when the sentence was written,
@@ -109,14 +114,19 @@ Check it rather than believe it, from any node:
 
     wam-cli scantxoutset start '["addr(WdMMqW1DcgWZ6HtyJuEMdce6QkKg4raGmE)"]'
 
-At height 4,989 that returned 4,788 unspent outputs totalling 11,972.49400520
-WAM. One output per block, and it accrues 1,800 WAM per day.
+At height 19,371 that returned 10,760 unspent outputs totalling
+26,927.24421040 WAM. One output per block, and it accrues 1,800 WAM per day.
 
-**It has moved once.** This paragraph said "the treasury has never moved a
-coin since block 1", and that was true until 2026-09-22, when 500 WAM went to
-a GLEEC maintainer so he could run an atomic-swap test on a pull request he
-had opened and fixed himself. Not a listing fee — none was asked for and none
-was paid. Every coin that leaves the treasury is recorded with its amount, its
+**It has moved twenty times, and every movement is a bounty or a test coin.**
+This paragraph said "the treasury has never moved a coin since block 1", and
+that was true until 2026-09-22, when 500 WAM went to a GLEEC maintainer so he
+could run an atomic-swap test on a pull request he had opened and fixed
+himself. Not a listing fee — none was asked for and none was paid. The
+nineteen movements since are the bounties below: two of them left in nine
+instalments each, because the treasury is paid one 2.5 WAM output per block
+and never consolidated, so 10,000 WAM in a single transaction would be about
+4,000 inputs and six times what any node will relay. Every
+coin that leaves is recorded with its amount, its fee, its
 reason and its transaction id in
 [docs/TREASURY_LEDGER.md](docs/TREASURY_LEDGER.md), and the balance above can
 be checked against the chain with the command above rather than believed.
@@ -138,8 +148,8 @@ running, which comes first, because a chain with no nodes has nothing worth
 securing.
 
 **This programme's share of it is one eighth: 93,750 WAM, for the whole life
-of the programme.** 11,000 of that is already committed to the two findings
-below. One of every class in the table above comes to 91,250, so the table is
+of the programme.** 21,250 of that has been paid against the findings below.
+One of every class in the table above comes to 91,250, so the table is
 payable even if every class is found — which is the test a promise has to
 pass before it is made.
 
@@ -183,6 +193,150 @@ been signed and broadcast and simply never arrived. The first of the nine was
 Every transaction id is in `docs/TREASURY_LEDGER.md`, and the total on the
 chain is 10000.00000000 WAM to `WcQCFiCzwikQTTmPeafn73e3asC32ofyLr`, which
 anybody can add up without asking us.
+
+**10,000 WAM — WAM-F5, pool share accounting, accepted 11 October 2026, PAID 11
+October 2026.** Nine transactions, every id in `docs/TREASURY_LEDGER.md`: a test
+payment of 10 WAM sent first and confirmed received, then 1,248.75 eight times.
+This heading said "first instalment paid" until 2026-10-15, after all nine had
+gone out — the wording was true on the day it was written and nothing moved it
+when the rest followed the same day.
+
+The pool rebuilds its job every 55 seconds even when the tip has not moved, so
+that newly arrived transactions reach miners, and keeps four jobs submittable.
+On this chain the mempool is almost always empty, so every job at one height
+came out byte-identical — same coinbase, same merkle root, same header — and
+the duplicate-share guard was a `Set` held per job. One RandomX solution was
+therefore claimed again under each live sibling: up to three credits for one
+unit of electricity. PPLNS pays a miner his weight against everyone else's, so
+the excess came out of the other miners in the round, and one stratum
+connection with a valid payout address was the whole requirement.
+
+Reported by Alboy on 11 October 2026 and reproduced end to end over the
+stratum socket. Fixed in two independent places rather than one: the claim is
+now keyed to the work it was done on, in `pool/lib/blockTemplate.js`, and
+`pool/lib/shareProcessor.js` separately refuses a proof-of-work hash it has
+already credited in the round. Held down by
+`pool/test/cross-job-replay.test.js`.
+
+Classified at 10,000 — *credit without entitlement, paying out coins nobody
+earned* — which is what it is, with no stretching of the rung's wording in
+either direction.
+
+Why it survived: `pool/test/share-claim.test.js` built one job and proved the
+guard refuses a repeat inside it. It never asked what happens across two. That
+test now builds two.
+
+**250 WAM — WAM-F6, a consensus field that no network assigned, accepted 11
+October 2026, not claimed.**
+
+`consensus.enforce_BIP94` was declared in `Consensus::Params` with no default
+initialiser, read in three consensus paths — `ContextualCheckBlockHeader`, the
+block assembler, and `GetNextWorkRequired` — and assigned by no network at all.
+The params object is heap-allocated, so every one of those reads was
+indeterminate. It read false on the binaries this project released, which is
+the behaviour this chain has had since block 1; but an indeterminate read is
+not a promise, and a compiler owes nobody that answer. That is the shape that
+makes two nodes disagree about which blocks are valid.
+
+Measured consequence: `mining_basic.py test_timewarp` failed on WAM's regtest,
+on the exact assertion the BIP94 mitigation exists to satisfy.
+
+Also reported by Alboy, the same day. Fixed by assigning the field in all three
+networks in `src/wam/chainparams.cpp` — false on mainnet and testnet, which
+keeps the behaviour the released binaries already had, and true on regtest. The
+class is now held down by `scripts/check_consensus_params.py`, which fails the
+sweep if any scalar in `Consensus::Params` is left both undefaulted and
+unassigned by some network.
+
+Hardening rung, 250 WAM. The reporter claimed the 10,000 above and has not
+asked for this one. It is payable on request, at the rung.
+
+**1,000 WAM — pool maturation, a matured block could lose every trace of who
+was owed what, accepted 12 October 2026, PAID 13 October 2026.** One
+transaction of 402 inputs, txid
+`867bffa18cafda9a82349125a2c1e15828a095ffe584b44dfa63d90d722dab70`, in block
+19,370, and in `docs/TREASURY_LEDGER.md` with the rest.
+
+When a block matured, the pool deleted it from `blocks:pending` and only then
+wrote the evidence to `blocks:maturing` — two separate Redis commands. An
+interruption between them left the block in no state at all: gone from
+pending, absent from maturing, never credited.
+
+What makes that final rather than inconvenient is one line in `recordBlock`:
+the round's shares are deleted in the same pipeline that writes the pending
+record. So that field is not a copy of anything. It is the only surviving
+statement of what each miner in the round is owed, and once it is gone the
+payout table cannot be rebuilt — not by the pool on restart, not by an
+operator by hand. The coins arrive in the pool's wallet with nobody able to
+say whose they are.
+
+The code argued for that order in a comment: *losing a credit is recoverable;
+paying it twice is not.* The second half is true. The first half was false,
+and the line deleting the round is what falsified it. The defect was a
+deliberate trade-off resting on a premise the code had already broken.
+
+Reported by Smooth Jazz Crypto (@smoothjazcrypto) on 12 October 2026, against
+`87ac8f0`, with a reproduction over the project's own test harness and the
+fix: make the transition one server-side operation. Fixed in
+`pool/lib/atomic.js` — a Lua script moves the field and writes the evidence
+together, and the pool refuses to start against a Redis that cannot run it,
+because a fallback is the same defect reachable by configuration. `_orphan`
+had the identical shape, was not reported, and was found while fixing this.
+
+Classified at 1,000 — the rung for denial of service against the pool — and
+said plainly as a judgement rather than a reading of the wording. The
+mechanism is the credit ledger, which is the 10,000 rung; the impact is one
+block's payout table inside a sub-second window that no attacker can cause,
+which is the 1,000 band.
+
+The reporter also made the point that mattered most. The regression test for
+the September finding crashes the pool at a point somebody chose — after the
+evidence is written — so the one interval it never touched was the one this
+fault lived in. `pool/test/crash-window.test.js` chooses nothing: it walks
+the failure across every Redis command the maturation path issues, one run
+per position, and asserts after each that the block is still recoverable.
+
+**250 WAM — pool address validation, valid base58 addresses refused as bech32,
+accepted 15 October 2026, PAID 15 October 2026.** One transaction of 102
+inputs, txid
+`2ba6139518819ffeee0a15d4075680f04fa00a4730859cbe206ea4b1c57c2d12`, in block
+21,114, and in `docs/TREASURY_LEDGER.md` with the rest.
+
+`addressToScript` in `pool/lib/util.js` tested whether an address *looked like*
+bech32 before trying to decode it as base58. The test asks whether there is a
+`1` with only bech32 characters after it, and a valid base58 address answers
+yes by chance about one time in twenty — measured at 4.99% over 200,000
+generated mainnet P2PKH addresses here, and at 5.04%, 4.8% and 5.12% in the
+reporter's own three simulations.
+
+This project's own treasury address is one of them.
+`WdMMqW1DcgWZ6HtyJuEMdce6QkKg4raGmE` lower-cases to a `1` followed by 27
+characters that all happen to be in the bech32 alphabet, so the pool called it
+*a segwit address for 'wdmmqw'* and refused it, while base58check decodes it
+cleanly as version 73 — this network's P2PKH version.
+
+A miner whose address matched was refused at `mining.authorize` and
+disconnected, told that his own address belonged to another chain. An operator
+whose `poolAddress` matched could not start his pool at all.
+
+No funds were at risk: payments go out through `sendmany`, where the node
+parses the address, and an affected address never reached that point.
+
+Reported by ahten (@ahteen66) on 15 October 2026, with a reproduction against
+the project's own test harness, prevalence simulations, and the fix. He also
+found the thing that makes this more than one file's mistake: the identical
+fault was fixed in the miner on 19 September 2026, in `miner/src/address.h`
+(`2e91026`), and the pool was never updated with it. `pool/lib/util.js` carried
+its original commit, twenty-six days later.
+
+Fixed by decoding first: base58check carries a checksum, so it decides instead
+of guessing, and a real segwit address cannot survive it. The message that
+names a Bitcoin or Litecoin address is kept — it is a useful answer to a
+routine mistake — and now runs after the decoder has refused the address
+rather than before it.
+
+Classified at 250, the hardening rung, which is where the reporter classified
+it. Held down by `pool/test/address-validation.test.js`.
 
 **1,000 WAM — the pool API leak, accepted 13 September 2026, unpaid.** Three of
 four `/api/*` endpoints returned every miner's full payout address while the
@@ -246,7 +400,7 @@ To check a download:
 ```
 gpg --import SIGNING-KEY.asc
 gpg --verify SHA256SUMS.asc SHA256SUMS
-curl -LO https://wamcoin.org/downloads/v0.1.11/SHA256SUMS.asc
+curl -LO https://wamcoin.org/downloads/v0.1.13/SHA256SUMS.asc
 curl -LO https://wamcoin.org/verify_release.sh
 curl -LO https://wamcoin.org/SIGNING-KEY.asc
 bash verify_release.sh .

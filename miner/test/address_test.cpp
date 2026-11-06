@@ -82,6 +82,18 @@ int main()
     Pays("wam1q5lsgy00xkq2axdy6w985htrlxlpxcaw9kgnm8c",
          "0014a7e0823de6b015d3349a714f4bac7f37c26c75c5");
 
+    // ---- regtest legacy addresses -----------------------------------------
+    //
+    // kernel/chainparams.cpp gives regtest the same version bytes as testnet,
+    // 65 and 128. This file's own NetParamsFor said 100 and 196 -- Bitcoin's
+    // numbers -- so every legacy address a regtest node hands out was
+    // refused. The regtest gates all mine to a wamrt1... address, which never
+    // reaches a version byte, so nothing ever asked.
+    Pays("TCpSQcu85CJB5jMxqTU96BMawXYJQfNpFB",
+         "76a9141f3fd31be04ea9beb61bb8079626baf0f40da1a388ac", "regtest");
+    Pays("tZ7SSTgGoZVNc39RNtTDe5W9bJmjCPTU6n",
+         "a9141f3fd31be04ea9beb61bb8079626baf0f40da1a387", "regtest");
+
     std::printf("\n\033[1mand refuses what it must not pay\033[0m\n");
 
     // A single wrong character. This is exactly what the checksum is for, and
@@ -105,6 +117,30 @@ int main()
 
     Refuses("", "an empty address");
     Refuses("wam1", "a prefix with no payload");
+
+    Refuses("wam1qrulaxxlqf65madsmhqrevf467r6qmgdrxhf9y",
+            "a wam1 address with a character missing");
+
+    // ---- base58 that begins with our bech32 prefix -------------------------
+    //
+    // These two are valid base58check for mainnet, and the miner must refuse
+    // them anyway, because key_io.cpp refuses them:
+    //
+    //     is_bech32 = ToLower(str.substr(0, hrp.size())) == hrp
+    //
+    // Three characters, case-insensitive, no '1' needed. The node never tries
+    // base58 on them, so it cannot parse the address and cannot pay it. A
+    // solo miner who built a coinbase to one would mine a perfectly valid
+    // block paying a script his own wallet does not recognise, and the only
+    // symptom would be a balance that never arrives.
+    //
+    // About 1 legacy mainnet address in 1,700 begins this way. Checked
+    // against a real mainnet node with `wam-cli validateaddress`, which calls
+    // both of these invalid.
+    Refuses("WaM1eGQr6YgwTPrX3G6n2UZLVwWa8W9Qgb",
+            "valid base58, but begins with 'WaM' and the node will not parse it");
+    Refuses("WamP6fzPxQAmriTpSnHmNUX25MZwmiw8bS",
+            "valid base58, but begins with 'Wam' -- no '1' needed for the node");
 
     std::printf("\n  %d checks, %d failure(s)\n\n", checks, failures);
     return failures ? 1 : 0;

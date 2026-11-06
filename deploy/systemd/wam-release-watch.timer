@@ -17,7 +17,7 @@
 # ===========================================================================
 [Unit]
 Description=Ask every ten minutes whether the published release verifies
-Documentation=https://github.com/wamcoin-core-dev/wam-coin/blob/main/scripts/release_watch.py
+Documentation=https://github.com/wamcoin-Project/wam-coin/blob/main/scripts/release_watch.py
 
 [Timer]
 OnBootSec=4min

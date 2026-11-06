@@ -1,5 +1,17 @@
 # Rehearsals
 
+**This is a record of a fortnight that has ended: the rehearsals run between
+4 and 15 September 2026, before mainnet existed. Present tense in it means
+that date and not today.** Where it says "the two servers", there were two;
+the third arrived on 11 September and the day it arrived is in the table
+below. Nothing here is rewritten to agree with what came afterwards, because
+a log that is edited to stay current is not a log of anything.
+
+Said at the top because somebody asked the founder on 2026-10-04 how many
+machines this project runs and was told three, and had read two — on this
+page, in a sentence that was true when it was written. A reader lands here
+and reads the tense, not the date.
+
 One rehearsal a day until launch, decided on 4 September 2026.
 
 The reasoning is not that something is expected to be wrong. It is that every
@@ -557,6 +569,7 @@ Two of the six Winsock differences would have failed silently:
 
 ### Measured on Windows 11, 03:04–03:09
 
+<!-- wam:quote-begin -->
 ```
 --self-test     SHA-256, byte order, targets, both official RandomX vectors
 connected       pool.wamcoin.org:13333, subscribed, authorized
@@ -565,6 +578,7 @@ randomx         full memory (2 GiB dataset) built in 5.52 s
 shares          10 accepted, 0 rejected
 block 8478      solved at 03:05:46
 ```
+<!-- wam:quote-end -->
 
 and on the pool, on France:
 
@@ -695,7 +709,7 @@ guard that is broken. The difference is whether you read it or silence it.
 ### And the box said v0.1.8 while the binaries said v0.1.7
 
 Found by running the finished artifact rather than by reading anything.
-`platform-build #11` produced `wam-coin-v0.1.11-x86_64-w64-mingw32.zip`, and
+`platform-build #11` produced `wam-coin-v0.1.13-x86_64-w64-mingw32.zip`, and
 the node inside it answered
 
 ```

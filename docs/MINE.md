@@ -28,15 +28,15 @@ than left to surprise you.
 ## Linux — nine lines
 
 ```
-curl -LO https://wamcoin.org/downloads/v0.1.11/wam-coin-v0.1.11-x86_64-linux-gnu.tar.gz
-curl -LO https://wamcoin.org/downloads/v0.1.11/wam-miner-v0.1.11-x86_64-linux-gnu.tar.gz
-curl -LO https://wamcoin.org/downloads/v0.1.11/SHA256SUMS
-curl -LO https://wamcoin.org/downloads/v0.1.11/SHA256SUMS.asc
+curl -LO https://wamcoin.org/downloads/v0.1.13/wam-coin-v0.1.13-x86_64-linux-gnu.tar.gz
+curl -LO https://wamcoin.org/downloads/v0.1.13/wam-miner-v0.1.13-x86_64-linux-gnu.tar.gz
+curl -LO https://wamcoin.org/downloads/v0.1.13/SHA256SUMS
+curl -LO https://wamcoin.org/downloads/v0.1.13/SHA256SUMS.asc
 curl -LO https://wamcoin.org/verify_release.sh
 curl -LO https://wamcoin.org/SIGNING-KEY.asc
 bash verify_release.sh .
-tar -xzf wam-coin-v0.1.11-x86_64-linux-gnu.tar.gz && tar -xzf wam-miner-v0.1.11-x86_64-linux-gnu.tar.gz
-cd wam-coin-v0.1.11/bin
+tar -xzf wam-coin-v0.1.13-x86_64-linux-gnu.tar.gz && tar -xzf wam-miner-v0.1.13-x86_64-linux-gnu.tar.gz
+cd wam-coin-v0.1.13/bin
 ./wamd -daemon
 ./wam-cli createwallet "mine"
 ./wam-cli -rpcwallet=mine getnewaddress
@@ -102,8 +102,10 @@ whole reward rarely:
 ./wam-miner -o stratum+tcp://pool.wamcoin.org:3333 -u YOUR_ADDRESS -t 4
 ```
 
-There is more than one pool, and ours takes a 1% operator fee like the
-others. [Which pool](#which-pool) lists them.
+There is more than one pool. [Which pool](#which-pool) lists them. Each one
+states its own fee and its own payout rules on its own page, ours included —
+they are settings an operator can change, so this page does not carry numbers
+it has no way of keeping true.
 
 **COPY the address, do not retype it.** The checksum catches a single wrong
 character, which is what it is for. If your miner's log says "bech32 checksum
@@ -125,18 +127,18 @@ and no Linux. Open PowerShell and work in a folder you choose:
 
 ```
 mkdir C:\wam ; cd C:\wam
-curl.exe -LO https://wamcoin.org/downloads/v0.1.11/wam-coin-v0.1.11-x86_64-w64-mingw32.zip
-curl.exe -LO https://wamcoin.org/downloads/v0.1.11/wam-miner-v0.1.11-x86_64-w64-mingw32.zip
-curl.exe -LO https://wamcoin.org/downloads/v0.1.11/SHA256SUMS
-Expand-Archive wam-coin-v0.1.11-x86_64-w64-mingw32.zip -DestinationPath .
-Expand-Archive wam-miner-v0.1.11-x86_64-w64-mingw32.zip -DestinationPath .
+curl.exe -LO https://wamcoin.org/downloads/v0.1.13/wam-coin-v0.1.13-x86_64-w64-mingw32.zip
+curl.exe -LO https://wamcoin.org/downloads/v0.1.13/wam-miner-v0.1.13-x86_64-w64-mingw32.zip
+curl.exe -LO https://wamcoin.org/downloads/v0.1.13/SHA256SUMS
+Expand-Archive wam-coin-v0.1.13-x86_64-w64-mingw32.zip -DestinationPath .
+Expand-Archive wam-miner-v0.1.13-x86_64-w64-mingw32.zip -DestinationPath .
 ```
 
 **Check it before you run it.** One command, and it is the only step here that
 cannot be checked afterwards:
 
 ```
-curl.exe -LO https://wamcoin.org/downloads/v0.1.11/SHA256SUMS.asc
+curl.exe -LO https://wamcoin.org/downloads/v0.1.13/SHA256SUMS.asc
 curl.exe -LO https://wamcoin.org/SIGNING-KEY.asc
 curl.exe -LO https://wamcoin.org/verify_release.ps1
 powershell -ExecutionPolicy Bypass -File verify_release.ps1
@@ -166,7 +168,7 @@ Then the node, with the directory named explicitly so you always know where
 the wallet is:
 
 ```
-cd wam-coin-v0.1.11\bin
+cd wam-coin-v0.1.13\bin
 .\wamd.exe -datadir=C:\wam\data
 .\wam-cli.exe -datadir=C:\wam\data createwallet "mine"
 .\wam-cli.exe -datadir=C:\wam\data -rpcwallet=mine backupwallet C:\wam\wallet-backup.dat
@@ -191,6 +193,70 @@ Start-Process -FilePath .\wamd.exe `
 `Invoke-WebRequest`, which does not understand `-LO` and fails. The real
 program is `C:\WINDOWS\system32\curl.exe`, which is why every download
 above says `curl.exe` rather than `curl`.
+
+### Moving from the terminal node to the graphical wallet
+
+`wam-qt` is the same node with a window on it, so it replaces `wamd` rather
+than running beside it. Three things stop people on the way across, and all
+three were walked through with a miner on 16 October 2026 — every one of them
+cost a step that nothing on this page had warned about.
+
+**1. The wallet does not open the RPC port, and `wamd` does.** `bitcoind.cpp`
+says it in a comment: *-server defaults to true for bitcoind but not for the
+GUI*. So the moment you switch, your solo miner stops — and nothing explains
+why, because from the wallet's side everything is working. Put this in your
+`wam.conf`, in the data directory, before you start:
+
+```
+server=1
+```
+
+**2. If you installed before v0.1.10 on Windows or macOS, your chain and your
+wallet are in a folder called `Bitcoin`.** Until v0.1.10 the rename that gave
+Linux `~/.wam` changed one branch of `GetDefaultDataDir` and left the other
+two alone. The new default is `WAM`, so a wallet started without `-datadir`
+opens an empty directory and a wallet that is perfectly safe looks lost.
+
+Stop the node first — `wam-cli.exe stop`, and wait for the window to close,
+because copying a chain mid-write produces a copy that is not a chain — then:
+
+```
+robocopy %LOCALAPPDATA%\Bitcoin %LOCALAPPDATA%\WAM /E /R:1 /W:1
+```
+
+It ends with exit code 1, which means *files were copied*. Failure starts at
+8. Nothing is deleted: the old folder stays as a third copy of your keys.
+
+The node does warn about this by itself, but only when the old folder
+contains a `wam.conf` — and a node that has always been started with
+command-line flags has never written one. The warning did not fire for the
+one person it was written for, which is why it is on this page as well.
+
+**3. Pressing *Receive* shows a new address every time, and that is not a new
+wallet.** One wallet holds thousands of addresses, all derived from one seed,
+and a fresh one per payment is the point rather than an accident. Your mining
+address is untouched and still yours — the dialog that shows the new address
+names the wallet it came from, and it is the same one. Do not change what the
+miner is pointed at.
+
+A complete move, in order, with nothing left out:
+
+```
+wam-cli.exe listwallets                     # which wallet is open
+wam-cli.exe -rpcwallet=NAME backupwallet C:\wam-backup.dat
+wam-cli.exe stop                            # and wait for the window to close
+robocopy %LOCALAPPDATA%\Bitcoin %LOCALAPPDATA%\WAM /E /R:1 /W:1
+echo server=1> %LOCALAPPDATA%\WAM\wam.conf
+```
+
+Then start `wam-qt.exe`. It opens with no wallet loaded, because the node it
+replaces had none loaded either; **File → Open Wallet → your wallet**, and do
+not take the *Create a new wallet* button that is offered beside it. Then the
+miner, unchanged except for the one word in its cookie path:
+
+```
+wam-miner.exe --solo -u YOUR_ADDRESS -t 4 --rpccookie "%LOCALAPPDATA%\WAM\.cookie"
+```
 
 and the miner, from the folder it unpacked into. Alone against your own node,
 which is the better way — it needs `server=1` in `wam.conf` and the node
@@ -268,10 +334,10 @@ than anything we can measure ourselves.
 
 ```
 mkdir -p ~/wam && cd ~/wam
-curl -LO https://wamcoin.org/downloads/v0.1.11/wam-coin-v0.1.11-arm64-apple-darwin.tar.gz
-curl -LO https://wamcoin.org/downloads/v0.1.11/wam-miner-v0.1.11-arm64-apple-darwin.tar.gz
-curl -LO https://wamcoin.org/downloads/v0.1.11/SHA256SUMS
-curl -LO https://wamcoin.org/downloads/v0.1.11/SHA256SUMS.asc
+curl -LO https://wamcoin.org/downloads/v0.1.13/wam-coin-v0.1.13-arm64-apple-darwin.tar.gz
+curl -LO https://wamcoin.org/downloads/v0.1.13/wam-miner-v0.1.13-arm64-apple-darwin.tar.gz
+curl -LO https://wamcoin.org/downloads/v0.1.13/SHA256SUMS
+curl -LO https://wamcoin.org/downloads/v0.1.13/SHA256SUMS.asc
 curl -LO https://wamcoin.org/SIGNING-KEY.asc
 curl -LO https://wamcoin.org/verify_release.sh
 bash verify_release.sh .
@@ -285,9 +351,9 @@ WAM release, unmodified since it was signed`.
 Then:
 
 ```
-tar -xzf wam-coin-v0.1.11-arm64-apple-darwin.tar.gz
-tar -xzf wam-miner-v0.1.11-arm64-apple-darwin.tar.gz
-cd wam-coin-v0.1.11/bin
+tar -xzf wam-coin-v0.1.13-arm64-apple-darwin.tar.gz
+tar -xzf wam-miner-v0.1.13-arm64-apple-darwin.tar.gz
+cd wam-coin-v0.1.13/bin
 ./wamd -datadir=$HOME/wam/data -daemon
 ./wam-cli -datadir=$HOME/wam/data createwallet "mine"
 ./wam-cli -datadir=$HOME/wam/data -rpcwallet=mine backupwallet $HOME/wam/wallet-backup.dat
@@ -340,7 +406,7 @@ have just checked, and never because a stranger told you to.
 ## The one line that is not optional
 
 ```
-curl -LO https://wamcoin.org/downloads/v0.1.11/SHA256SUMS.asc
+curl -LO https://wamcoin.org/downloads/v0.1.13/SHA256SUMS.asc
 curl -LO https://wamcoin.org/verify_release.sh
 curl -LO https://wamcoin.org/SIGNING-KEY.asc
 bash verify_release.sh .
@@ -355,10 +421,10 @@ afterwards.
 
 Real coins on the live chain. Mainnet opened at 00:00 UTC on 15 September
 2026. A block pays 50 WAM: 47.50 to whoever found it and 2.50 to the
-treasury, by a consensus rule every node checks. There is no price, no
-exchange and nothing to sell them on, and there may never be. Mine because
-you want to hold the coin of a chain you can verify, not because you expect a
-market.
+treasury, by a consensus rule every node checks. This project sets no price
+and runs no market, and what you mine may never be worth anything. Mine
+because you want to hold the coin of a chain you can verify, not because you
+expect a market.
 
 Coins from a block cannot be spent for 100 blocks, about three hours. That is
 consensus, not the pool.
@@ -368,21 +434,56 @@ consensus, not the pool.
 There is more than one, and they are not run by us:
 
 ```
-pool.wamcoin.org:3333             run by this project, 1% operator fee
-wam.ariabrain.com:3333
+pool.wamcoin.org:3333             run by this project, and :3334 :3335 higher
 stratum.cryptopickaxe.co.uk:6040
+wampool.vslabs.co.in:3333         and :3334 for servers and farms
+veinpool.fr:3310                  and :3311 for servers, a higher start
 ```
 
 Ask their operators about their fees and their payout rules — those are
-theirs to state, not ours to state for them. All three answered when this
-page was last checked; if one does not answer for you, try another.
+theirs to state, not ours to state for them. A check in this repository
+dials every address on this page on every sweep, so if one stops answering
+we find out rather than hearing it from a miner. If one does not answer for
+you, try another.
 
-**Ours charges the same as the others on purpose.** It ran at 0% while it was
+**One is not answering, and it is listed here anyway so that nobody wonders
+where it went.**
+
+<!-- wam:quote-begin -->
+    wam.ariabrain.com:3333
+<!-- wam:quote-end -->
+
+On 2026-10-08 it refused the connection, measured from this laptop and from
+all three seeds, in three countries, so it was not a block on one address.
+On 2026-10-18 it had become worse: the name does not resolve at all. Its
+website is up and the pool is still listed there, which is why nobody
+noticed — the page a reader sees is not the port a miner dials.
+
+It is out of the block above rather than deleted from the page. The pool is
+its operator's to run and the page is ours, and a stranger following our
+instructions should not meet a dead address first. If it answers again it
+goes back up, and that is the operator's call to tell us rather than ours to
+keep testing forever.
+
+**Ours charges what the others charge, on purpose.** It ran free while it was
 the only pool in existence, and a pool charging nothing is not competing with
 the others — nobody can offer less than nothing. Matching their rate means
 you pick a pool for how it runs rather than for a number that cannot be
-beaten. The 1% is taken after the chain's 5% treasury output, and it goes to
-an address that receives nothing else, named on pool.wamcoin.org.
+beaten. Whatever the rate is, it is taken after the chain's 5% treasury
+output and swept to an address that receives nothing else, so what stays in
+the pool wallet is miners' money.
+
+**The rate itself is on <https://pool.wamcoin.org>, not here.** It is in the
+header and in the reward split, beside the address it is swept to, and in
+`/api/stats` under `config` — all three read out of the configuration the
+pool is actually running. That page is also where the rest of the payout
+policy is: the PPLNS window, the payout threshold, how often payments run,
+and how long a block matures before any of it reaches you. Those are
+settings, not consensus rules, and a number for any of them written here is a
+number nothing keeps in step. The fee was carried at two different values in
+two files for weeks — this page said one thing and `pool/config.mainnet.json`
+said another — and the only reason anybody found out was that somebody went
+looking. The pool always knew. Ask it.
 
 ## Mining alone, which works here
 
@@ -414,21 +515,45 @@ anyway.
 
 ### How, exactly
 
-> **A defect you should know about before you start.** `--solo` and `--check`
-> are in v0.1.10, which is published and downloadable. But the miner in
-> v0.1.10 can fail to send a block it has solved: it asks the node for work
-> every five seconds, treated every answer as a new job even when nothing had
-> changed, and remembered only the last eight. A worker keeps its job until
-> the chain moves on, about two minutes, so a block solved more than forty
-> seconds after its job was issued could not be rebuilt — and the miner
-> refused to send it rather than send something wrong. Roughly two blocks in
-> three were lost that way.
+> **Use v0.1.11 or newer.** `--solo` and `--check` first appeared in v0.1.10,
+> and the miner in that version could fail to SEND a block it had already
+> solved — roughly two in three were lost. It was reported by a miner on
+> 2026-09-26, found the same morning, and fixed in v0.1.11, which has been
+> published since 2026-09-27. Mining alone on v0.1.10 still loses blocks;
+> mining alone on v0.1.11 does not.
 >
-> It was reported by a miner on 2026-09-26, found the same morning, and fixed
-> in the source that day. **The fix needs v0.1.11 to reach you.** Until that
-> is published: mining to a pool loses nothing, and mining alone with
-> v0.1.10 will lose blocks. This is written here rather than left out because
-> anybody reading this page is deciding where to spend electricity.
+<!-- wam:quote-begin -->
+> This paragraph said "the fix needs v0.1.11 to reach you, and until that is
+> published, mining alone will lose blocks" for nine days after v0.1.11 was
+> published — so this page spent those nine days telling people not to mine
+> alone, which is the opposite of what it is for.
+<!-- wam:quote-end -->
+
+> **If you see "do not leave it running", read this first.**
+>
+> A line that looks like an emergency usually is not one:
+>
+>     1 block(s) found have NOT been accepted: 0 not sent, 1 refused by the
+>     node. That is real money; do not leave it running.
+>
+> **If `not sent` is 0, nothing was lost.** Another miner reached that height
+> a second before you did, the node took his block, and yours became a side
+> branch. That is ordinary proof of work, and it happens to everybody with
+> enough hash rate to win sometimes.
+>
+> The counts are cumulative for as long as the program runs, so one lost race
+> an hour ago repeats that line every thirty seconds for ever. Restarting the
+> miner clears it and costs nothing: the blocks you were paid for are on the
+> chain, not in the counter.
+>
+> **Do not stop mining over it.** Stopping recovers nothing and loses every
+> block you would have found afterwards. The line is wrong and it is ours: the
+> miner counts a lost race and a block it could not send in the same warning,
+> so the warning itself cannot tell you which one happened. The two numbers
+> can, and `not sent` is the one to read.
+>
+> `not sent` above zero is the other case, and that one is worth stopping for:
+> it means a block your machine solved never reached the node at all.
 
 You need two things running: your own node, and the miner pointed at it.
 
@@ -508,9 +633,21 @@ your address anyway.
 
 ## Your balance will say zero, and that is normal
 
-The pool pays out at **1 WAM** and runs a payment round every **10 minutes**.
-Below that threshold your earnings sit in the pool's ledger and not in your
-wallet, so
+Two things stand between your machine working and a number appearing in your
+wallet, and the first of them is a consensus rule rather than anything a pool
+decided.
+
+**A block's reward cannot be spent for 100 confirmations.** That is coinbase
+maturity, it lives in the chain and not in the pool, and it binds a solo
+miner exactly as hard. The pool works out your share of a block the moment it
+finds one, but holds that share against the block until it matures — so your
+unpaid balance lags the work that earned it by about three and a half hours,
+and then moves in steps rather than smoothly. The maturity queue is on the
+pool page, counted beside the blocks found.
+
+**Then there is a payout threshold and a payment round.** Both are settings,
+so both are on the pool's own page rather than on this one. Below the
+threshold your earnings sit in the pool's ledger and not in your wallet, so
 
 ```
 ./wam-cli -rpcwallet=mine getbalance
@@ -524,6 +661,7 @@ your share of each block the pool finds.
 Watch the ledger instead of the wallet:
 
     https://pool.wamcoin.org
+    https://pool.wamcoin.org/api/miner?address=YOUR_ADDRESS
 
 And if you change your payout address, your share history starts again from
 nothing. Whatever the old address had earned stays owed to that address.

@@ -35,8 +35,9 @@
 
 const EventEmitter = require('events');
 
-const { computeBlockRewards, estimateHashrate } = require('./rewards');
+const { computeBlockRewards, estimateHashrate, pplnsWindowDifficulty } = require('./rewards');
 const { COIN, COINBASE_MATURITY } = require('./constants');
+const { defineAtomicCommands, CLAIM_AND_RECORD_NAME } = require('./atomic');
 
 class ShareProcessor extends EventEmitter {
     /**
@@ -45,7 +46,10 @@ class ShareProcessor extends EventEmitter {
      */
     constructor(redis, daemon, config, logger) {
         super();
-        this.redis = redis;
+        // Before anything else, because a pool that cannot make the
+        // pending-to-evidence transition atomic must not start. See
+        // pool/lib/atomic.js for what the two-command version cost.
+        this.redis = defineAtomicCommands(redis);
         this.daemon = daemon;
         this.config = config;
         this.log = logger;
@@ -105,6 +109,70 @@ class ShareProcessor extends EventEmitter {
      * pay. A pool that pauses is a support ticket. A pool that pays twice is
      * the operator's own money, and a pool that skips a payment is a reputation.
      */
+    /**
+     * The broadcast's answer was lost. Did the transaction arrive?
+     *
+     * This is only answerable because the transaction was built and signed
+     * before it was sent, so it had a txid and a body before anybody could
+     * have seen it. With sendmany there was nothing to ask about and the only
+     * safe response was to stop and wait for a person.
+     *
+     * Returns true if the payment is known to be out there, false if the pool
+     * has been paused and a human has been told why. It never returns true on
+     * a guess: everything it does not understand ends in a pause.
+     */
+    async _settleUnknownPayment(txid, hex, cause) {
+        // Is it already known to this node -- mempool or chain?
+        try {
+            const tx = await this.daemon.cmd('getrawtransaction', [txid, true]);
+            if (tx && tx.txid === txid) return true;
+        } catch (err) {
+            // "No such mempool or blockchain transaction" is the node
+            // answering the question, not failing to. Anything else is a
+            // failure to ask, and is handled below by not guessing.
+            if (err.ambiguous !== false) {
+                this.paused = true;
+                this.log.error('could not ask the node whether the payment exists ' +
+                               `(${err.message}). PAYMENTS ARE PAUSED. The intent, ` +
+                               `with txid ${txid} and the exact bytes, is at ` +
+                               `${this.k('payment:inflight')}.`);
+                return false;
+            }
+        }
+
+        // Not known. Re-broadcasting the SAME bytes is safe by construction:
+        // same inputs, same outputs, same txid. The node either accepts it or
+        // tells us it already has it, and both answers mean the payment is
+        // out there. This is the one case where retrying a money RPC is not
+        // only allowed but correct, which is why sendrawtransaction is
+        // deliberately absent from MONEY_RPCS in daemon.js.
+        try {
+            await this.daemon.cmd('sendrawtransaction', [hex]);
+            this.log.warn(`re-broadcast ${txid} after a lost answer; the bytes ` +
+                          'were identical, so this cannot pay anybody twice');
+            return true;
+        } catch (err) {
+            const msg = String(err.message || '');
+            if (/already in block chain|txn-already|already have/i.test(msg)) {
+                return true;        // somebody else's copy got there first
+            }
+            this.paused = true;
+            this.log.error('=========================================================');
+            this.log.error('PAYMENT OUTCOME UNKNOWN AND NOT RECOVERABLE HERE.');
+            this.log.error(`  first failure : ${cause.message}`);
+            this.log.error(`  on retry      : ${msg}`);
+            this.log.error(`  txid          : ${txid}`);
+            this.log.error('');
+            this.log.error('  Balances have NOT been cleared. The signed bytes are');
+            this.log.error(`  in ${this.k('payment:inflight')}; the transaction can be`);
+            this.log.error('  looked up or sent again by hand:');
+            this.log.error('');
+            this.log.error(`    wam-cli getrawtransaction ${txid} true`);
+            this.log.error('=========================================================');
+            return false;
+        }
+    }
+
     async startupReconcile() {
         const raw = await this.redis.get(this.k('payment:inflight'));
         if (!raw) {
@@ -210,6 +278,47 @@ class ShareProcessor extends EventEmitter {
     // -----------------------------------------------------------------------
 
     async recordShare(share) {
+        // ONE PROOF OF WORK IS PAID FOR ONCE, WHATEVER DOOR IT CAME THROUGH.
+        //
+        // The claim in blockTemplate.js is the first gate and it is scoped to
+        // the work now. This is the second, and it exists because the first
+        // one has been got around twice by two different routes: once by the
+        // spelling of the key (hex case, 2026-10-04) and once by its scope
+        // (a sibling job at the same height, 2026-10-11). Both were found by
+        // somebody outside this project, and both were the same sentence --
+        // one unit of electricity, credited more than once, paid for by the
+        // other miners in the round.
+        //
+        // A third route is not worth waiting for. The RandomX hash IS the
+        // work: it cannot be produced twice without doing the work twice, it
+        // does not depend on which job carried it, and the pool already has
+        // it in hand here. SADD returns 0 if the member was already present,
+        // and it is atomic, so two shares racing cannot both pass.
+        //
+        // Scoped to the round and deleted with it, so the set is bounded by
+        // the shares in one block and never grows without end.
+        if (share.powHash) {
+            let fresh;
+            try {
+                fresh = await this.redis.sadd(this.k('round:pow'), share.powHash);
+            } catch (err) {
+                // A redis that cannot answer must not become a free pass: the
+                // share is refused rather than credited blind.
+                this.log.error(`could not check the proof of work for a share `
+                                  + `from ${share.worker}: ${err.message}`);
+                throw err;
+            }
+            if (fresh === 0) {
+                this.log.warn(`share from ${share.worker} carries a proof of `
+                                 + `work already credited this round `
+                                 + `(${share.powHash.slice(0, 16)}...) -- not `
+                                 + `credited again`);
+                this.stats = this.stats || {};
+                this.stats.replayedShares = (this.stats.replayedShares || 0) + 1;
+                return;
+            }
+        }
+
         const now = Math.floor(Date.now() / 1000);
         const entry = JSON.stringify({
             w: share.worker,
@@ -242,8 +351,15 @@ class ShareProcessor extends EventEmitter {
     _pplnsBufferSize() {
         const configured = this.config.pplnsMaxShares;
         if (configured) return configured;
+        // THE SAME NUMBER THE PAYOUT ASKS FOR, NOT A SECOND OPINION ON IT.
+        //
+        // This used `networkDifficulty * pplnsMultiplier` while rewards.js
+        // used `Math.max(1, ...)` of the same product. One floor, present in
+        // one file, and the buffer ended up a tenth of the window it feeds --
+        // see pplnsWindowDifficulty, which both now call.
         const avgShareDiff = this.config.startDifficulty || 1000;
-        const needed = (this.networkDifficulty * this.pplnsMultiplier) / avgShareDiff;
+        const needed = pplnsWindowDifficulty(this.networkDifficulty,
+                                             this.pplnsMultiplier) / avgShareDiff;
         return Math.max(10000, Math.min(2000000, Math.ceil(needed * 4)));
     }
 
@@ -274,6 +390,37 @@ class ShareProcessor extends EventEmitter {
      * Freezes the payout table and resets the round.
      */
     async recordBlock(share) {
+        // ONE BLOCK, ONE PAYOUT, HOWEVER MANY TIMES THIS IS CALLED.
+        //
+        // This was not safe to call twice, and nothing stopped it being. The
+        // pending record is keyed on the block hash so a second call merely
+        // overwrites it -- but the same call also runs `del(round)` and
+        // `incrby(poolfees)`, so a repeat WIPES A LIVE ROUND'S CONTRIBUTIONS
+        // and double-counts the fee. Every miner in that round loses the work
+        // they had done since the last block.
+        //
+        // It matters now because the spool drain has to offer a recovered
+        // block for payout without knowing whether the crash happened before
+        // or after the original accounting. The honest answer to "was this
+        // already paid" is to look, and the only safe way to let the drain ask
+        // is for asking twice to cost nothing.
+        //
+        // Both lists are checked, not just the pending one: a block recovered
+        // after it had already matured would otherwise be paid a second time.
+        //
+        // Found by dang150296 (Urriki1502) against bb6d521.
+        if (share.blockHash) {
+            const [pending, confirmed] = await Promise.all([
+                this.redis.hexists(this.k('blocks:pending'), share.blockHash),
+                this.redis.sismember(this.k('blocks:confirmed:hashes'), share.blockHash)
+            ]);
+            if (pending || confirmed) {
+                this.log.info(`block ${share.height} is already accounted for ` +
+                              `(${pending ? 'pending' : 'confirmed'}); nothing to do`);
+                return null;
+            }
+        }
+
         const [shares, roundContributions] = await Promise.all([
             this.mode === 'pplns' ? this.getPplnsShares() : Promise.resolve([]),
             this.getRoundContributions()
@@ -321,6 +468,10 @@ class ShareProcessor extends EventEmitter {
         const pipe = this.redis.pipeline();
         pipe.hset(this.k('blocks:pending'), share.blockHash, JSON.stringify(record));
         pipe.del(this.k('round'));           // PROP round closes here
+        // The proof-of-work set belongs to the round and dies with it. Left
+        // behind it would grow for ever and start refusing honest shares in
+        // the astronomically unlikely case of a repeat across rounds.
+        pipe.del(this.k('round:pow'));
         pipe.incrby(this.k('poolfees'), rewards.poolFee);
         await pipe.exec();
 
@@ -418,9 +569,31 @@ class ShareProcessor extends EventEmitter {
         record.orphanedAt = Date.now();
         record.orphanReason = reason;
 
+        // THE SAME TRANSITION, SO THE SAME ATOM.
+        //
+        // This was a pipeline, which is one round trip and not a transaction:
+        // HDEL could land and LPUSH not, and then the block had been dropped
+        // from pending with no orphan record anywhere. Less costly than the
+        // maturation case -- an orphan pays nobody -- but it is the identical
+        // mistake, and the orphan count and the pool-fee reversal below both
+        // depend on this having happened exactly once.
+        //
+        // It also now checks that it won the claim. It never did, so two runs
+        // could each orphan the same block and decrement poolfees twice.
+        const claimed = Number(await this.redis[CLAIM_AND_RECORD_NAME](
+            this.k('blocks:pending'), this.k('blocks:orphaned'),
+            hash, JSON.stringify(record)));
+        if (claimed !== 1) {
+            this.log.warn(`block ${record.height} was already orphaned by ` +
+                          'another run; not counting it again');
+            return;
+        }
+
+        // Everything below is repairable from blocks:orphaned if it is lost:
+        // a capped list, a counter and a fee reversal, all derivable from the
+        // evidence the atom above has already written. Only the payout table
+        // was irreplaceable, and it is now safe.
         const pipe = this.redis.pipeline();
-        pipe.hdel(this.k('blocks:pending'), hash);
-        pipe.lpush(this.k('blocks:orphaned'), JSON.stringify(record));
         pipe.ltrim(this.k('blocks:orphaned'), 0, 999);
         // Same reason as blocks:confirmed:count below. This list is capped at
         // 1000, so the orphan total would freeze there too -- later, quieter,
@@ -433,32 +606,34 @@ class ShareProcessor extends EventEmitter {
     }
 
     async _mature(hash, record) {
-        // The claim IS the delete. HDEL returns how many fields it removed, so
-        // of any number of concurrent callers exactly one gets 1 and the rest
-        // get 0 -- and only the winner credits. The guard above stops two runs
-        // in this process; this stops two processes, and a pipeline that was
-        // never atomic in the first place.
+        // THE CLAIM AND THE EVIDENCE ARE ONE OPERATION, OR NEITHER HAPPENS.
         //
-        // Until today the credit and the delete sat in one redis.pipeline(),
-        // which batches commands into one round trip and is NOT a transaction:
-        // a crash or a dropped connection between them left the balances
-        // credited and the block still pending, so the next run credited it
-        // again.
-        const claimed = await this.redis.hdel(this.k('blocks:pending'), hash);
+        // The claim is still the delete: HDEL reports how many fields it
+        // removed, so of any number of concurrent callers exactly one gets 1
+        // and only that one credits. The guard above stops two runs in this
+        // process; this stops two processes.
+        //
+        // What changed on 2026-10-12 is that the delete and the evidence are
+        // no longer two awaits. They were, and between them this block
+        // belonged to no state at all: gone from pending, absent from
+        // maturing, not credited. An interruption there destroyed the payout
+        // table, and because recordBlock deletes the round's shares in the
+        // same breath that writes it, there was nothing left to rebuild it
+        // from -- not for the pool and not for an operator by hand.
+        //
+        // The comment that used to sit here said losing a credit was
+        // recoverable. It was not. Reported by Smooth Jazz Crypto; see pool/lib/atomic.js.
+        record.maturedAt = Date.now();
+        const evidence = JSON.stringify(record);
+
+        const claimed = Number(await this.redis[CLAIM_AND_RECORD_NAME](
+            this.k('blocks:pending'), this.k('blocks:maturing'),
+            hash, evidence));
         if (claimed !== 1) {
             this.log.warn(`block ${record.height} was already claimed for ` +
                           'maturation by another run; not crediting it again');
             return;
         }
-
-        record.maturedAt = Date.now();
-        const evidence = JSON.stringify(record);
-
-        // Evidence inside the window that cannot be closed. If this process
-        // dies between the claim and the credit, this list is what tells an
-        // operator which block to replay by hand. Losing a credit is
-        // recoverable; paying it twice is not, so the order is deliberate.
-        await this.redis.lpush(this.k('blocks:maturing'), evidence);
 
         const pipe = this.redis.pipeline();
 
@@ -493,6 +668,19 @@ class ShareProcessor extends EventEmitter {
         // The list stays, because the page also wants the recent blocks to
         // show, and a sample and a count are two different questions.
         pipe.incr(this.k('blocks:confirmed:count'));
+        // AND A SET OF THE HASHES, FOR THE QUESTION "WAS THIS ALREADY PAID?"
+        //
+        // The list above is trimmed at 5000 and the counter is a number, so
+        // neither can answer it. recordBlock has to be able to: the spool
+        // drain offers a recovered block for payout without knowing whether
+        // the crash happened before or after the original accounting, and
+        // "already in pending" only covers a block that has not matured yet.
+        // Without this, a block recovered after maturing would be paid twice.
+        //
+        // A set of 32-byte hex strings, one per block ever confirmed. At 720
+        // blocks a day that is about 1.7 MB a year, which is the cheapest
+        // honest answer available.
+        pipe.sadd(this.k('blocks:confirmed:hashes'), record.blockHash);
         pipe.lrem(this.k('blocks:maturing'), 0, evidence);
 
         await pipe.exec();
@@ -636,9 +824,51 @@ class ShareProcessor extends EventEmitter {
         };
         await this.redis.set(this.k('payment:inflight'), JSON.stringify(intent));
 
+        // BUILD IT AND SIGN IT FIRST, SO IT HAS A NAME BEFORE IT HAS A FATE.
+        //
+        // sendmany creates and broadcasts in one call, so when the reply is
+        // lost there is nothing to ask about: no txid, no bytes, nothing to
+        // look up and nothing to send again. The only safe response was to
+        // pause and fetch a human, which is what the block below used to do
+        // every time -- correct, and it stops payouts until somebody is awake.
+        //
+        // Doing it in three steps gives the transaction an identity before
+        // anybody could have seen it. If the broadcast's answer is then lost,
+        // the recovery is a question with an answer: is this txid known? If
+        // yes, it was sent. If no, send these exact bytes again --
+        // sendrawtransaction is idempotent, same txid, same outputs, so
+        // re-sending cannot pay anyone twice.
+        //
+        // Reported by dang150296 (Urriki1502) on 2026-10-04: payout identity
+        // is created inside sendmany, with no deterministic txid or raw
+        // transaction stored before broadcast.
+        //
+        // The wallet still chooses the inputs and the change, through
+        // fundrawtransaction. Nothing about coin selection moves into this
+        // file; what moves is only WHEN the identity exists.
         let txid;
+        let signedHex;
         try {
-            txid = await this.daemon.cmd('sendmany', ['', sendMany]);
+            const raw = await this.daemon.cmd('createrawtransaction', [[], sendMany]);
+            const funded = await this.daemon.cmd('fundrawtransaction', [raw]);
+            const signed = await this.daemon.cmd('signrawtransactionwithwallet',
+                                                 [funded.hex]);
+            if (!signed || !signed.complete) {
+                throw Object.assign(
+                    new Error('the wallet could not fully sign the payment: ' +
+                              JSON.stringify((signed && signed.errors) || []).slice(0, 300)),
+                    { ambiguous: false });
+            }
+            signedHex = signed.hex;
+            const decoded = await this.daemon.cmd('decoderawtransaction', [signedHex]);
+            txid = decoded.txid;
+
+            // Written down BEFORE the broadcast, which is the whole point.
+            intent.txid = txid;
+            intent.hex = signedHex;
+            await this.redis.set(this.k('payment:inflight'), JSON.stringify(intent));
+
+            await this.daemon.cmd('sendrawtransaction', [signedHex]);
         } catch (err) {
             // THIS BLOCK USED TO ASSUME. Its comment read "the call failed, so
             // nothing was spent and the intent is stale", and it deleted the
@@ -656,30 +886,45 @@ class ShareProcessor extends EventEmitter {
             // site, a wrapper, a bug -- is unknown by default, because the
             // default has to be the direction that cannot lose money.
             if (err.ambiguous !== false) {
-                this.paused = true;
-                this.log.error('=========================================================');
-                this.log.error('PAYMENT OUTCOME UNKNOWN. PAYMENTS ARE PAUSED.');
-                this.log.error(`  ${err.message}`);
-                this.log.error('');
-                this.log.error('  The node may have broadcast this payment before the');
-                this.log.error('  connection failed. Balances have NOT been cleared, so');
-                this.log.error('  paying again would pay these miners twice.');
-                this.log.error('');
-                this.log.error('    wam-cli listtransactions "*" 20');
-                this.log.error('');
-                this.log.error(`  The intent is kept at ${this.k('payment:inflight')}.`);
-                this.log.error('  startupReconcile() prints what to do with it.');
-                this.log.error('=========================================================');
+                // An unknown outcome is now a QUESTION, not a dead end -- but
+                // only if the transaction got far enough to have a name. If it
+                // failed while being built or signed, nothing was broadcast
+                // and there is nothing to ask about.
+                if (txid) {
+                    const settled = await this._settleUnknownPayment(txid, signedHex, err);
+                    if (settled) {
+                        this.log.warn(`the payment's answer was lost (${err.message}) ` +
+                                      `but ${txid} is on the node. Continuing.`);
+                    } else {
+                        return;     // _settleUnknownPayment has paused and said why
+                    }
+                } else {
+                    this.paused = true;
+                    this.log.error('=========================================================');
+                    this.log.error('PAYMENT OUTCOME UNKNOWN BEFORE IT HAD A TXID.');
+                    this.log.error(`  ${err.message}`);
+                    this.log.error('');
+                    this.log.error('  It failed while being built or signed, so almost');
+                    this.log.error('  certainly nothing was broadcast -- but "almost" is');
+                    this.log.error('  not a word this pays miners on.');
+                    this.log.error('');
+                    this.log.error('    wam-cli listtransactions "*" 20');
+                    this.log.error('');
+                    this.log.error(`  The intent is kept at ${this.k('payment:inflight')}.`);
+                    this.log.error('=========================================================');
+                    return;
+                }
+            } else {
+
+                // A refusal from the node itself: it parsed the request and
+                // said no, so no transaction exists and the intent really is
+                // stale. Clearing it here is safe; leaving it would halt
+                // payments over a transient RPC error.
+                await this.redis.del(this.k('payment:inflight'));
+                this.log.error(`the payment was refused, balances left ` +
+                               `untouched: ${err.message}`);
                 return;
             }
-
-            // A refusal from the node itself: it parsed the request and said
-            // no, so no transaction exists and the intent really is stale.
-            // Clearing it here is safe; leaving it would halt payments over a
-            // transient RPC error.
-            await this.redis.del(this.k('payment:inflight'));
-            this.log.error(`sendmany refused, balances left untouched: ${err.message}`);
-            return;
         }
 
         // Only now is it safe to clear balances. Doing it before the RPC
@@ -732,6 +977,41 @@ class ShareProcessor extends EventEmitter {
     }
 
     async getHashrateStats() {
+        // ONE WINDOW, ONE READ, SHARED BY EVERY CALLER.
+        //
+        // This answer is pool-wide. It does not depend on who asked, and two
+        // callers a millisecond apart get the same numbers. It was being
+        // computed per caller anyway, and getMinerStats() below calls it --
+        // so every miner opening his own page pulled the WHOLE pool's share
+        // window out of redis and JSON.parsed all of it to find his own line.
+        //
+        // On 2026-11-05 that took the pool down. With ~200 workers the reply
+        // is tens of megabytes; the main thread could not drain them as fast
+        // as they were asked for, so redis buffered reply after reply for one
+        // client. Measured at the time: dataset 56 MB, output buffer 4.4 GB
+        // and still climbing, with client-output-buffer-limit normal 0 0 0
+        // and maxmemory 0 -- no brake anywhere. The kernel OOM-killed redis
+        // twice in four minutes, took wam-electrumx@testnet with it once, and
+        // between kills the saturated main thread filled the verification
+        // queue, so miners got "share rejected: verification queue full" --
+        // one miner reported 49 rejected and 0 accepted -- while the public
+        // pool page showed "API unreachable: HTTP 504".
+        //
+        // Three symptoms, one cause. The memo turns N callers into one read.
+        const ttl = this.config.hashrateCacheMs ?? this.config.apiCacheMs ?? 3000;
+        const memo = this._hashrateMemo || (this._hashrateMemo = {});
+        if (memo.value && Date.now() - memo.at < ttl) return memo.value;
+        // A read already running is the read this caller wants. Awaiting it
+        // is what stops a burst of requests becoming a burst of queries.
+        if (memo.inFlight) return memo.inFlight;
+
+        memo.inFlight = this._computeHashrateStats()
+            .then((v) => { memo.value = v; memo.at = Date.now(); return v; })
+            .finally(() => { memo.inFlight = null; });
+        return memo.inFlight;
+    }
+
+    async _computeHashrateStats() {
         const windowSec = this.config.hashrateWindowSec || 600;
         const since = Math.floor(Date.now() / 1000) - windowSec;
         const raw = await this.redis.zrangebyscore(this.k('hashrate'), since, '+inf');
@@ -762,6 +1042,32 @@ class ShareProcessor extends EventEmitter {
     }
 
     async getPoolStats() {
+        // Same shape as getHashrateStats above, and for the same reason.
+        //
+        // This reads up to five thousand confirmed blocks and JSON.parses
+        // every one of them to show twenty-five and to sum the treasury
+        // line. That is affordable once every few seconds and ruinous once
+        // per request.
+        //
+        // api.js does cache it -- but only after a reply completes. On
+        // 2026-11-05 no reply completed: the main thread was saturated, every
+        // request timed out at nginx's thirty seconds, so nothing was ever
+        // cached and every one of ~220 clients started its own full read.
+        // A cache that fills on success cannot break a stampede that never
+        // succeeds. This one dedupes the work itself, which holds whether or
+        // not anybody gets an answer.
+        const ttl = this.config.apiCacheMs ?? 3000;
+        const memo = this._poolStatsMemo || (this._poolStatsMemo = {});
+        if (memo.value && Date.now() - memo.at < ttl) return memo.value;
+        if (memo.inFlight) return memo.inFlight;
+
+        memo.inFlight = this._computePoolStats()
+            .then((v) => { memo.value = v; memo.at = Date.now(); return v; })
+            .finally(() => { memo.inFlight = null; });
+        return memo.inFlight;
+    }
+
+    async _computePoolStats() {
         // A COUNT IS NOT THE LENGTH OF A WINDOW.
         //
         // This read lrange(blocks:confirmed, 0, 49) and reported

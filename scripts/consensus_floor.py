@@ -96,6 +96,72 @@ NOT_A_VALIDITY_RULE = (
     "nMinimumChainWork",
 )
 
+# A VALIDITY RULE THAT WAS ASSIGNED THE VALUE IT ALREADY HAD.
+#
+# NOT_A_VALIDITY_RULE above is for fields that never decide whether a block
+# is valid. This is the other case, and it is not the same: the field IS a
+# validity rule, and the release did not change what it decides.
+#
+# enforce_BIP94 was declared with no default initialiser, read in three
+# consensus paths, and assigned by no network. Consensus::Params is
+# heap-allocated, so every read was indeterminate -- and read false on every
+# binary this project has released, which SECURITY.md records. v0.1.12
+# assigns false on mainnet and testnet. A v0.1.11 node and a v0.1.12 node
+# accept exactly the same blocks.
+#
+# Without this, the floor moved to v0.1.12 and release.yml demanded a
+# MANDATORY line. It was written, and every channel was told that a node on
+# an earlier version "will be rejected by the network and fork" -- which was
+# false for 49 of the 50 independent operators then on the network, all of
+# them on one chain with a v0.1.12 node at the time the notice went out.
+# That is the cry-wolf failure this file's own comments describe, reached
+# from the other direction: the guard could not distinguish a line changing
+# from behaviour changing, and a human agreed with it against the evidence.
+#
+# KEYED BY THE VALUE, NOT BY THE TAG.
+#
+# It was keyed by tag -- {"v0.1.12": ("enforce_BIP94",)} -- so the field was
+# dropped from v0.1.12's fingerprint and present in v0.1.13's. Nothing about
+# the field changed between them: src/wam/chainparams.cpp is byte for byte
+# identical at the two tags. The EXEMPTION lapsing is what made the two
+# fingerprints differ, so on 2026-10-31 release.yml refused to publish
+# v0.1.13 with "changes a consensus value and its tag has no MANDATORY:
+# line", and the value it was pointing at had not moved since before v0.1.12.
+#
+# An exemption that expires after one tag reports the release AFTER it as the
+# change. That is the same cry-wolf this block was written to end, moved one
+# release later.
+#
+# So the field is dropped while it still carries the value recorded here, and
+# at no other time. `= true` is never dropped, whatever tag it is at, and
+# nothing has to be remembered at the next tag.
+#
+# AND A HOLE THIS DID NOT MAKE, FOUND WHILE PROVING IT, WHICH IS OLDER.
+#
+# chainparams.cpp assigns enforce_BIP94 three times -- false on mainnet,
+# false on testnet, true on regtest, which is upstream's own value there.
+# The fingerprint is a set of DISTINCT normalised value lines and not a value
+# per network, so `consensus.enforce_BIP94 = true` is already in it because
+# of regtest. Setting mainnet's to true would therefore add a line the set
+# already holds, and the floor would not move -- the hard fork this file
+# exists to catch, invisible to it.
+#
+# That was true with this exemption and without it, and it was deferred once
+# -- "not a thing to do in the middle of cutting a release" -- which was the
+# right call for about four hours. The sweep run straight after v0.1.13
+# published then reported that 24 of 75 independent operators "will reject
+# every valid block and fork off at height 1" on MAINNET, because of that
+# regtest line. The same false sentence had already gone to every channel
+# once, in v0.1.12's MANDATORY line.
+#
+# It is fixed now, below, where the values are read: each is keyed by the
+# network class that assigns it, and regtest is left out of the floor
+# entirely. Proved both ways -- setting MAINNET's line to true changes the
+# fingerprint, and setting REGTEST's to false does not.
+ASSIGNED_NOT_CHANGED = {
+    "enforce_BIP94": "false",
+}
+
 
 def git(*args):
     r = subprocess.run(["git", "-C", str(REPO), *args],
@@ -113,7 +179,7 @@ def tags():
                   key=ver_tuple)
 
 
-def fingerprint_text(chainparams, params):
+def fingerprint_text(chainparams, params, tag=None):
     """Every consensus value in those two files, normalised, in a stable
     order. Separated from the git plumbing so the same definition serves the
     local walk below and the over-the-network comparison install.sh makes --
@@ -127,15 +193,65 @@ def fingerprint_text(chainparams, params):
     # the value itself.
     text = re.sub(r"/\*(?!nNonce=).*?\*/", " ", chainparams, flags=re.S)
     text = re.sub(r"//[^\n]*", "", text)
+    # EVERY VALUE IS KEYED BY THE NETWORK THAT ASSIGNS IT.
+    #
+    # Without this the fingerprint is a set of distinct value LINES, so one
+    # network's value hides another's. chainparams assigns enforce_BIP94
+    # false on mainnet, false on testnet and true on regtest -- upstream's own
+    # value there -- and on 2026-10-31 that single regtest line was the ONLY
+    # difference between v0.1.11's fingerprint and v0.1.12's. The floor moved
+    # to v0.1.12, and the sweep told us that 24 of 75 independent operators
+    # "will reject every valid block and fork off at height 1" on MAINNET,
+    # because of a value in a local test chain that each of them creates from
+    # scratch.
+    #
+    # That is the second telling of the same false sentence. The first went to
+    # every channel with v0.1.12's MANDATORY line and was wrong for 49 of the
+    # 50 operators then online.
+    #
+    # REGTEST IS EXCLUDED FROM THE FLOOR, and that is a decision with a reason
+    # rather than a convenience: regtest has no shared history. Whoever runs
+    # it mines block 1 himself, so no rule there can put him on the wrong side
+    # of a chain somebody else is already on -- which is the only thing this
+    # floor exists to measure. Mainnet and testnet both stay in; both are
+    # shared, and a node can be forked off either.
+    #
+    # A regtest-only consensus change is therefore invisible here, and must
+    # be: scripts/check_consensus_params.py reads the fields directly and is
+    # the guard over that ground.
+    bounds = [(m.start(), m.group(1))
+              for m in re.finditer(r"class\s+(C\w*Params)\b", text)]
+
+    def network_of(pos):
+        name = "?"
+        for start, cls in bounds:
+            if start <= pos:
+                name = cls
+            else:
+                break
+        return name
+
     for pat in CHAINPARAMS_PATTERNS:
-        for m in re.findall(pat, text):
-            v = re.sub(r"\s+", " ", m).strip()
+        for mo in re.finditer(pat, text):
+            net = network_of(mo.start())
+            if net in ("CRegTestParams", "CUnusedNetParams"):
+                continue
+            m = mo.group(1) if mo.groups() else mo.group(0)
+            v = net + ": " + re.sub(r"\s+", " ", m).strip()
             # See NOT_A_VALIDITY_RULE. Dropped after matching rather than by
             # narrowing the pattern, so that `consensus.` still catches every
             # field by default and an exception has to be named and argued
             # for -- a new consensus value must never be missed because a
             # regular expression was tightened to exclude a different one.
             if any(("." + f) in v for f in NOT_A_VALIDITY_RULE):
+                continue
+            # The field is a validity rule and it still carries the value it
+            # was assigned, so no release has changed what it decides. The
+            # moment it carries a different one it falls through to the list
+            # below and the floor moves. See ASSIGNED_NOT_CHANGED.
+            if any(("." + f) in v
+                   and re.search(r"=\s*" + re.escape(val) + r"\s*;?\s*$", v)
+                   for f, val in ASSIGNED_NOT_CHANGED.items()):
                 continue
             values.append(v)
 
@@ -151,10 +267,10 @@ def fingerprint_text(chainparams, params):
 def fingerprint(tag):
     """Every consensus value at that tag, read from this repository."""
     return fingerprint_text(git("show", f"{tag}:{CHAINPARAMS}"),
-                            git("show", f"{tag}:{PARAMS}"))
+                            git("show", f"{tag}:{PARAMS}"), tag)
 
 
-def fetch_tag(tag, repo="wamcoin-core-dev/wam-coin"):
+def fetch_tag(tag, repo="wamcoin-Project/wam-coin"):
     """The two consensus files at a tag, read from GitHub rather than from
     here. A checkout that is behind has tags that are behind too, so it
     cannot answer this question about itself."""
@@ -210,8 +326,12 @@ def main():
     # marker is missing.
     if args.compare_remote:
         a, b = args.compare_remote
-        fa = fingerprint_text(*fetch_tag(a))
-        fb = fingerprint_text(*fetch_tag(b))
+        # The tag is passed here too, or install.sh's over-the-network
+        # comparison and the local walk would answer differently about the
+        # same pair -- which is the one thing fingerprint_text exists to
+        # prevent.
+        fa = fingerprint_text(*fetch_tag(a), tag=a)
+        fb = fingerprint_text(*fetch_tag(b), tag=b)
         if fa is None or fb is None:
             print("unreadable")
             return 1

@@ -22,6 +22,7 @@
 
 const assert = require('assert');
 const ShareProcessor = require('../lib/shareProcessor');
+const { attachAtomic, attachUnsupported } = require('./fakeAtomic');
 
 let pass = 0;
 const fail = [];
@@ -55,7 +56,7 @@ function fakeRedis(confirmedCount, pendingCount, devFeePerBlock = 250000000) {
         pending[`h${i}`] = JSON.stringify({ height: 2000 + i, devFeeAmount: devFeePerBlock,
                                             minerPot: 4750000000, payouts: {} });
     }
-    return {
+    const r = {
         async lrange(key, start, stop) {
             const list = key.endsWith('blocks:confirmed') ? confirmed : [];
             return list.slice(start, stop === -1 ? undefined : stop + 1);
@@ -75,6 +76,8 @@ function fakeRedis(confirmedCount, pendingCount, devFeePerBlock = 250000000) {
         },
         async zrangebyscore() { return []; }
     };
+    attachUnsupported(r, 'it keeps blocks:pending as a plain object and blocks:confirmed as one array, for counting only');
+    return r;
 }
 
 function sp(redis) {

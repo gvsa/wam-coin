@@ -53,7 +53,7 @@ SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 . "$SCRIPTS_DIR/lib/python.sh"
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REPO="wamcoin-core-dev/wam-coin"
+REPO="wamcoin-Project/wam-coin"
 QUIET=0
 [ "${1:-}" = "--quiet" ] && QUIET=1
 

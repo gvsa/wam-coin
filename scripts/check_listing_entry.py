@@ -183,13 +183,10 @@ def main():
             # One field is asked for and not ours to change, and the rest are
             # dangerous. They must not be reported the same way.
             #
-            # `links` holds the repository URL, and the live one still points
-            # at the account that was locked on 2026-09-24. It was reported to
-            # the maintainer on 2026-09-25 -- GLEECBTC/coins#2034, kept in
-            # posts/replies/cipig-2034.txt -- and only he can edit that file.
-            # A red that nobody here can clear is a red that teaches the
-            # reader to skip the line, which this project has already paid for
-            # once.
+            # `links` holds the repository URL and only that repository's
+            # maintainer can edit it. A red that nobody here can clear is a
+            # red that teaches the reader to skip the line, which this project
+            # has already paid for once.
             #
             # So it warns while it is waiting, AND STOPS WAITING. After
             # WAITING_ON_UNTIL it is a failure again, because "reported" is
@@ -197,8 +194,30 @@ def main():
             # field fails immediately: a wrong prefix, port or confirmation
             # count does not inconvenience a reader, it sends somebody's coins
             # nowhere.
+            #
+            # TWICE NOW, AND THE SECOND TIME THIS CHECK WAS THE ONLY WITNESS.
+            # The first time the live link named the account locked on
+            # 2026-09-24; it was reported in GLEECBTC/coins#2034, kept in
+            # posts/replies/cipig-2034.txt, and he changed it. On 2026-10-29
+            # that replacement account was suspended in turn, so the one venue
+            # where WAM actually trades went back to sending anyone who
+            # pressed "source" to a 404 -- and nothing but this line said so,
+            # on 2026-10-30.
+            #
+            # This time a pull request went instead of a comment:
+            # GLEECBTC/coins#2077, one line, +1/-1, approved and merged
+            # FIFTEEN MINUTES after it was opened.
+            #
+            # So the messages below name no pull request number. A number is
+            # true for one incident and a lie at the next, and this block
+            # exists because a check that lies stops being read -- it was
+            # already telling us to send a request we had just sent. What
+            # they name instead is the part that does not go stale: a
+            # one-line request to this repository has been merged twice now,
+            # the second time inside a quarter of an hour, so there is no
+            # case for sitting in a warning and asking again.
             WAITING_ON = {"links"}
-            WAITING_ON_UNTIL = "2026-10-05"
+            WAITING_ON_UNTIL = "2026-11-13"
             import datetime as _dt
             overdue = _dt.date.today().isoformat() > WAITING_ON_UNTIL
 
@@ -207,14 +226,13 @@ def main():
                     msg = (f"live entry disagrees with ours: {k} is {theirs!r} "
                            f"at GLEECBTC/coins and {ours!r} here")
                     if k in WAITING_ON and not overdue:
-                        warn(f"{msg} -- asked for on 2026-09-25 in "
-                             f"GLEECBTC/coins#2034; only that repository's "
-                             f"maintainer can change it. This becomes a "
-                             f"failure on {WAITING_ON_UNTIL}.")
+                        warn(f"{msg} -- only that repository's maintainer can "
+                             f"change it. This becomes a failure on "
+                             f"{WAITING_ON_UNTIL}.")
                     elif k in WAITING_ON:
-                        bad(f"{msg} -- asked for on 2026-09-25 and still not "
-                            f"changed. Ask again, or send the one-line pull "
-                            f"request instead of waiting.")
+                        bad(f"{msg} -- open a one-line pull request against "
+                            f"GLEECBTC/coins. Two have been merged there, the "
+                            f"second within fifteen minutes of opening.")
                     else:
                         bad(msg)
             else:
@@ -241,14 +259,61 @@ def main():
     # testnet set, a wallet would be pointed at the wrong chain -- which is
     # exactly the state that was corrected on 2026-08-29.
     el = json.loads((KOMODO / "electrums-WAM.json").read_text(encoding="utf-8"))
+    # Local, not `if not _fails`. That read the whole run's tally, so a field
+    # disagreeing two checks above silently swallowed this line -- and a line
+    # that disappears when something else is wrong is worst exactly when it is
+    # needed.
+    ports_ok = True
     for s in el:
         url = s.get("url", "")
         ws = s.get("ws_url", "")
         if ":50002" not in url or ":50004" not in ws:
+            ports_ok = False
             bad(f"electrum entry {url} / {ws} does not use the published "
                 f"mainnet ports 50002 and 50004")
-    if not _fails:
+    if ports_ok:
         ok(f"{len(el)} electrum server(s), all on the published mainnet ports")
+
+    # And what a wallet is actually handed, which is a different file.
+    #
+    # Everything above reads OUR copy. A wallet reads GLEECBTC/coins, and the
+    # two came apart the moment a third server was verified on 2026-11-02: ours
+    # held three, the live file held two, and nothing here said so. The coin
+    # entry forty lines up has been read from the live copy since September for
+    # exactly this reason. The electrum list never was -- and it is the half
+    # that decides whether a wallet can read a balance at all.
+    #
+    # The two directions do not mean the same thing. A server in ours and not
+    # theirs is work prepared and not yet merged: expected between verifying an
+    # operator and the pull request landing, and the action is to open it or
+    # chase it. A server in theirs and not ours is a wallet being sent to an
+    # endpoint nobody here has verified, which is not paperwork.
+    try:
+        import urllib.request as _u
+        _req = _u.Request("https://raw.githubusercontent.com/GLEECBTC/coins"
+                          "/master/electrums/WAM",
+                          headers={"User-Agent": "wam-listing-audit"})
+        with _u.urlopen(_req, timeout=25) as f:
+            live_el = json.load(f)
+    except Exception as e:
+        unmeasured(f"could not read electrums/WAM at GLEECBTC/coins, so the "
+                   f"servers a wallet is actually given were not compared: {e}")
+    else:
+        ours_urls = {s.get("url") for s in el}
+        live_urls = {s.get("url") for s in live_el}
+        only_ours = sorted(ours_urls - live_urls)
+        only_live = sorted(live_urls - ours_urls)
+        if only_live:
+            bad(f"electrums/WAM at GLEECBTC/coins names {', '.join(only_live)}, "
+                f"which is not in ours -- a wallet is being handed a server "
+                f"nobody here has verified against the node")
+        if only_ours:
+            bad(f"{', '.join(only_ours)} is verified here and absent from "
+                f"electrums/WAM at GLEECBTC/coins, so no wallet is being given "
+                f"it. If the pull request is open this is the expected state; "
+                f"if it is not, the work is sitting here serving nobody")
+        if not only_ours and not only_live:
+            ok(f"{'live electrums':<18} matches ours, {len(live_urls)} server(s)")
 
     check_blockdx(prefix, num, hdr)
 

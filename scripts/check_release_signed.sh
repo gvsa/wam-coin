@@ -25,7 +25,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 GRN=$'\033[32m'; RED=$'\033[31m'; YLW=$'\033[33m'; BLD=$'\033[1m'; OFF=$'\033[0m'
-REPO="${WAM_REPO:-wamcoin-core-dev/wam-coin}"
+REPO="${WAM_REPO:-wamcoin-Project/wam-coin}"
 EXPECT="4BD4A8D3AFD43F5CBCB500E23798462FE00ADBA4"
 
 fails=0
@@ -66,7 +66,11 @@ fi
 # limit, and it is where the person this check speaks for will actually go.
 # GitHub is one of three mirrors of the SOURCE; it is not where a wallet is
 # fetched from, and a check must ask the place the reader will go.
-DOWNLOADS="https://wamcoin.org/downloads"
+#
+# Overridable so the failure paths can be tested against a server that misbehaves
+# on purpose -- see scripts/test/test_release_check_silence.sh. Nothing in
+# production sets it; the default is the only address a reader is ever sent to.
+DOWNLOADS="${WAM_DOWNLOADS:-https://wamcoin.org/downloads}"
 
 TAG="${1:-}"
 if [ -z "$TAG" ]; then
@@ -81,28 +85,127 @@ if [ -z "$TAG" ]; then
 fi
 
 tag="$TAG"
-index="$(curl -sS --max-time 25 "$DOWNLOADS/$tag/" 2>/dev/null)"
+
+# NOT ASKED IS NOT ANSWERED NO.
+#
+# This read the body and nothing else. An nginx error page has a body, so the
+# empty-string guard below never fired for one: the page was parsed for href=
+# links, none were found, and the check concluded that SHA256SUMS IS NOT
+# PUBLISHED -- which release_watch.py sends to Telegram and Discord as
+# "the release DOES NOT VERIFY ... being told the signature is not valid".
+#
+# On the night of 2026-10-03 that went out twice, at 12:05 and at 03:29, and
+# recovered at 12:16 and 03:39. Ten minutes each time, with nobody touching
+# anything, because ten minutes is the watcher's interval: one failed poll
+# alarms, the next one clears it. Nothing was ever wrong with the release. The
+# founder saw the pattern before the cause and said so: a half-finished upload
+# does not repair itself twice in a night.
+#
+# So: the status code is read, the body is checked for being our index at all,
+# and a transient failure is retried before anything is concluded. Only a page
+# that genuinely IS the listing may be used to say a file is missing from it.
+#
+# Exit 2 throughout, never 1. The watcher treats 2 as "could not ask" and says
+# nothing, which is the correct behaviour when we do not know -- and the same
+# distinction the pool payout path needed on the same day.
+index=""
+http=""
+for attempt in 1 2 3; do
+    body="$(curl -sS --max-time 25 -w '\n%{http_code}' "$DOWNLOADS/$tag/" 2>/dev/null)"
+    http="${body##*$'\n'}"
+    body="${body%$'\n'*}"
+    if [ "$http" = "200" ] && printf '%s' "$body" | grep -q 'href="wam-'; then
+        index="$body"
+        break
+    fi
+    [ "$attempt" -lt 3 ] && sleep 5
+done
+
 if [ -z "$index" ]; then
-    warn "wamcoin.org/downloads/$tag/ did not answer"
+    if [ "$http" = "200" ]; then
+        # 200, but not our directory listing: a proxy page, a holding page, a
+        # truncated response. Whatever it is, the absence of a name in it
+        # proves nothing about the release.
+        warn "wamcoin.org/downloads/$tag/ answered 200 but did not look like the"
+        warn "download index -- no release archive is linked in it. Not reading"
+        warn "a missing name out of a page that is not the list."
+    else
+        warn "wamcoin.org/downloads/$tag/ did not answer (HTTP ${http:-none}, 3 tries)"
+    fi
     echo; exit 2
 fi
 names="$(printf '%s' "$index" | grep -oE 'href="[^"]+"' | cut -d'"' -f2)"
 echo "  release: $tag"
 
+# A NAME MISSING FROM THE INDEX IS NOT A FILE THAT IS NOT THERE.
+#
+# On 2026-10-31 at 11:00 UTC one of the two hosts behind wamcoin.org answered
+# this directory with 200 and a body that passed the test above -- it linked
+# archives -- and did not contain SHA256SUMS. So the watcher told Telegram
+# "the download cannot be verified by anyone" and advised setting the release
+# back to Draft.
+#
+# It was published the whole time. The other two hosts running the same
+# watcher never saw anything wrong, and this one recovered by itself on the
+# next cycle, ten minutes later. Four separate runs afterwards -- the laptop
+# and all three hosts -- verified it, and both addresses behind the domain
+# served the same twelve links.
+#
+# The index is a convenience. The file is the fact. So a name absent from the
+# listing is asked for directly before anything is said about it, and only a
+# 404 may mean absent. Anything else is exit 2, which the watcher reads as
+# "could not ask" and stays silent about -- the same distinction the index
+# fetch above already makes, carried one step further.
 for want in SHA256SUMS SHA256SUMS.asc; do
     if printf '%s\n' "$names" | grep -qx "$want"; then
         ok "$want is published"
-    else
-        bad "$want is NOT published -- the download cannot be verified by anyone"
+        continue
     fi
+    code="$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' \
+            "$DOWNLOADS/$tag/$want" 2>/dev/null)"
+    case "$code" in
+        200)
+            ok "$want is published (the directory index did not list it)"
+            ;;
+        404|410)
+            bad "$want is NOT published -- the download cannot be verified by anyone"
+            ;;
+        *)
+            warn "$want is not in the index, and asking the server for it"
+            warn "directly answered HTTP ${code:-none}. A file is not called"
+            warn "missing on that."
+            echo; exit 2
+            ;;
+    esac
 done
 [ "$fails" -gt 0 ] && { echo; printf '  %s%d problem(s)%s\n\n' "$RED" "$fails" "$OFF"; exit 1; }
 
 T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT
 base="$DOWNLOADS/$tag"
-curl -sSL --max-time 40 -o "$T/SHA256SUMS"     "$base/SHA256SUMS"
-curl -sSL --max-time 40 -o "$T/SHA256SUMS.asc" "$base/SHA256SUMS.asc"
+
+# The same distinction as above, one level down and with sharper teeth.
+#
+# `curl -o` writes whatever arrives, including a 502 page, and gpg then
+# verifies an HTML error document against a signature and says no. That path
+# reports "the published signature does not verify" -- the single most
+# alarming sentence this project can send -- because a web server hiccupped
+# for one second. The release would be untouched and perfect throughout.
+#
+# Retried, status-checked, and anything but a clean 200 exits 2.
+fetch() {
+    local url="$1" out="$2" code
+    for attempt in 1 2 3; do
+        code="$(curl -sSL --max-time 40 -o "$out" -w '%{http_code}' "$url" 2>/dev/null)"
+        [ "$code" = "200" ] && [ -s "$out" ] && return 0
+        [ "$attempt" -lt 3 ] && sleep 5
+    done
+    warn "$url did not download (HTTP ${code:-none}, 3 tries)"
+    return 1
+}
+
+fetch "$base/SHA256SUMS"     "$T/SHA256SUMS"     || { echo; exit 2; }
+fetch "$base/SHA256SUMS.asc" "$T/SHA256SUMS.asc" || { echo; exit 2; }
 
 # An empty keyring, so this proves what a stranger's machine would prove and
 # not what ours happens to trust already.

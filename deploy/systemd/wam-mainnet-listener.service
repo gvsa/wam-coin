@@ -32,7 +32,7 @@
 
 [Unit]
 Description=Count nodes waiting on the mainnet port, without being one
-Documentation=https://github.com/wamcoin-core-dev/wam-coin/blob/main/scripts/mainnet_listener.py
+Documentation=https://github.com/wamcoin-Project/wam-coin/blob/main/scripts/mainnet_listener.py
 After=network-online.target
 
 # If this unit fails, say so. A timer stays active however often the service

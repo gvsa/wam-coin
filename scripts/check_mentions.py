@@ -81,9 +81,6 @@ EXEMPT = {
         "tracked file -- there is nothing in it for an author to have marked. "
         "The text it scans was written by the check it just ran, seconds "
         "earlier, on this machine",
-    "scripts/check_post_text.py":
-        "it reads announcement drafts, which are the text itself -- there is "
-        "no code in them for a quotation to be part of",
     "scripts/check_channels.py":
         "CHANNELS.txt is a signed list of accounts; a quotation mark inside it "
         "would change the bytes the signature covers",

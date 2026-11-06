@@ -80,13 +80,28 @@ GRN = "\033[32m"; RED = "\033[31m"; OFF = "\033[0m"
 
 
 def load_master():
+    # 1, NOT 2. THE TWO MEAN OPPOSITE THINGS TO WHOEVER READS THIS.
+    #
+    # This project's convention is 0 pass, 1 a finding, 2 could not look --
+    # and these two are findings. A missing brand mark and a master of the
+    # wrong size are both real: the wallet would ship with no icon of its own.
+    # Pillow being absent, above, is the other case entirely, and it is the
+    # only exit 2 here.
+    #
+    # They were all 2 until 2026-10-12, and scripts/preflight.sh judged this
+    # script by "did it exit zero". So on every machine without Pillow -- which
+    # is every seed -- preflight reported "the GUI icons are missing or
+    # malformed, Windows and macOS would ship Bitcoin's logo", permanently,
+    # about four icons that were present and correct. A launch-readiness check
+    # that is always red about the same thing is one an operator learns to
+    # scroll past, which is worse than not having it.
     if not SOURCE.exists():
         print(f"{RED}the brand mark is missing: {SOURCE}{OFF}", file=sys.stderr)
-        sys.exit(2)
+        sys.exit(1)
     im = Image.open(SOURCE).convert("RGBA")
     if im.size != (1024, 1024):
         print(f"{RED}expected a 1024x1024 master, found {im.size}{OFF}", file=sys.stderr)
-        sys.exit(2)
+        sys.exit(1)
     return im
 
 

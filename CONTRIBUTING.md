@@ -80,6 +80,50 @@ node and check what it actually rejects.
 "Rename the binaries" that only inserted a comment left the project convinced for
 three days that its programs were called `wamd`.
 
+## Listing your pool
+
+If you run a WAM pool and want it on the mining page, open a pull request that
+adds it to **Which pool** in `docs/MINE.md`. Do not ask in chat and do not
+email. The reason is in the sentence already on that page: *ask their operators
+about their fees and their payout rules — those are theirs to state, not ours
+to state for them.* A pull request is you stating them, in your own words, with
+your name and a date on it.
+
+That matters most on the day something goes wrong. A pool that stops answering,
+or an operator who changes his terms without saying so, is not something this
+project can answer for — and the record shows exactly what was claimed, by
+whom, and when, rather than leaving a reader to guess how the line got there.
+veinpool was the first to do it this way, in #3, and it is the shape every
+listing takes from now on.
+
+Put this in the pull request body:
+
+```
+host:port          the stratum address, and what any second port is for
+where it runs      country or region; latency is the first thing a miner feels
+own node           does it run its own full node, or proxy to someone else's
+reward scheme      PPLNS, PROP, solo
+fee                the number, and what it is taken from
+minimum payout
+status page        if you have one
+contact            a Discord handle we can reach when your endpoint stops
+                   answering, because we will find out before your miners tell
+                   you
+```
+
+The last line is not a formality. A check in this repository dials every
+address on that page on every sweep. When one goes dark we would rather tell
+you than remove you.
+
+What happens then: the endpoint is dialled, the pull request is merged, and
+**then** it is announced in the Discord. That order is deliberate. The
+announcement points at a merged change anybody can open and read, so a miner
+hearing about a new pool can see what its operator actually claimed before he
+points a machine at it.
+
+Listing is not endorsement, and it never has been. An entry that stops
+answering is removed, and that is the whole of the relationship.
+
 ## Style
 
 Match the file you are editing. The C++ follows Bitcoin Core's conventions

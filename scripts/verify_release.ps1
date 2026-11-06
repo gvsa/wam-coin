@@ -168,7 +168,7 @@ if (-not (Test-Path -LiteralPath $sums)) {
              Select-Object -First 1
         if ($m) { $ver = $m.Matches[0].Groups[1].Value }
     }
-    $base = "https://github.com/wamcoin-core-dev/wam-coin/releases"
+    $base = "https://github.com/wamcoin-Project/wam-coin/releases"
     Write-Say ""
     Write-Say "Fetch the release into this directory first:"
     Write-Say ""

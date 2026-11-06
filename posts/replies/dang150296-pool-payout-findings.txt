@@ -33,16 +33,28 @@ pool/lib/daemon.js. They are one root cause with four faces, which is how the
 
 His disclosure is scoped correctly: the public repository carries invariants,
 formal models and mutation tests, no exploitation paths, and his own
-SECURITY.md routes unresolved findings to wam.coin.official@proton.me.
+security policy routes unresolved findings to wam.coin.official@proton.me.
 
 NOT IN THIS REPLY, DELIBERATELY: the bounty. The published tiers apply to this
 finding whether or not he asks, and he has asked for nothing -- the founder's
 reading is that he sees himself as part of the project rather than as a
 supplier, and that putting money in front of him now would change what he is
 doing here. It is raised when the fix ships and the finding is published,
-which is where SECURITY.md puts it anyway.
+which is where our published security policy puts it anyway.
+
+WHAT WAS WRONG WITH IT, KEPT RATHER THAN QUIETLY FIXED: the message names
+SECURITY.md three times, as bare text.          <!-- wam:quote-line -->
+.md is Moldova's top-level domain, so
+Telegram and Discord render it as a link to a host on a registry this project
+does not control -- in a message about where to report security findings.
+check_post_text.py exists for exactly this and caught it the next morning,
+after it had been sent. It went to one technical person in a DM, so it cost
+nothing, and the next draft written for a chat client uses the full URL.
+
+The text below is left as it went out. It is a record, not a draft.
 
 --------------------------------------------------------------- sent, unchanged
+<!-- wam:quote-begin -->
 
 We went through the repository, then through our own pool code against it.
 You were read properly, so here is what we found rather than a thank-you.
@@ -87,3 +99,4 @@ more pointed at our patch than at our old code.
 Your repository is scoped correctly: invariants and models, no exploitation
 paths, and your SECURITY.md says the right thing. Keep the detail of the two
 payout findings out of it until the fix is released.
+<!-- wam:quote-end -->

@@ -267,6 +267,32 @@ function witnessScript(version, program) {
 }
 
 /**
+ * The address did not decode as base58check. Name it if we recognise it, and
+ * otherwise hand back the decoder's own complaint unchanged.
+ *
+ * Pasting a Bitcoin or Litecoin address into a WAM pool is a routine mistake
+ * and deserves a routine answer, not "invalid base58 character '0'", which
+ * tells a miner nothing he can act on.
+ *
+ * This is a DESCRIPTION, not a decision. It runs only after base58check has
+ * already refused the address, which is why it is allowed to guess.
+ */
+function describeUndecodable(address, netVersions, decodeError) {
+    const looksBech32 = /^[a-z0-9]{1,20}1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{6,}$/i
+        .test(address);
+    if (!looksBech32) return decodeError;
+
+    const otherHrp = address.slice(0, address.lastIndexOf('1')).toLowerCase();
+    const known = { bc: 'Bitcoin mainnet', tb: 'Bitcoin testnet',
+                    bcrt: 'Bitcoin regtest', ltc: 'Litecoin' }[otherHrp];
+    return new Error(
+        `'${address}' is a segwit address for '${otherHrp}'` +
+        (known ? ` (${known})` : '') +
+        `, not for WAM. A ${netVersions.bech32 ? `'${netVersions.bech32}1…'` : 'WAM'} ` +
+        'address is required. Coins sent to another chain\'s address are lost.');
+}
+
+/**
  * Build the locking script for any WAM address.
  *
  * Handles base58 (P2PKH, P2SH) and bech32/bech32m (P2WPKH, P2WSH, P2TR).
@@ -276,36 +302,88 @@ function witnessScript(version, program) {
 function addressToScript(address, netVersions) {
     const hrp = netVersions.bech32;
 
-    // bech32 first: its addresses are unambiguous by prefix.
-    if (hrp && address.toLowerCase().startsWith(hrp + '1')) {
-        const { hrp: got, version, program } = decodeBech32(address);
-        if (got !== hrp) {
+    // THE HRP PREFIX IS BECH32-ONLY, AND THE RULE IS THE NODE'S, NOT OURS.
+    //
+    // key_io.cpp, DecodeDestination:
+    //
+    //     bool is_bech32 = (ToLower(str.substr(0, params.Bech32HRP().size()))
+    //                       == params.Bech32HRP());
+    //     if (!is_bech32 && DecodeBase58Check(str, data, 21)) { ... }
+    //
+    // Three characters, case-insensitive, and no '1' required. When they
+    // match, the node never attempts base58 at all. So a valid base58check
+    // address beginning "wam", "WAM", "WaM" and so on is one the node calls
+    // invalid -- about 1 in 1,700 legacy mainnet addresses.
+    //
+    // This file used `hrp + '1'`, which is narrower, so the pool accepted
+    // addresses the node refuses: WamP6fzPxQAmriTpSnHmNUX25MZwmiw8bS among
+    // them. A miner could authorize with one, mine, accrue a balance, and
+    // then every sendmany carrying him would fail -- taking the rest of the
+    // batch with it -- because the wallet that has to pay him cannot parse
+    // his address.
+    //
+    // Matching the node exactly is the only safe answer. The node is what
+    // pays; being more permissive than it is not generosity, it is a debt we
+    // cannot settle. The miner is told now, at authorize, with an address he
+    // can still change.
+    if (hrp && address.slice(0, hrp.length).toLowerCase() === hrp) {
+        try {
+            const { hrp: got, version, program } = decodeBech32(address);
+            if (got !== hrp) {
+                throw new Error(
+                    `address '${address}' is for network '${got}', not '${hrp}'. ` +
+                    'Refusing to pay to another chain.');
+            }
+            return witnessScript(version, program);
+        } catch (err) {
+            // A real base58 address that merely starts with the prefix gets
+            // told what is actually wrong. "bech32 checksum failed" sends a
+            // miner looking for a typo in an address that has none.
+            let base58 = true;
+            try { addressToHash160(address); } catch (ignored) { base58 = false; }
+            if (!base58) throw err;
             throw new Error(
-                `address '${address}' is for network '${got}', not '${hrp}'. ` +
-                'Refusing to pay to another chain.');
+                `'${address}' is valid base58check, but it begins with ` +
+                `'${address.slice(0, hrp.length)}'. This network's node reads any ` +
+                `address starting with '${hrp}' as bech32 and never tries base58 ` +
+                '(key_io.cpp, DecodeDestination), so it would call this address ' +
+                'invalid and could not pay it. Roughly 1 legacy address in 1,700 ' +
+                'lands here. Generate another one.');
         }
-        return witnessScript(version, program);
     }
 
-    // Catch a segwit address belonging to some OTHER chain before it falls
-    // through to the base58 decoder, which would report a meaningless
-    // "invalid base58 character" and leave the miner guessing. Pasting a
-    // Bitcoin or Litecoin address into a WAM pool is a routine mistake and
-    // deserves a routine answer.
-    const looksBech32 = /^[a-z0-9]{1,20}1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{6,}$/i
-        .test(address);
-    if (looksBech32) {
-        const otherHrp = address.slice(0, address.lastIndexOf('1')).toLowerCase();
-        const known = { bc: 'Bitcoin mainnet', tb: 'Bitcoin testnet',
-                        bcrt: 'Bitcoin regtest', ltc: 'Litecoin' }[otherHrp];
-        throw new Error(
-            `'${address}' is a segwit address for '${otherHrp}'` +
-            (known ? ` (${known})` : '') +
-            `, not for WAM. A ${netVersions.bech32 ? `'${netVersions.bech32}1…'` : 'WAM'} ` +
-            'address is required. Coins sent to another chain\'s address are lost.');
+    // DECODE FIRST. GUESS ONLY IF THE DECODE FAILS. The order is the whole
+    // point, and it is the same order miner/src/address.h has used since
+    // 2026-09-19.
+    //
+    // Until 2026-10-15 this file asked "does it look like somebody else's
+    // bech32?" before trying base58 at all. That question is a guess: it asks
+    // whether there is a '1' with only bech32 characters after it, and about
+    // one valid base58 address in twenty answers yes by chance -- measured at
+    // 4.99% over 200,000 addresses, on every network and for P2PKH and P2SH
+    // alike. This project's own treasury address is one of them:
+    // WdMMqW1DcgWZ6HtyJuEMdce6QkKg4raGmE lower-cases to a '1' followed by 27
+    // characters that all happen to be in the bech32 alphabet, so the pool
+    // called it a segwit address for 'wdmmqw' and refused it.
+    //
+    // base58check decides instead of guessing, because it carries a checksum.
+    // A real segwit address cannot survive it: the base58 alphabet has no
+    // '0', '1', 'i' or 'l', and the 25-byte length check catches the rest.
+    //
+    // A miner whose address matched was disconnected at mining.authorize. An
+    // operator whose poolAddress matched could not start his pool at all.
+    let decoded;
+    try {
+        decoded = addressToHash160(address);
+    } catch (err) {
+        throw describeUndecodable(address, netVersions, err);
     }
 
-    const { version, hash } = addressToHash160(address);
+    // Decoded, so it IS base58check and the question is only whose. A wrong
+    // version byte is answered here and never handed to the guess above --
+    // a Bitcoin legacy address decodes cleanly and deserves to be told that
+    // its version byte is not ours, not that it looks like something.
+    const { version, hash } = decoded;
     if (version === netVersions.pubkey) return p2pkhScript(hash);
     if (version === netVersions.script) return p2shScript(hash);
 
@@ -324,10 +402,15 @@ function validateAddress(address, netVersions) {
         return { ok: false, reason: 'empty address' };
     }
     try {
-        addressToScript(address, netVersions);
-        const hrp = netVersions.bech32;
-        const isBech32 = hrp && address.toLowerCase().startsWith(hrp + '1');
-        return { ok: true, kind: isBech32 ? 'bech32' : 'base58' };
+        // The kind is read off the script that was actually built, not
+        // guessed from the prefix. The prefix lies for the same reason it
+        // lied in addressToScript: WaM1eGQr6YgwTPrX3G6n2UZLVwWa8W9Qgb is
+        // base58check and lower-cases to "wam1...".
+        //
+        // A witness script is OP_0/OP_1..16 then a single push, so its first
+        // byte is below 0x60; P2PKH opens 0x76 0xa9 and P2SH 0xa9 0x14.
+        const script = addressToScript(address, netVersions);
+        return { ok: true, kind: script[0] <= 0x60 ? 'bech32' : 'base58' };
     } catch (err) {
         return { ok: false, reason: err.message };
     }

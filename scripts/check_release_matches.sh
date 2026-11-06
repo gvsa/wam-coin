@@ -48,7 +48,7 @@ SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$HERE"
 CHAINPARAMS="src/wam/chainparams.cpp"
-REPO="wamcoin-core-dev/wam-coin"
+REPO="wamcoin-Project/wam-coin"
 ALSO_SOURCE=0
 
 case "${1:-}" in

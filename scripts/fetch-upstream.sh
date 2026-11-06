@@ -88,6 +88,122 @@ git -C "$RANDOMX_DIR" checkout --quiet "$RANDOMX_TAG"
 # so a slip fails loudly instead of being discovered by a stranger's crash.
 RANDOMX_ARCH="${WAM_RANDOMX_ARCH:-x86-64}"
 
+# ===========================================================================
+#  THE NOTE THE ASSEMBLER WILL NOT ADD FOR YOU
+# ===========================================================================
+#
+# RandomX ships hand-written assembly -- jit_compiler_x86_static.S and its
+# ARM and RISC-V siblings -- and none of the three carries a
+# .note.GNU-stack section. When the linker meets one object without that
+# note it cannot know whether the code needs an executable stack, so it
+# assumes the worst and marks the WHOLE output RWE.
+#
+# Measured on the published v0.1.11 Linux release:
+#
+#     wam-cli  wam-tx  wam-util  wam-wallet     GNU_STACK RW
+#     wamd                                      GNU_STACK RWE
+#
+# One binary out of five, and it is the only one that links librandomx.a.
+#
+# It is not needed. RandomX takes its executable memory from mmap with
+# PROT_EXEC -- build/randomx/src/virtual_memory.c -- never from the stack, so
+# the permission buys nothing and removes a protection every other program we
+# ship has. An executable stack is the condition a stack-overflow exploit
+# needs in order to run what it wrote.
+#
+# Reported by dang150296 (Urriki1502) on 2026-10-12, with readelf output,
+# after the pool and the node had both been audited and this had not. Nothing
+# in this project read the hardening flags of the binaries it publishes;
+# scripts/check_binary_hardening.sh does now.
+#
+# The note is added here rather than passed at link time because librandomx.a
+# is a static archive: the objects inside it carry the answer, and no flag on
+# a later link can put a note into an object that has none.
+# AND IT IS GUARDED, BECAUSE THE DIRECTIVE IS ELF-ONLY.
+#
+# The first version of this appended the directive bare. It is correct on
+# Linux and it is not a directive at all on Windows: the mingw assembler
+# targets PE/COFF, reads the line as text and stops --
+#
+#     jit_compiler_x86_static.S:235: Error: junk at end of line, first
+#     unrecognized character is `-'
+#     FAIL librandomx.a did not build for x86_64-w64-mingw32
+#
+# -- so the Windows build was broken for everybody between that commit and
+# this one. Reported as issue #4 by gvsa within hours of the push, from a
+# WSL build of scripts/build_windows.sh. Nothing here builds for Windows, so
+# nothing here could have caught it; the platform-build workflow would have,
+# on the next release, which is after the damage.
+#
+# The files are .S with a capital S, so the C preprocessor runs over them
+# before the assembler does and __ELF__ decides. On Linux the note is
+# emitted; on mingw the three lines vanish before the assembler sees them.
+# EVERY BLOCK WE EVER WROTE, NOT JUST THE CURRENT ONE.
+#
+# The first attempt at this upgrade keyed on a marker string the broken
+# version had never written -- it says "Added by WAM", not "WAM:note" -- so
+# the test tree fell through to "there is already a note here, skip it" and
+# stayed broken, silently, which is the exact failure the upgrade exists to
+# prevent. Both spellings are matched below because both were shipped.
+# Both spellings, because both were shipped: the broken version's block
+# begins "/* Added by WAM", the current one "/* WAM:note.GNU-stack".
+#
+# Cut by LINE NUMBER, not with a sed address. The first attempt used
+# sed -E "/($PATTERN)/,\$d" with the pattern in a variable, and the pattern
+# contains a slash -- which is sed's own address delimiter, so it died with
+# "Unmatched ( or \(" and deleted nothing. The guarded block was then
+# appended BELOW the broken one, leaving the file with two directives and
+# still unbuildable on Windows. Twice wrong in the same half hour, and both
+# times it reported success.
+RANDOMX_PATCHED=0
+for _s in "$RANDOMX_DIR"/src/*.S; do
+    [ -f "$_s" ] || continue
+    # `|| true` because this script runs under `set -euo pipefail` and grep
+    # returns 1 when it matches nothing -- which is the normal case, on every
+    # clean clone, for every file. pipefail made that 1 the status of the
+    # whole pipeline, the assignment inherited it, and -e killed the script
+    # one line after "1/4 RandomX", printing nothing.
+    #
+    # So from the commit that added this block until 2026-10-16, fetching
+    # upstream from a fresh checkout failed for everybody, and the only trees
+    # it worked on were ones that had already been patched once. Both of my
+    # tests were upgrades of an existing tree, so neither touched it, and the
+    # last platform-build before it was 27 September. The workflow found it in
+    # 35 seconds on the first run after.
+    _mine="$(grep -nE 'WAM:note\.GNU-stack|Added by WAM' "$_s" | head -1 | cut -d: -f1 || true)"
+    if [ -n "$_mine" ]; then
+        # Ours. Guarded already means there is nothing to do; unguarded means
+        # a tree that cannot build for Windows or macOS and must be rewritten.
+        grep -q '__ELF__' "$_s" && continue
+        head -n "$((_mine - 1))" "$_s" > "$_s.wamtmp" && mv "$_s.wamtmp" "$_s"
+        log "     replaced an unguarded note in $(basename "$_s")"
+    elif grep -q 'note\.GNU-stack' "$_s"; then
+        continue        # upstream added one of its own: not ours to rewrite
+    fi
+    cat >> "$_s" <<'NOTE'
+
+/* WAM:note.GNU-stack -- see scripts/fetch-upstream.sh.
+   RandomX takes its executable memory from mmap, never from the stack, so
+   without this note the linker marks the whole node RWE. ELF only: on
+   mingw the directive does not exist and the assembler stops on it. */
+#if defined(__ELF__)
+.section .note.GNU-stack,"",%progbits
+#endif
+NOTE
+    log "     added a guarded .note.GNU-stack to $(basename "$_s")"
+    RANDOMX_PATCHED=1
+done
+
+# AND THE ARCHIVE HAS TO BE REBUILT, OR THE PATCH IS A COMMENT.
+#
+# The build below is skipped when librandomx.a already exists. An archive
+# built before the note was added does not have it, and the fix would then
+# apply to nothing while this script said it had applied it.
+if [ "$RANDOMX_PATCHED" = 1 ] && [ -f "$RANDOMX_DIR/build/librandomx.a" ]; then
+    log "     the note changed the sources; discarding the old librandomx.a"
+    rm -f "$RANDOMX_DIR/build/librandomx.a"
+fi
+
 if [ ! -f "$RANDOMX_DIR/build/librandomx.a" ]; then
     log "     building librandomx (ARCH=$RANDOMX_ARCH)"
     cmake -S "$RANDOMX_DIR" -B "$RANDOMX_DIR/build" \

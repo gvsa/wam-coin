@@ -75,7 +75,7 @@ BEGIN
             // Not a marketing line. Somebody who finds this process using
             // their CPU and opens its Properties should be told in one
             // sentence what it is doing and that they chose it.
-            VALUE "Comments",         "Mines WAM Coin to the address given on its command line, and takes no fee. Source: https://github.com/wam-coin-official/wam-coin"
+            VALUE "Comments",         "Mines WAM Coin to the address given on its command line, and takes no fee. Source: https://wamcoin.org"
         END
     END
     BLOCK "VarFileInfo"

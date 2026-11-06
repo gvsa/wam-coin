@@ -151,7 +151,28 @@ run "repository self-agreement"  bash scripts/audit_repo.sh
 # The backlog stays until a change that rewrites history anyway; this only
 # guarantees the backlog does not grow.
 run "no assistant attribution"   "$PY" scripts/check_attribution.py
+
+# The one thing that has actually cost this project an account. On 2026-09-24
+# a step in platform-build.yml mined two regtest blocks on a GitHub runner;
+# suspended within the hour, and the repository, every download and the whole
+# site answered 404 to the public on a release day. The step was fixed the
+# same day and nothing has enforced it since. Building on CI is not the
+# fault and never was -- the line is between work and PROOF of work.
+run "nothing of ours hashes on CI" "$PY" scripts/check_ci_mining.py
+
+# And the second account, on 2026-10-29. GitHub sent no reason; the founder
+# watched the cause happen -- a workflow started, failed, and was started
+# again, once, twice, three times, with nothing changed between the runs.
+# Their fourth Actions term is the words for it: a burden "disproportionate
+# to the benefits provided to users". This counts; it cannot stop a click.
+run "a failure is read, not repeated" "$PY" scripts/check_ci_reruns.py
 run "mention is not use"         "$PY" scripts/check_mentions.py
+
+# And the library those checks lean on. A quotation mark that opens a region
+# and never closes it silences the REST of its file, and the symptom is a
+# file that has gone quiet -- which nothing notices. On 8 October 2026 one
+# docstring sentence naming the convention had been doing that for weeks.
+run "a mention is not a mark"    "$PY" scripts/test/test_quoted.py
 run "every link resolves"        "$PY" scripts/check_links.py
 run "the zone is signed and validates" "$PY" scripts/check_dnssec.py
 run "the seeds inside the binary answer" "$PY" scripts/check_fixed_seeds.py
@@ -169,7 +190,53 @@ run "the listing entry matches source" "$PY" scripts/check_listing_entry.py
 # was read as covering the whitepaper, and the whitepaper was wrong for days
 # underneath a green line.
 run "the 3 code copies of vesting agree"  "$PY" scripts/check_vesting_sync.py
+
+# And the fields nothing copies, because WAM REPLACES upstream's chainparams
+# rather than editing it. A field upstream assigns and our replacement does
+# not keeps its declaration, keeps the code that reads it, and tells nobody.
+# consensus.enforce_BIP94 was exactly that: declared with no default, read in
+# validation.cpp, node/miner.cpp and pow.cpp, assigned by no network at all,
+# and indeterminate because the params object is heap-allocated. Found from
+# outside on 2026-10-11, not by us.
+# scripts/lib/components.py is where "what does this project ship, and on
+# whose version" is answered once. set_version.py and the announcement check
+# read it instead of each knowing the answer by heart. A central file that
+# has drifted is wrong everywhere that trusts it, at the same moment, so it
+# is asked whether it is still describing this repository.
+run "the manifest describes the repository" "$PY" scripts/check_components.py
+run "no consensus field is unset" "$PY" scripts/check_consensus_params.py
 run "supply arithmetic"          "$PY" scripts/verify_supply.py
+
+# "Which script pays this address" is answered in three places: the pool in
+# JavaScript, the miner in C++, and the node, which is consensus. Nothing
+# compared them until 2026-10-15, and two of them had drifted -- the pool was
+# refusing one valid base58 address in twenty, found from outside after
+# twenty-six days, and the miner was refusing every legacy regtest address
+# the node hands out, found by this check on its first run.
+#
+# It compiles a driver against miner/src/address.h, so without a C++ compiler
+# it exits 2 and says nothing was compared. --node is passed by the caller
+# when a mainnet node is reachable; without it the two copies are still
+# checked against each other.
+run "pool, miner and node agree on addresses" \
+    "$PY" scripts/check_address_agreement.py
+
+# How much has been paid in bounties is stated in four places by hand. On
+# 2026-10-13 the front page's footer said 21,000 WAM, which was right and
+# counted three payments, while the paragraph directly above it said the
+# exchange had happened "twice" and named two. Both sentences were visible at
+# once and contradicted each other for two days.
+run "the paid bounty total matches the ledger" \
+    "$PY" scripts/check_bounty_total.py
+
+# Three times now a sentence denying something has outlived the thing it
+# denied. CHANNELS.txt went stale three times in two days in September; the
+# front page said WAM was not listed when a venue had merged it; and on
+# 2026-10-15 four live documents at once still said there was no market, no
+# exchange and -- in the package handed to listing venues -- that the chain
+# had not launched, a month after it did.
+run "no live page denies what became true" \
+    "$PY" scripts/check_stale_denials.py
 run "executable bits in index"   bash scripts/test/test_exec_bits.sh
 
 # Its neighbour above checks that a script is marked runnable. This checks
@@ -183,6 +250,22 @@ run "line endings are LF"        bash scripts/test/test_line_endings.sh
 # pointed at a stranger's server. It reached the operator chat rather than the
 # public channel, which is the only reason it cost nothing.
 run "no alert looks like a link" "$PY" scripts/test/test_alert_text.py
+# And the other way an alarm does damage: being sent at all when nothing is
+# wrong. On the night of 2026-10-03 the channels were twice told the published
+# release DOES NOT VERIFY, recovering ten minutes later each time -- ten
+# minutes being the watcher's interval, with nobody touching anything. The
+# release was correct throughout; check_release_signed.sh read an nginx error
+# page, found no SHA256SUMS link in it, and said SHA256SUMS is not published.
+run "a check that cannot ask stays quiet" bash scripts/test/test_release_check_silence.sh
+# The same confusion, on the ops panel rather than in the channels. On
+# 2026-11-04 two rows read FAILING -- "electrum servers answer and agree" and
+# "a server we do not own agrees" -- while all four of our endpoints and cup's
+# were answering at the right height. One slow ssh to the France node had
+# raised TimeoutExpired out of check_electrum.py's own private copy of the ssh
+# call, past the caller's graceful path, and the panel printed the traceback
+# under those two names. wamssh.py exists so this is written once; this holds
+# the panel to using it.
+run "a hung ssh is not a failing service" "$PY" scripts/test/test_panel_ssh_silence.py
 # The release note inside a platform archive was wrong four times in one
 # evening, each time found by downloading the finished artifact. The root was
 # that the packaging is parameterised by platform and only one branch was ever
@@ -223,6 +306,14 @@ run "units report their own failure"  bash scripts/test/test_onfailure.sh
 # did anything else here. This one reads what we publish.
 run "published claims match consensus"  "$PY" scripts/check_published_claims.py
 
+# And the claims nothing can check, because they are about the future. Until
+# 2026-10-04 the front page said the founder's mining addresses "will be
+# published here" and that his share of the hash rate would fall "so you can
+# watch it fall". He has never mined and holds no WAM: it was a plan written
+# before launch, in the future tense, still standing nineteen days after the
+# future arrived. A reader quoted it back at him as a description of today.
+run "no page promises and forgets"  "$PY" scripts/check_promises.py
+
 # That one reads wam-params.h, which is consensus, and consensus has no opinion
 # about what has been SPENT. On 2 October the founder found "No fee was asked
 # and none was paid" on the front page about the venue we had sent 500 WAM to
@@ -232,6 +323,48 @@ run "published claims match consensus"  "$PY" scripts/check_published_claims.py
 # front page anyway, because nothing compared a claim about money to
 # docs/TREASURY_LEDGER.md.
 run "treasury claims match the ledger" "$PY" scripts/check_treasury_claims.py
+
+# That one reads what we SAY about the money. This reads the LEDGER itself,
+# against the chain, and it is the half that was missing. docs/TREASURY_LEDGER.md
+# does not merely record the spends: it hands the reader an identity and tells
+# him to repeat it -- 2.5 x height minus every amount and every fee is what a
+# node will report. On 2026-10-11 that worked example still stood at height
+# 4,989 and subtracted one 500 WAM spend, while ten further rows sat in the
+# table beneath it. Anybody who did as the file asked would have landed 10,010
+# WAM away from the chain, in the file about where the money went, and nothing
+# here had noticed for nine days.
+#
+# It also answers the question the ledger exists for: the identity cannot hold
+# if a coin ever left the treasury without a row.
+run "the ledger is what the chain says"  "$PY" scripts/check_treasury_ledger.py --node "${NODES%% *}"
+
+# All three of those read the pages. Nothing read the thing that WRITES them.
+# scripts/build_pages.py has put five defects on the live site -- an escaped
+# quotation mark mid-sentence in the whitepaper, numbered rules rendered
+# "1. 1. 1.", a build that hung on one line, three links to pages that never
+# existed, and ten indented blocks turned into prose with their whitespace
+# collapsed, among them the treasury address on /security/ and the Qt
+# filenames on /start/. Every one was found by a person looking at a rendered
+# page. The documents were right each time; only the page was wrong.
+run "the pages say what the documents say" "$PY" scripts/test/test_build_pages.py
+
+# And the one document generated from a binary rather than written. An
+# operator asked for an example wam.conf on 2026-10-13 and we shipped none:
+# the release is binaries and documents, and upstream's bitcoin.conf was
+# never renamed, never adapted and never packaged. share/examples/wam.conf
+# is generated from `wamd -help` so it cannot become a stale hand-written
+# list -- which only holds while somebody regenerates it. This compares the
+# committed option list against what the binary accepts today.
+run "the example conf matches the binary" "$PY" scripts/check_example_conf.py
+
+# And the script that actually moves it. On 2026-10-04 treasury_spend.py had
+# no test of any kind: 490 lines, the treasury's key in memory while it signs,
+# a file carried by hand between two machines, and nothing that runs. The pool
+# had fourteen test files. Both of its known faults -- selecting outputs an
+# unconfirmed transaction had already spent, and accepting a mistyped key --
+# were found by a person using it, which is the most expensive way to find
+# anything in a money path.
+run "the treasury spender refuses what it should" "$PY" scripts/test/test_treasury_spend.py
 
 # And the other half of that question, which had no detector until mainnet's
 # second day: the repository can be right while the WEBSITE is wrong. Two
@@ -270,6 +403,14 @@ run "the channel list's signature is current"  bash scripts/check_channels_signe
 # our fingerprint to a shop in Moldova. Found by the founder pressing it.
 run "no filename reads as a domain"  "$PY" scripts/check_post_text.py
 
+# And whether it arrives shaped the way it was written. On 2026-10-30 a
+# correction posted to a pool operator's #wam channel came out with its
+# sentences broken in half on a phone: it was wrapped at 72 columns, like
+# everything here, and Discord keeps a single newline rather than joining it.
+# Every fact in that text was right and it still read badly. Found by the
+# founder, in the channel, after sending.
+run "the text renders as written"   "$PY" scripts/check_wrapping.py
+
 # Asked before a chain is started, not after. A consensus value that changes
 # once blocks exist invalidates every block mined under the old one, and the
 # running nodes are the last to notice.
@@ -288,6 +429,34 @@ printf '\n%sthe network as strangers meet it%s\n' "$BLD" "$OFF"
 # machine the sweep is run from.
 run "DNS seeds answer x9."    bash scripts/check_dns_seeds.sh
 
+# Which strings on a page are an address at all. The check below has been
+# wrong in both directions -- it read a line of our own source as a host for
+# three days, and it never once dialled the bare second port two pools
+# publish for farms. Both were in the extraction, which needs no network, so
+# it is held here rather than discovered by a stranger.
+run "every address on the page, and nothing that only looks like one" \
+    "$PY" scripts/test/test_endpoint_extraction.py
+
+# Every host:port on a page a stranger reads. The mining guide sent miners to
+# a testnet port that had stopped existing on launch day, and on 8 October
+# 2026 it was naming a third-party pool whose stratum port refuses the
+# connection from four different countries. The sentence "all three answered
+# when this page was last checked" is a claim with no checker behind it.
+run "published endpoints answer, and will next month" \
+    "$PY" scripts/check_published_endpoints.py
+
+# Every page sends a reader to wamcoin.org/downloads/<newest>/. On
+# 2026-10-16 that directory answered 404 for four minutes after v0.1.12 was
+# published, because the archives had not been uploaded to our own hosts
+# yet. Eight things were verified before publishing, and not the one URL a
+# stranger actually follows. release_watch caught it and held the
+# announcement; this is so the net is not the thing that catches it.
+newest_tag="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+if [ -n "$newest_tag" ]; then
+    run "the newest release is downloadable" \
+        bash scripts/check_release_ready.sh "$newest_tag"
+fi
+
 if command -v curl >/dev/null 2>&1; then
     run "published download is this network" bash scripts/check_release_matches.sh
 
@@ -296,8 +465,46 @@ if command -v curl >/dev/null 2>&1; then
     # 2026 nobody could, because SHA256SUMS was published unsigned and whoever
     # can replace a binary can replace the list of hashes beside it.
     run "the published release is signed"  bash scripts/check_release_signed.sh
+
+    # Signed, published, mirrored -- and never READ. On 2026-10-12
+    # dang150296 ran readelf over the v0.1.11 Linux release and found wamd
+    # requesting an executable stack, which is the condition a stack
+    # overflow needs in order to run what it wrote. RandomX ships assembly
+    # with no .note.GNU-stack section, so the linker assumed the worst and
+    # marked the whole binary; nothing we ship needs it.
+    #
+    # He found one. This check reads every binary in every Linux artefact of
+    # the release and found three -- wamd, wam-miner and wam-qt, the three
+    # that link librandomx.a. The graphical wallet is the one an ordinary
+    # person runs, and nobody had reported that one.
+    #
+    # Every other property of those files was already right: full RELRO,
+    # PIE, stack canaries, FORTIFY. The gap was not the build. It was that
+    # this project verified what it SAID about a release and never what the
+    # release WAS.
+    run "the published binaries are hardened" bash scripts/check_binary_hardening.sh
+
+    # "This project verified what it SAID about a release and never what the
+    # release WAS" -- and after that was written, it still only read half of
+    # what the release was. Hardening is a property of the file; what the file
+    # DEMANDS of the machine running it is another, and v0.1.12 could not
+    # start on a clean Ubuntu because of it. Same artefacts, same readelf, one
+    # more question, found by Jeeves on 2026-10-18 instead of by this line.
+    run "the published binaries carry their libraries" bash scripts/check_shared_deps.sh
 else
     skip "published download is this network" "curl is not installed"
+fi
+
+# And the three repositories named in every announcement, which a reader is
+# told he may clone any of. On 2026-10-06 GitHub had a ruleset requiring main
+# to be changed through a pull request and had been silently refusing the
+# push. ship.sh is right to report a mirror and carry on -- and it says so in
+# one line, once, inside a ship that worked. The only reason it was noticed
+# is that somebody read that line, which is luck rather than a check.
+if command -v git >/dev/null 2>&1; then
+    run "the three homes hold the same project" "$PY" scripts/check_mirrors.py
+else
+    skip "the three homes hold the same project" "git is not installed"
 fi
 
 # ---------------------------------------------------------------------------
@@ -313,6 +520,26 @@ else
         skip "ports reachable from outside" "--nodes needs two or more hosts"
     else
         run "nodes agree with each other" bash scripts/check_nodes_agree.sh $NODES
+
+        # AND AGREE WITH THE RELEASE, which is a different question.
+        #
+        # The check above compares the hosts to each other, so the one case it
+        # cannot see is a fleet that is uniformly wrong -- which is exactly what
+        # a deploy that silently did nothing produces, on every machine at once.
+        #
+        # On 1 November 2026 it called France and Singapore "byte-identical"
+        # while wam-tx, wam-util and wam-wallet on both were pinned at v0.1.7,
+        # six releases back, since 11 September. They agreed perfectly. The
+        # third host had COPIES of the same v0.1.7 tools, and a v0.1.9 wamd its
+        # testnet node had been running for seventeen days, through four
+        # releases -- while "deployed code is origin/main" said ok about the
+        # git checkout beside it, truthfully, because a checkout is not what
+        # systemd executes.
+        #
+        # So this one compares against something outside the fleet: the newest
+        # signed release in our own download directory, which is what a
+        # stranger gets when he follows our instructions.
+        run "machines run the version we publish"             "$PY" scripts/check_running_version.py $NODES
 
         # A node that cannot say who connected is not unhealthy -- it answers
         # every other question correctly. It simply stops being able to tell
@@ -416,6 +643,37 @@ else
             "$PY" scripts/check_electrum.py --node "$1" --network "$NETWORK" \
             electrum.wamcoin.org electrum2.wamcoin.org
 
+        # And one that is not ours, which is the whole point of it.
+        #
+        # Two servers run by one operator fail together. That is not a theory
+        # on this project: the version drift found on 2026-11-01 put the same
+        # wrong binaries on all three of our machines, and check_nodes_agree.sh
+        # -- which compares them to each other -- called them agreed, correctly
+        # and uselessly. Redundancy that shares an operator shares his
+        # mistakes. On 2026-11-02 a second operator stood one up in Seoul on a
+        # third provider, built from integration/electrumx/install.sh, and
+        # asked to be measured from outside rather than trusted.
+        #
+        # It gets its own row instead of joining the line above, because a
+        # reboot of a machine we do not own must not redden the row that judges
+        # the machines we do. It can still fail, and it has to: electrums/WAM
+        # advertises this endpoint, so a wallet told a wrong balance by it was
+        # sent there by us. The action on a red line here is to tell the
+        # operator, or to take the endpoint out of the entry -- not to log in,
+        # which we cannot do and should not be able to.
+        #
+        # --node still reads OUR node because we hold no ssh on his, and that
+        # is the question anyway: does his index agree with our chain. It is
+        # the one thing "I track your signed releases" cannot prove about
+        # itself, and he said so before we did.
+        if [ "$NETWORK" = mainnet ]; then
+            run "a server we do not own agrees" \
+                "$PY" scripts/check_electrum.py --node "$1" --network "$NETWORK" \
+                wam.zcd.lol
+        else
+            skip "a server we do not own agrees" "it serves mainnet only"
+        fi
+
         # The pool had found 150 blocks, owed 16,176 WAM to two miners and had
         # paid nothing since genesis -- every payout failing for the whole life
         # of the chain -- while its page was green, its service active, its
@@ -460,6 +718,13 @@ else
         # newest file: a run can succeed and write nothing.
         run "there is something to restore from" \
             "$PY" scripts/check_backups.py $NODES
+
+        # Room, and the direction it is going. The daily report already
+        # prints free memory and disk; what it cannot print is that a machine
+        # is losing 400 MB a day and has six weeks. A threshold fires on the
+        # night it is already a problem; a slope gives time to buy a bigger
+        # machine. A chain only grows, so disk is the one that will bite.
+        run "room, and which way it is going"             "$PY" scripts/check_headroom.py --nodes "$NODES"
 
         # Who tried to join, and why they did not stay.
         #

@@ -394,11 +394,26 @@ async function renderConcentration() {
   // number.
   const line = (label, span, top, distinct) => {
     if (top === null || top === undefined) return `${label}: reading…`;
-    const rule = top >= 50
-      ? 'above the 50% line \u2014 no exchange application is made at this level'
-      : (top >= 35 ? 'below 50%, above the 35% target' : 'below the 35% target');
+    // THIS LINE USED TO JUDGE THE NUMBER. NOW IT ONLY REPORTS IT.
+    //
+    // It carried a threshold ladder, and the top rung carried a promise:
+    // "above the 50% line \u2014 no exchange application is made at this
+    // level", written 2026-09-17 on launch week. By 2026-10-24 it was false.
+    // Block DX #199, BasicSwap #743 and NBitcoin #1362 were all opened above
+    // that line, and the coin has traded on Komodo's DEX since 22 September.
+    // A stranger on Bitcointalk quoted the sentence back at us as our policy,
+    // which is what any sentence on a live page eventually becomes.
+    //
+    // The thresholds went with it. "The 35% target" is an intention too, and
+    // an intention on a page nobody revisits is a promise waiting to expire.
+    // check_stale_denials.py exempts sentences about our own conduct as
+    // "a rule we keep", and that exemption is only sound while we keep it.
+    //
+    // What is left cannot go stale: a measurement, and how many parties it
+    // was spread across. A number changes, which is what numbers are for.
+    // Whoever reads it can judge it themselves, which was always their job.
     return `${label} (${span}): largest finder ${top.toFixed(1)}%, `
-         + `${distinct} distinct \u2014 ${rule}`;
+         + `${distinct} distinct`;
   };
 
   // THE SPAN IS MEASURED NOW, NOT MULTIPLIED OUT.
@@ -420,17 +435,33 @@ async function renderConcentration() {
     return `${(h / 24).toFixed(1)} days`;
   };
 
+  // WHICH BLOCKS, BECAUSE A COUNT CANNOT SHOW MOVEMENT.
+  //
+  // This printed "5037 blocks" for the long window, and 5037 is what a
+  // window capped at 5040 reads every single day once the chain is past
+  // that height. It rolls, but nothing here said so, and the founder
+  // watched the same number for days and concluded the panel had frozen
+  // and was lying to readers. He was right about what it looked like.
+  //
+  // The heights move every two minutes. Printing them turns "is this
+  // thing even running" into something a reader settles by looking twice.
+  const blocks = (w) => {
+    if (!w.fromHeight || !w.toHeight) return `${w.blocksRead} blocks`;
+    const n = (x) => x.toLocaleString('en-US');
+    return `blocks ${n(w.fromHeight)}–${n(w.toHeight)}`;
+  };
+
   const sevenSpan = sd && span(sd.spanSeconds);
   text($('concSeven'), sd && sd.blocksRead
     ? line(sd.complete ? 'the long window' : 'the whole chain so far',
-           sevenSpan ? `${sd.blocksRead} blocks, ${sevenSpan}` : `${sd.blocksRead} blocks`,
+           sevenSpan ? `${blocks(sd)}, ${sevenSpan}` : blocks(sd),
            sd.topPercent, sd.distinct)
     : 'the long window: reading…');
 
   const nowSpan = span(c.spanSeconds);
   text($('concSummary'),
     line('right now',
-         nowSpan ? `${c.blocksRead} blocks, ${nowSpan}` : `${c.blocksRead} blocks`,
+         nowSpan ? `${blocks(c)}, ${nowSpan}` : blocks(c),
          pc, c.distinct));
 
   const t = $('concTable');

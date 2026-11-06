@@ -37,11 +37,11 @@
 #
 #      <!-- wam:quote-begin -->            markdown, HTML
 #          curl .../wam-coin-v0.1.4.tar.gz
-#      <!-- wam:quote-end -->
+#      <!-- wam:quote-end -->                and the region ends
 #
 #      # wam:quote-begin                   shell, python, yaml, systemd
 #      #     -rpcuser=t -rpcpassword=t
-#      # wam:quote-end
+#      # wam:quote-end                       and the region ends
 #
 #  A line carrying `wam:quote-line` is exempt by itself, for the common case
 #  of one sentence:
@@ -58,8 +58,26 @@
 
 import re
 
-BEGIN = re.compile(r"wam:quote-begin\b")
-END = re.compile(r"wam:quote-end\b")
+# A REGION MARK IS THE WHOLE LINE. A LINE MARK IS NOT.
+#
+# These matched the words anywhere on a line, and so a file that EXPLAINED
+# the convention opened a region by naming it. scripts/test/test_alert_text.py
+# has a docstring reading "Lines the author marked ... or inside a
+# wam:quote-begin", and from that sentence to the end of the file every text
+# check in this repository was silenced -- in a file nobody had touched for
+# weeks, found on 8 October 2026 by a new check counting marks.
+#
+# That is this library's own disease: it exists because a check cannot tell
+# use from mention, and it could not tell them apart in its own marks.
+#
+# Every real region mark in this repository stands alone on its line, carried
+# by whatever comment syntax the file uses -- `<!-- wam:quote-begin -->`,
+# `# wam:quote-begin`. Every mention sits inside a sentence or a string. So
+# the region marks are anchored, and \W* is exactly the comment syntax that
+# may surround one. The end-of-line mark stays unanchored: sitting inside a
+# sentence is what it is for.
+BEGIN = re.compile(r"^\W*wam:quote-begin\W*$")
+END = re.compile(r"^\W*wam:quote-end\W*$")
 LINE = re.compile(r"wam:quote-line\b")
 
 

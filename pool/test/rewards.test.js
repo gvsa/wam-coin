@@ -8,7 +8,8 @@
 const assert = require('assert');
 
 const {
-    splitProportionally, selectPplnsWindow, computeBlockRewards, estimateHashrate
+    splitProportionally, selectPplnsWindow, computeBlockRewards, estimateHashrate,
+    pplnsWindowDifficulty
 } = require('../lib/rewards');
 const util = require('../lib/util');
 const { seedHeightFor, blocksUntilNextSeed, BOOTSTRAP_SEED } = require('../lib/randomxSeed');
@@ -523,6 +524,64 @@ test('a high bit gets a sign byte, as CScriptNum requires', () => {
 test('multi-byte heights are little-endian', () => {
     assert.strictEqual(util.serializeHeight(256).toString('hex'), '020001');
     assert.strictEqual(util.serializeHeight(400000).toString('hex'), '03801a06');
+});
+
+
+// ---------------------------------------------------------------------------
+console.log('\n[9] the PPLNS window is the one we publish');
+
+// The window was Math.max(1, networkDifficulty * multiplier) in rewards.js and
+// networkDifficulty * multiplier in shareProcessor, so the payout asked for
+// difficulty 1 while the buffer feeding it was sized for 0.0078 -- a tenth of
+// the shares it needed, and what fell off the end was the OLDEST work. The
+// floor was undocumented and, at WAM's difficulty, was the only thing deciding
+// the window: 129x the rule published in docs/POOL_OPERATOR.md and on the
+// pool's own page.
+//
+// Reported by dang150296 (Urriki1502), 2026-10-04.
+
+test('the window is multiplier x network difficulty, with no hidden floor', () => {
+    assert.ok(Math.abs(pplnsWindowDifficulty(0.0039, 2) - 0.0078) < 1e-12);
+    assert.strictEqual(pplnsWindowDifficulty(0.5, 2), 1);
+    assert.strictEqual(pplnsWindowDifficulty(1000, 2), 2000);
+    assert.ok(pplnsWindowDifficulty(0.003888, 2) < 0.01,
+        'a floor is overriding the published rule again');
+});
+
+test('a difficulty that cannot be measured gives no window, not a huge one', () => {
+    // computeBlockRewards already falls back to the round's own contributions
+    // when the window selects nothing, which is the right answer when there is
+    // no difficulty to measure against. A floor would instead pay out over a
+    // window nobody asked for.
+    for (const bad of [0, -1, null, undefined, NaN, Infinity, 'x']) {
+        assert.strictEqual(pplnsWindowDifficulty(bad, 2), 0, 'window for ' + bad);
+        assert.strictEqual(pplnsWindowDifficulty(0.004, bad), 0, 'multiplier ' + bad);
+    }
+});
+
+test('the window is computed in one place and nowhere else', () => {
+    // The fault was two expressions of one quantity in two files. A second
+    // expression appearing anywhere is what this catches, which is cheaper
+    // than hoping nobody writes one.
+    const fs = require('fs');
+    const sp = fs.readFileSync(require.resolve('../lib/shareProcessor'), 'utf8');
+    const rw = fs.readFileSync(require.resolve('../lib/rewards'), 'utf8');
+
+    assert.ok(/_pplnsBufferSize\(\)[\s\S]{0,700}pplnsWindowDifficulty\(/.test(sp),
+        'the redis buffer is no longer sized from pplnsWindowDifficulty, so it '
+        + 'can disagree with the window it feeds again');
+
+    // Comments first. Both files EXPLAIN the old expression, and a check that
+    // reads prose alongside code cannot tell a mention from a use -- it fired
+    // on the two comments describing the bug it exists to prevent. Stripping
+    // is crude and sufficient here: it is counting one specific pattern, not
+    // parsing JavaScript.
+    const code = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    const inlined = (code(rw) + code(sp))
+        .match(/networkDifficulty\s*\*\s*(this\.)?pplnsMultiplier/g) || [];
+    assert.strictEqual(inlined.length, 0,
+        'the window is computed inline as well as in pplnsWindowDifficulty; '
+        + 'that is exactly how the two drifted apart');
 });
 
 // ---------------------------------------------------------------------------

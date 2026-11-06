@@ -52,11 +52,15 @@ for _s in (sys.stdout, sys.stderr):
 # An artefact a reader acts on, and the words that would tell him it is there.
 # The archive prefix is what package_release.sh and package_platform.sh name
 # the file, so this list cannot drift away from what is actually shipped.
-KINDS = [
-    ("wam-qt",    ("wallet", "wam-qt", "graphical")),
-    ("wam-miner", ("miner", "mine", "wam-miner")),
-    ("wam-coin",  ("node", "wamd", "wam-coin")),
-]
+# Asked for, not listed here. A fourth thing to ship would otherwise have to
+# be remembered in this file as well as built, and the failure this check
+# exists for is precisely something shipping that nobody was told about.
+# scripts/lib/components.py names what this project ships and what a reader
+# would call each one.
+sys.path.insert(0, str(ROOT / "scripts" / "lib"))
+import components  # noqa: E402
+
+KINDS = components.recognise_pairs()
 
 
 def bot_text(tag_message: pathlib.Path) -> str:
@@ -69,8 +73,15 @@ def bot_text(tag_message: pathlib.Path) -> str:
     console.log(toDiscord(A.releaseMessage({ tag: 'v0.0.0', name: 'render',
       url: 'https://wamcoin.org/downloads/', body, prerelease: true })));
     """
+    # encoding is named, because text=True alone decodes with the platform's
+    # preferred encoding -- cp1252 on Windows, which cannot represent an em
+    # dash. This check therefore passed on Linux and died on a Windows
+    # console with a UnicodeDecodeError from inside subprocess, two frames
+    # away from anything that looks like a release note. Found on
+    # 2026-10-16, verifying a tag message that was itself fine.
     out = subprocess.run(["node", "-e", script, str(tag_message)],
-                         cwd=ROOT, capture_output=True, text=True)
+                         cwd=ROOT, capture_output=True, text=True,
+                         encoding="utf-8", errors="replace")
     if out.returncode != 0:
         print(f"  {RED}could not render{OFF}  {out.stderr.strip()[:200]}")
         sys.exit(2)
@@ -118,6 +129,28 @@ def main() -> int:
 
         print(f"\n{BLD}{version}{OFF}  what the bot sends is "
               f"{len(sent.splitlines())} lines")
+
+        # A NOTE THAT NAMES NO FILE PROVES NOTHING, AND USED TO PASS.
+        #
+        # "Shipped" is decided by finding an artefact's file name in the
+        # notes, because the file names are the evidence and the prose is
+        # not. The consequence went unnoticed until 2026-10-16: a release
+        # note that mentions no file name at all matches nothing, so the
+        # loop below runs zero times and the check reports success over a
+        # note that could have announced nothing whatsoever.
+        #
+        # The first draft of v0.1.12's note was exactly that, and this said
+        # "everything shipped is named" about it while the paragraph the bot
+        # would actually send named neither the wallet nor the node. A check
+        # that cannot see the thing it is checking has not checked it.
+        if not any(re.search(rf"{re.escape(p)}-v[0-9]", whole) for p, _ in KINDS):
+            print(f"  {YLW}no artefact file name appears in this note, so "
+                  f"there is nothing to check it against.{OFF}")
+            print(f"        A release note names the files it releases. "
+                  f"Until it does,")
+            print(f"        this check cannot tell a complete announcement "
+                  f"from an empty one.")
+            return 2
 
         for prefix, words in KINDS:
             shipped = re.search(rf"{re.escape(prefix)}-v[0-9]", whole)

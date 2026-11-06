@@ -45,11 +45,18 @@ import sys
 REPO = pathlib.Path(__file__).resolve().parent.parent
 
 sys.path.insert(0, str(REPO / "scripts" / "lib"))
-import docversion  # noqa: E402  -- needs the path above
+import components  # noqa: E402  -- needs the path above
+import docversion  # noqa: E402
 
-# The build's own idea of what it is.
-CLIENT_VERSION = REPO / "scripts" / "patch_upstream.py"
-CLIENT_RE = re.compile(r'(WAM_CLIENT_VERSION\s*=\s*")(\d+\.\d+\.\d+)(")')
+# The build's own idea of what it is -- asked for rather than known by heart.
+#
+# This was a path and a pattern written here, and the path had already moved
+# once, from a constant edited by hand to patch_upstream.py, with nothing
+# recording the move except the diff. scripts/lib/components.py now says
+# where each release train keeps its version, so a train that is split off
+# later changes one line there instead of every file that had learnt this
+# one by heart.
+CLIENT_VERSION, CLIENT_RE = components.train_version_file(REPO)
 
 # Documents that tell a reader to download something.
 #

@@ -81,8 +81,15 @@ function renderStats(s) {
     `pool fee ${s.config ? s.config.poolFeePercent : '?'}% + 5% treasury`);
 
   text($('poolHashrate'), hashrate(pool.hashrate));
+  // The share is F of the last N blocks, counted off the ledger, so it says
+  // which N. It used to be this pool's measured hashrate divided by an
+  // estimate of the network's, which read "102.057% of network" on 29 October
+  // -- a part larger than the whole it is part of.
   text($('poolShare'), pool.poolSharePercent
-    ? `${pool.poolSharePercent.toFixed(3)}% of network`
+    ? (pool.shareBasis === 'counted'
+        ? `${pool.poolSharePercent.toFixed(1)}% of the last ` +
+          `${pool.shareWindowBlocks} blocks (${pool.blocksFoundInWindow} found here)`
+        : `about ${pool.poolSharePercent.toFixed(1)}% of network, estimated`)
     : 'no shares in window');
 
   text($('minerCount'), String(pool.miners ?? 0));
@@ -94,6 +101,20 @@ function renderStats(s) {
   // half an hour. The age of the tip cannot lag -- it is the clock minus the
   // block header -- so it is shown next to the estimate, and says plainly when
   // the estimate has stopped meaning anything.
+  //
+  // AND IT IS THE EXPLORER'S NUMBER, NOT ONE OF OURS THAT RESEMBLES IT.
+  //
+  // A miner here should not have to open a second page to see how strong the
+  // chain is; that is what this tile is for. So it asks the same node the
+  // same question over the same 720-block window the explorer uses, and the
+  // two agree by construction. For an afternoon this tile carried a total of
+  // its own -- our measured hashrate over our counted share -- which read
+  // 615.7 while the explorer read 608.3: one quantity, two headlines, and no
+  // way for a reader to choose between them.
+  //
+  // The share below the pool's own hashrate is what had to stop being a
+  // division, and it has: it is counted off the ledger now. The total never
+  // needed to be.
   const stale = net.secondsSinceBlock != null && net.secondsSinceBlock > 600;
   text($('netHashrate'), hashrate(net.networkHashPerSecond));
   // Two decimal places round WAM's difficulty to "0". At the floor it is

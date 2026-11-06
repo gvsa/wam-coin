@@ -56,6 +56,7 @@
 #      2  the question could not be put (no network, a page 404s)
 # ===========================================================================
 
+import glob
 import hashlib
 import os
 import sys
@@ -68,16 +69,33 @@ BASE = os.environ.get("WAM_SITE", "https://wamcoin.org")
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SITE = os.path.join(HERE, "site")
 
-# The pages a stranger actually lands on. Every one of them has carried a
-# wrong number at some point in this project's short life.
-PAGES = [
-    ("index.html", "/"),
-    ("mine/index.html", "/mine/"),
-    ("start/index.html", "/start/"),
-    ("security/index.html", "/security/"),
-    ("pool/index.html", "/pool/"),
-    ("whitepaper/index.html", "/whitepaper/"),
-]
+
+# Files that are not pages and are still read: the channel list a stranger
+# downloads to find us, and the signature he checks it against. They are
+# published by the same deploy and were compared by nothing.
+FILES = ["CHANNELS.txt", "CHANNELS.txt.asc", "sitemap.xml", "robots.txt"]
+
+
+def pages():
+    """Everything the site serves, found rather than listed.
+
+    This was a hand-written list of six pages. The site had nine, and the
+    three it did not know about were /start-ar/, /build/ and /rehearsals/ --
+    so the Arabic start page, the one page a reader who cannot read the
+    others depends on, could have been stale on the live site for any length
+    of time and this check would have said the live site is this repository.
+    A list of what to check is a list that stops being true the day somebody
+    adds a page, and nothing makes a noise when it does.
+    """
+    out = []
+    for path in sorted(glob.glob(os.path.join(SITE, "**", "index.html"),
+                                 recursive=True)):
+        rel = os.path.relpath(path, SITE).replace(os.sep, "/")
+        out.append((rel, "/" + rel[:-len("index.html")]))
+    for name in FILES:
+        if os.path.exists(os.path.join(SITE, name)):
+            out.append((name, "/" + name))
+    return out
 
 
 def fetch(url):
@@ -99,7 +117,12 @@ def main():
 
     differ, unreadable, same = [], [], 0
 
-    for rel, path in PAGES:
+    found = pages()
+    if not found:
+        print(f"  {YEL}no page was found under site/ -- this is not a pass{OFF}\n")
+        return 2
+
+    for rel, path in found:
         local_path = os.path.join(SITE, rel.replace("/", os.sep))
         if not os.path.exists(local_path):
             continue

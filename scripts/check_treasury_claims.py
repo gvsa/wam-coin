@@ -105,15 +105,53 @@ DENIALS = [
 # wam:quote-end
 
 
+# A WAM mainnet P2PKH address, which is how the recipient cell is recognised
+# rather than counted to.
+# wam:quote-begin
+ADDRESS = re.compile(r"^W[1-9A-HJ-NP-Za-km-z]{25,42}$")
+AMOUNT = re.compile(r"^\*{0,2}([\d,]+\.\d+)\s*WAM\s*\*{0,2}$")
+DATE = re.compile(r"^(20\d\d-\d\d-\d\d)$")
+# wam:quote-end
+
+
 def rows():
-    """Every spend in the ledger: (date, amount string, amount, recipient)."""
+    """Every spend in the ledger: (date, amount string, amount, recipient).
+
+    BY WHAT THE CELL IS, NOT BY WHICH COLUMN IT SITS IN.
+
+    This used to read the date, the amount and the recipient as cells one,
+    two and three. On 2026-10-11 a fee column was added between the amount
+    and the recipient -- a correct change, because the ledger asks the reader
+    to subtract the fees and had not been telling him what they were -- and
+    this check went on matching position three. It read every fee as an
+    address, found no rows for the real recipient, and reported that
+    SECURITY.md claimed 10,000 WAM paid where the ledger showed zero.
+
+    The ledger is a document people edit. A checker that depends on its
+    column order will accuse it of lying every time a column is added, and
+    the accusation is about missing money, which is the worst thing here to
+    be wrong about. So each cell is identified by its own shape."""
     out = []
     for line in LEDGER.read_text(encoding="utf-8").splitlines():
-        m = re.match(r"\|\s*(20\d\d-\d\d-\d\d)\s*\|\s*\*{0,2}([\d,]+\.\d+)"
-                     r"\s*WAM\s*\*{0,2}\s*\|\s*`([^`]+)`", line.strip())
-        if m:
-            out.append((m.group(1), m.group(2),
-                        float(m.group(2).replace(",", "")), m.group(3)))
+        line = line.strip()
+        if not line.startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        date = amount = recipient = None
+        for c in cells:
+            if date is None and DATE.match(c):
+                date = c
+                continue
+            m = AMOUNT.match(c)
+            if amount is None and m:
+                amount = m.group(1)
+                continue
+            bare = c.strip("`")
+            if recipient is None and ADDRESS.match(bare):
+                recipient = bare
+        if date and amount and recipient:
+            out.append((date, amount, float(amount.replace(",", "")),
+                        recipient))
     return out
 
 

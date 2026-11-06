@@ -355,19 +355,23 @@ notification arrives where you got the software, before any of that.</p>
 are not ours. What keeps a chain decentralised is not how a pool is built — a pool is
 central by definition — it is that a miner can leave for one somebody else runs, or mine
 alone. <a href="https://gitlab.com/WAMCoin/wam-coin/blob/main/docs/POOL_OPERATOR.md">POOL_OPERATOR.md</a>
-is the whole thing: architecture, configuration, payouts, and what it costs to run. If you
-start one, say so and it will be listed here beside ours.</p>
+is the whole thing: architecture, configuration, payouts, and what it costs to run.</p>
 
-<p class="dim"><strong>The founder mines too</strong> — same software, same public pool,
-same difficulty as anyone else, and the addresses he mines to will be published here. A new
-chain with few miners is a chain that is cheap to attack, so he is the floor under its
-security until others arrive. His share of the hash rate will be large at launch and is
-meant to fall; it will be published so you can watch it fall rather than take his word for
-it.</p>
+<p class="dim"><strong>The founder does not mine, and holds no WAM.</strong> Not one unit,
+from the genesis block to today. The founder reserve in the genesis coinbase is locked by
+consensus until September 2027 — five outputs behind OP_CHECKLOCKTIMEVERIFY, readable from
+any node — and he has said in public that he will not spend it when it opens.</p>
+<p class="dim">This paragraph said the opposite until 4 October 2026. Written before
+launch, it said he would mine from the public pool, that the addresses he mined to would be
+published here, and that his share of the hash rate would be large at launch and fall. None
+of it happened, because he never mined: it was a plan in the future tense, left standing
+after the future arrived. What secures this chain is the people mining it, and what they
+are doing is on the <a href="https://explorer.wamcoin.org">explorer</a> rather than
+described here.</p>
 
 <h2 class="sec">Trading</h2>
-<p><strong>WAM trades by atomic swap, and there is no price.</strong> It cannot be
-bought with money on an exchange.</p>
+<p><strong>WAM settles by atomic swap.</strong> A swap is two coins moving at once
+or neither moving, with nobody holding both halves in between.</p>
 <p class="dim">Enquiries were sent to six decentralised venues before launch — Komodo
 Wallet, BasicSwap DEX, Bisq, Maya Protocol, Haveno and Block DX — asking what each requires
 to list a chain like this. <strong>One has merged it:</strong> WAM entered the Komodo /
@@ -378,6 +382,16 @@ so 500 WAM went to him from the treasury — in the
 <a href="https://gitlab.com/WAMCoin/wam-coin/blob/main/docs/TREASURY_LEDGER.md">treasury
 ledger</a> with its transaction id — and he swapped 249.68 WAM against Litecoin. The other
 five are still requests for requirements, with nothing agreed.</p>
+<p class="dim"><strong>A real, organic exchange has happened four times: somebody did work
+for this project and took WAM as the payment for it.</strong> Two researchers who found pool
+accounting faults were paid 10,000 WAM each — the amount the published bounty tiers give that
+class of finding — in nine transactions apiece. A third was paid 1,000 for a fault that could
+have destroyed a round's payout table, and a fourth 250 for address validation that refused
+one valid address in twenty. 21,250 WAM in all, with every transaction id in the treasury
+ledger and every finding written out in full in
+<a href="https://gitlab.com/WAMCoin/wam-coin/blob/main/SECURITY.md">the security
+policy</a>. None of them bought it. Each read this code looking for what was wrong with it,
+and then accepted its coin for the work.</p>
 <p class="dim">WAM is its own layer 1 rather than a token on someone else's chain, so it
 settles by atomic swap or a peer-to-peer order book — you swap another coin for it,
 directly, with no custodian in between. It cannot appear on an automated market maker such
@@ -521,14 +535,19 @@ does not.</p>
 فيه كل شيء: البنية، والإعداد، والدفعات، وما يكلّفه التشغيل. ومن يُنشئ واحداً فليخبرنا،
 ويُذكَر هنا بجانب مجمّعنا.</p>
 
-<p class="dim"><strong>والمؤسّس يعدّن أيضاً</strong> — بالبرنامج نفسه، ومن المجمّع العام
-نفسه، وبالصعوبة نفسها كأي أحد، والعناوين التي يعدّن إليها ستُنشر هنا. سلسلةٌ جديدة قليلة
-المعدّنين سلسلةٌ رخيصة المهاجمة، فهو الأرضية تحت أمانها حتى يأتي غيره. ونصيبه من قوّة
-الشبكة سيكون كبيراً يوم الإطلاق ومقصودٌ أن ينزل؛ وسيُنشر لتراه ينزل بنفسك بدل أن تُصدّقه.</p>
+<p class="dim"><strong>المؤسّس لا يعدّن، ولا يملك من WAM وحدةً واحدة</strong> — من كتلة
+التكوين إلى اليوم. واحتياطي المؤسّس في كتلة التكوين مقفولٌ بالإجماع حتى سبتمبر 2027، خمسة
+مخرَجات خلف OP_CHECKLOCKTIMEVERIFY تُقرأ من أيّ عقدة، وقد قال علناً إنّه لن ينفقه حين
+يُفتح.</p>
+<p class="dim">وكانت هذه الفقرة تقول العكس حتى 4 أكتوبر 2026. كُتبت قبل الإطلاق فقالت إنّه
+سيعدّن من المجمّع العام، وإنّ عناوينه ستُنشر هنا، <!-- wam:quote-line --> وإنّ نصيبه من قوّة الشبكة سيكون كبيراً
+يوم الإطلاق ثمّ ينزل. ولم يقع شيءٌ من ذلك، لأنّه لم يعدّن قطّ: خطّةٌ بصيغة المستقبل بقيت
+بعد أن جاء المستقبل. والذي يؤمّن هذه السلسلة هم من يعدّنونها، وما يفعلونه على
+<a href="https://explorer.wamcoin.org">المستكشف</a> لا في وصفٍ هنا.</p>
 
 <h2 class="sec">التداول</h2>
-<p><strong>تُتداول WAM بالمبادلة الذرّية، ولا سعر لها.</strong> ولا تُشترى بالمال
-في منصّة.</p>
+<p><strong>تُسوّى WAM بالمبادلة الذرّية.</strong> والمبادلة الذرّية أن تتحرّك العملتان
+معاً أو لا تتحرّك واحدةٌ منهما، ولا يمسك أحدٌ الطرفين في ما بين.</p>
 <p class="dim">أُرسلت استفسارات إلى ستّ منصّات لا مركزية قبل الإطلاق — Komodo Wallet
 وBasicSwap DEX وBisq وMaya Protocol وHaveno وBlock DX — سؤالاً عمّا تشترطه لإدراج سلسلة
 كهذه. <strong>وواحدة منها أدرجتها:</strong> دخلت WAM سجلّ عملات Komodo / GLEEC في
@@ -538,6 +557,15 @@ does not.</p>
 <a href="https://gitlab.com/WAMCoin/wam-coin/blob/main/docs/TREASURY_LEDGER.md">دفتر
 الخزينة</a> برقم معاملتها — وبادل 249.68 WAM بلايتكوين. والخمس الباقية ما زالت طلب
 متطلّبات لم يُوافَق على شيء فيها.</p>
+<p class="dim"><strong>وقد وقعت المبادلة العضويّة الحقيقيّة أربع مرّات: رجلٌ عمل عملاً لهذا
+المشروع وأخذ WAM ثمناً له.</strong> فمراجعان وجدا عطبَين في حسابات المسبح أُعطي كلٌّ منهما
+10,000 WAM — وهو ما تمنحه جداول المكافآت المنشورة لهذا الصنف من النتائج — في تسع معاملات
+لكلٍّ منهما. وثالثٌ أُعطي 1,000 على عطبٍ كان يمكن أن يمحو جدول دفع جولةٍ كاملة، ورابعٌ 250
+على تحقّقٍ من العناوين كان يرفض عنواناً صحيحاً من كلّ عشرين. 21,250 WAM في الجملة، كلّ
+معرّف معاملةٍ منها في دفتر الخزينة، وكلّ عطبٍ مشروحٌ بتمامه في
+<a href="https://gitlab.com/WAMCoin/wam-coin/blob/main/SECURITY.md">سياسة الأمان</a>.
+ولم يشترِها أحدٌ منهم: كلٌّ قرأ هذه الشيفرة باحثاً عن خللٍ فيها، ثمّ قبل عملتها أجراً على
+عمله.</p>
 <p class="dim">WAM سلسلة مستقلّة بذاتها لا عملة رمزية على سلسلة غيرها، فتداولها يكون بمبادلة
 ذرّية أو بدفتر أوامر بين الأطراف — تبادل عملة أخرى بها مباشرةً بلا وسيط يحتفظ بمالك. ولا
 يمكن إدراجها في منصّة صانع سوق آلي مثل Uniswap بلا جسر ونسخة ملفوفة — وهو نفس سبب غياب
@@ -547,10 +575,13 @@ does not.</p>
 
 
 <footer>
-  <p class="en">MIT licensed, as Bitcoin Core. Two independent developers have reviewed it and their findings were adopted; no paid security audit has been performed.</p>
+  <p class="en">MIT licensed, as Bitcoin Core. More than seven people have read this code and reported what they found — developers and reviewers, independently — and their findings were adopted; the accepted ones are named with their reports in the security policy. No firm has been hired to audit it. What stands in place of that is a published table with a price for each class of finding, open to anyone: 21,250 WAM has been paid against it so far, with every amount, its reasoning and its transaction id in the same policy.</p>
   <p class="en">This page states no price, forecasts no value, and solicits nothing.</p>
-  <p class="ar" dir="rtl">رخصة MIT، كما Bitcoin Core. راجعها مطوّران مستقلّان وأُخذت
-  ملاحظاتهما؛ ولم يُجرَ تدقيق أمني مدفوع.</p>
+  <p class="ar" dir="rtl">رخصة MIT، كما Bitcoin Core. قرأ هذه الشيفرة أكثر من سبعة أشخاص
+  وأبلغوا بما وجدوا — مطوّرون ومراجعون مستقلّون — وأُخذت ملاحظاتهم؛ والمقبول منها
+  مذكورٌ بأسماء أصحابه في سياسة الأمان. ولم نستأجر شركةً لتدقيقه؛ والذي يقوم مقام ذلك
+  جدولٌ منشورٌ لكلّ صنفٍ من الاكتشافات سعرُه، مفتوحٌ لمن أراد: دُفع عليه حتى الآن
+  21,250 WAM، بكلّ مبلغٍ وسببه ورقم معاملته في السياسة نفسها.</p>
   <p class="ar" dir="rtl">هذه الصفحة لا تذكر سعراً، ولا تتنبّأ بقيمة، ولا تطلب منك شيئاً.</p>
 </footer>
 

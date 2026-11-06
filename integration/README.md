@@ -20,7 +20,7 @@ but a chain client inside their node.
 > the single most useful fact in this file — a submission somebody else
 > carries is a submission we cannot lose.
 >
-> Re-opening the other four is a new fork and a new PR from `wamcoin-core-dev`
+> Re-opening the other four is a new fork and a new PR from `wamcoin-Project`
 > for each, plus one short message. Not all in one day: five forks and five
 > pull requests from an account born yesterday is a pattern, and one is work.
 > The content of every entry below is unchanged and still correct; only the

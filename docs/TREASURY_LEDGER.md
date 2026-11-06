@@ -29,44 +29,64 @@ Consensus rule WAM-1 pays the treasury 5% of the block subsidy — 2.5 WAM per
 block at the current subsidy — once per block, for heights 1 to 400,000. So
 the balance at any height is:
 
-    2.5 × height  −  everything in the table below
+    2.5 × height  −  (every amount below + every fee below)
 
-At height 4,989 that is `2.5 × 4989 − 500 − 0.00599480 = 11,972.49400520`,
-which is what `scantxoutset` returns. Two independent routes to the same
-number, to the last decimal place.
+The fee has a column of its own because a spend costs the treasury what it
+sent *and* what it paid to send it. A fee left out of the arithmetic is a
+number this file cannot be checked against, which defeats the point of it.
+
+At height 21,126 that is `2.5 × 21126 − 21,750.00000000 − 0.25882440 =
+31,064.74117560`, which is what `scantxoutset` returns, in 12,414 unspent
+outputs. Two independent routes to the same number, to the last decimal
+place.
 
 ---
 
 ## Spends
 
-| date | amount | to | reason | txid |
-|---|---|---|---|---|
-| 2026-09-22 | **500.00000000 WAM** | `WgsySSWQr1tRyjwj3S53XbiVz9yEUCCK9t` | Coin for an atomic-swap test on GLEEC PR #2034, at the maintainer's own request. Not a listing fee: none was asked for and none was paid, and the decision to merge is his. | txid `ac06a7af6d87eed56fda28898e483d67b1033365f4d5f744e59ec5f80b5f0605` |
-| 2026-10-01 | **10.00000000 WAM** | `WcQCFiCzwikQTTmPeafn73e3asC32ofyLr` | Security bounty to chovy, accepted 16 September 2026: the pool accounting finding — the same pending block could mature more than once, crediting miner balances twice out of the operator's own wallet, plus two further manifestations of the same fault. Classified at 10,000 WAM under the tiers published at the time. Paid in nine transactions because consensus pays the treasury 2.5 WAM per block, so its balance is thousands of small outputs: 10,000 in one transaction would be about 4,000 inputs and 590 KB, six times the standard size limit, which no node would relay. 1 of 9 — the test payment, sent first and confirmed received before the rest. | txid `871e0f9e6e431ba2bae5a35777a8f739c83b8ceafc55a4fe94c5317a3262b5bd` |
-| 2026-10-01 | **1248.75000000 WAM** | `WcQCFiCzwikQTTmPeafn73e3asC32ofyLr` | Same bounty, 2 of 9. | txid `a52d1d2f77ca2160d3126aaa41d1dc2a3ede4d23acf6661f0d7cd51b58b69f51` |
-| 2026-10-01 | **1248.75000000 WAM** | `WcQCFiCzwikQTTmPeafn73e3asC32ofyLr` | Same bounty, 3 of 9. | txid `7f34f4e1e07e01b12595a6d74bf511003f06422d2e26e1b51a04948840d3f1d4` |
-| 2026-10-01 | **1248.75000000 WAM** | `WcQCFiCzwikQTTmPeafn73e3asC32ofyLr` | Same bounty, 4 of 9. | txid `b0031f8c0ee779e2d2d4a20d30c763b0b482d6b7b3c55386264395eec78a13af` |
-| 2026-10-01 | **1248.75000000 WAM** | `WcQCFiCzwikQTTmPeafn73e3asC32ofyLr` | Same bounty, 5 of 9. | txid `1692852e9ce0063b77b1ec81924017dfce1406fda5a68cb80e70c57196b39899` |
-| 2026-10-01 | **1248.75000000 WAM** | `WcQCFiCzwikQTTmPeafn73e3asC32ofyLr` | Same bounty, 6 of 9. | txid `390d112403b914545f721d4328b032c7ae2d7a019ff7b96948ca7da16575e9fc` |
-| 2026-10-01 | **1248.75000000 WAM** | `WcQCFiCzwikQTTmPeafn73e3asC32ofyLr` | Same bounty, 7 of 9. | txid `1bfef00cf093fdbdfb04e23f3d2c2ed261fec4160db06a09598117425501ca04` |
-| 2026-10-01 | **1248.75000000 WAM** | `WcQCFiCzwikQTTmPeafn73e3asC32ofyLr` | Same bounty, 8 of 9. | txid `e8ace6f3a2a951e24be887d7a10b8773e9b4269e4911dd5ce43256d95029a666` |
-| 2026-10-02 | **1248.75000000 WAM** | `WcQCFiCzwikQTTmPeafn73e3asC32ofyLr` | Same bounty, 9 of 9. | txid `7c87c49a9bd35d0b75d4271febb3cb864d104068285bafbc4ab8f6b59ae19fa3` |
+| date | amount | fee | to | reason | txid |
+|---|---|---|---|---|---|
+| 2026-09-22 | **500.00000000 WAM** | `0.00599480` | `WgsySSWQr1tRyjwj3S53XbiVz9yEUCCK9t` | Coin for an atomic-swap test on GLEEC PR #2034, at the maintainer's own request. Not a listing fee: none was asked for and none was paid, and the decision to merge is his. | txid `ac06a7af6d87eed56fda28898e483d67b1033365f4d5f744e59ec5f80b5f0605` |
+| 2026-10-01 | **10.00000000 WAM** | `0.00019320` | `WcQCFiCzwikQTTmPeafn73e3asC32ofyLr` | Security bounty to chovy, accepted 16 September 2026: the pool accounting finding — the same pending block could mature more than once, crediting miner balances twice out of the operator's own wallet, plus two further manifestations of the same fault. Classified at 10,000 WAM under the tiers published at the time. Paid in nine transactions because consensus pays the treasury 2.5 WAM per block, so its balance is thousands of small outputs: 10,000 in one transaction would be about 4,000 inputs and 590 KB, six times the standard size limit, which no node would relay. 1 of 9 — the test payment, sent first and confirmed received before the rest. | txid `871e0f9e6e431ba2bae5a35777a8f739c83b8ceafc55a4fe94c5317a3262b5bd` |
+| 2026-10-01 | **1248.75000000 WAM** | `0.01484520` | `WcQCFiCzwikQTTmPeafn73e3asC32ofyLr` | Same bounty, 2 of 9. | txid `a52d1d2f77ca2160d3126aaa41d1dc2a3ede4d23acf6661f0d7cd51b58b69f51` |
+| 2026-10-01 | **1248.75000000 WAM** | `0.01484520` | `WcQCFiCzwikQTTmPeafn73e3asC32ofyLr` | Same bounty, 3 of 9. | txid `7f34f4e1e07e01b12595a6d74bf511003f06422d2e26e1b51a04948840d3f1d4` |
+| 2026-10-01 | **1248.75000000 WAM** | `0.01484520` | `WcQCFiCzwikQTTmPeafn73e3asC32ofyLr` | Same bounty, 4 of 9. | txid `b0031f8c0ee779e2d2d4a20d30c763b0b482d6b7b3c55386264395eec78a13af` |
+| 2026-10-01 | **1248.75000000 WAM** | `0.01484520` | `WcQCFiCzwikQTTmPeafn73e3asC32ofyLr` | Same bounty, 5 of 9. | txid `1692852e9ce0063b77b1ec81924017dfce1406fda5a68cb80e70c57196b39899` |
+| 2026-10-01 | **1248.75000000 WAM** | `0.01484520` | `WcQCFiCzwikQTTmPeafn73e3asC32ofyLr` | Same bounty, 6 of 9. | txid `390d112403b914545f721d4328b032c7ae2d7a019ff7b96948ca7da16575e9fc` |
+| 2026-10-01 | **1248.75000000 WAM** | `0.01484520` | `WcQCFiCzwikQTTmPeafn73e3asC32ofyLr` | Same bounty, 7 of 9. | txid `1bfef00cf093fdbdfb04e23f3d2c2ed261fec4160db06a09598117425501ca04` |
+| 2026-10-01 | **1248.75000000 WAM** | `0.01484520` | `WcQCFiCzwikQTTmPeafn73e3asC32ofyLr` | Same bounty, 8 of 9. | txid `e8ace6f3a2a951e24be887d7a10b8773e9b4269e4911dd5ce43256d95029a666` |
+| 2026-10-02 | **1248.75000000 WAM** | `0.01484520` | `WcQCFiCzwikQTTmPeafn73e3asC32ofyLr` | Same bounty, 9 of 9. | txid `7c87c49a9bd35d0b75d4271febb3cb864d104068285bafbc4ab8f6b59ae19fa3` |
+| 2026-10-11 | **10.00000000 WAM** | `0.00019320` | `WZSY6XFjmsef7Xb2E7DLhnkeU44bYyTLrA` | Security bounty to Alboy, findings WAM-F5 and WAM-F6, accepted 11 October 2026. WAM-F5 is the pool crediting one RandomX solution once per live job instead of once; WAM-F6 is a consensus field that no network assigned, read in three consensus paths. Classified at 10,000 WAM for WAM-F5 under the published tiers. WAM-F6 sits in the hardening rung at 250 WAM and has not been claimed. 1 of 9 — the test payment, sent first and confirmed received before the rest. | txid `a2754907f887e65bbafffed62564e5ac4848962e99afad6a01760be1011b54b0` |
+| 2026-10-11 | **1248.75000000 WAM** | `0.01484520` | `WZSY6XFjmsef7Xb2E7DLhnkeU44bYyTLrA` | Same bounty, 2 of 9. | txid `ccd6de28e9b31a2e209749250736729ad04205a05152f97cf4506ac9ce60d3be` |
+| 2026-10-11 | **1248.75000000 WAM** | `0.01481560` | `WZSY6XFjmsef7Xb2E7DLhnkeU44bYyTLrA` | Same bounty, 3 of 9. | txid `38fb1bc2156e0b89dd50f8a33a8011ce578147d3b3351c7b4b45d87a7a2acfa7` |
+| 2026-10-11 | **1248.75000000 WAM** | `0.01484520` | `WZSY6XFjmsef7Xb2E7DLhnkeU44bYyTLrA` | Same bounty, 4 of 9. | txid `1f9cce2a6f7673776fcb9d00c224fafd1a7ab316ed1d830a997d178bc15371b6` |
+| 2026-10-11 | **1248.75000000 WAM** | `0.01484520` | `WZSY6XFjmsef7Xb2E7DLhnkeU44bYyTLrA` | Same bounty, 5 of 9. | txid `f45a75635195a6acbe035038bedff52d9264ca52b2ac4dc0d751bdcc181901ff` |
+| 2026-10-11 | **1248.75000000 WAM** | `0.01484520` | `WZSY6XFjmsef7Xb2E7DLhnkeU44bYyTLrA` | Same bounty, 6 of 9. | txid `2570f0c5799ce0aa010942c8427db500ed6c2f988311797876b0227b45eb2535` |
+| 2026-10-11 | **1248.75000000 WAM** | `0.01484520` | `WZSY6XFjmsef7Xb2E7DLhnkeU44bYyTLrA` | Same bounty, 7 of 9. | txid `0495e63eaeb38e1e5992c9501fe13a4ff45ef8edc9ecff078c3670c8d9d4d61b` |
+| 2026-10-11 | **1248.75000000 WAM** | `0.01484520` | `WZSY6XFjmsef7Xb2E7DLhnkeU44bYyTLrA` | Same bounty, 8 of 9. | txid `7436e0bd60b0374df73e600959d47c7d3481dac60a40f0ac03560a833d0f9efc` |
+| 2026-10-11 | **1248.75000000 WAM** | `0.01484520` | `WZSY6XFjmsef7Xb2E7DLhnkeU44bYyTLrA` | Same bounty, 9 of 9. | txid `b5d7710f76e7f247625cd04da5b1e7a3dc5c64f454f7bcf05dbcec7c2d851266` |
+| 2026-10-13 | **1000.00000000 WAM** | `0.01191480` | `wam1q03z5vzzkz03a5nq986y9n49u6ku28rvcw5p0mz` | Security bounty to Smooth Jazz Crypto (@smoothjazcrypto), accepted 12 October 2026: the pool deleted a matured block from its pending state before writing any durable record of it, and the round's shares are deleted when that state is written — so an interruption between the two destroyed the only surviving statement of what each miner was owed. Classified at 1,000 WAM under the denial-of-service rung, as a judgement: the mechanism is the credit ledger, the impact is one block in a window no attacker can cause. One transaction, 402 inputs. | txid `867bffa18cafda9a82349125a2c1e15828a095ffe584b44dfa63d90d722dab70` |
+| 2026-10-15 | **250.00000000 WAM** | `0.00303480` | `WRRXkrgxGkhePeBgFf4Xn1LYP8HfGKPzGh` | Security bounty to ahten (@ahteen66), accepted 15 October 2026: `addressToScript` in `pool/lib/util.js` tested whether an address looked like bech32 before trying to decode it as base58, so about one valid base58 address in twenty was refused as a segwit address for another chain -- including this treasury address itself, which decodes cleanly as version 73. A miner whose address matched was disconnected at `mining.authorize`; an operator whose `poolAddress` matched could not start his pool. No funds were at risk. The same fault had been fixed in the miner on 19 September and the pool was never updated with it. Classified at 250, the hardening rung, which is where the reporter classified it. One transaction of 102 inputs, in block 21,114. | txid `2ba6139518819ffeee0a15d4075680f04fa00a4730859cbe206ea4b1c57c2d12` |
 
-Fee paid on that transaction: `0.00599480 WAM`, on 202 inputs and 29,974
-bytes. The treasury is paid one output per block and never consolidated, so a
-500 WAM spend is 202 of them.
+The treasury is paid one output per block and never consolidated, so every
+spend above is built from 2.5 WAM outputs and nothing else: the 500 WAM line
+took 202 of them and 29,974 bytes, and each 10 WAM line takes 6 and 960. That
+is also why a bounty leaves in instalments rather than at once — 10,000 WAM in
+one transaction is about 4,000 inputs and 590 KB, six times the standard size
+limit, and no node would relay it.
 
-**Balance after it:** `11,972.49400520 WAM` in 4,788 unspent outputs, at
-height 4,989.
+**Balance after the last line:** `31,064.74117560 WAM` in 12,414 unspent
+outputs, at height 21,126.
 
 ---
 
 ## What this was, and what it was not
 
-The transaction above is the **first movement of the treasury since block 1**.
-Until 2026-09-22 every coin WAM-1 had ever paid it was still sitting where it
+The 2026-09-22 line is the **first movement of the treasury since block 1**.
+Until that day every coin WAM-1 had ever paid it was still sitting where it
 arrived — 4,946 outputs, none of them spent, which anybody could and did
-verify.
+verify. Everything after it is a security bounty, and there has been nothing
+else.
 
 It was not a payment for a listing. The rule against those is in
 `docs/LISTING_PACKAGE.md` and has not changed: this project does not pay a

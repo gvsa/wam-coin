@@ -119,3 +119,9 @@ integration/komodo/submission/
 # said, not a record of anything, and it is different on every machine.
 ops/state.json
 ops/state.json.tmp
+
+# The miner writes one of these beside itself whenever the node refuses a
+# block, so a developer running wam-miner from inside a checkout collects
+# them -- and then git pull refuses to run because untracked files are in
+# the way. That happened twice on one seed while testing the race fix.
+wam-miner-rejected-*.hex

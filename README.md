@@ -1,5 +1,9 @@
 # WAM Coin
 
+[![release](https://img.shields.io/github/v/release/wamcoin-Project/wam-coin?include_prereleases&label=release&color=0a7)](https://github.com/wamcoin-Project/wam-coin/releases)
+[![downloads](https://img.shields.io/github/downloads/wamcoin-Project/wam-coin/total?label=downloads&color=0a7)](https://wamcoin.org/downloads/)
+[![licence MIT](https://img.shields.io/badge/licence-MIT-blue)](COPYING)
+
 **A CPU-mineable proof-of-work currency with a hard 22,000,000 cap.**
 
 RandomX proof of work · DarkGravityWave v3 · 2-minute blocks · consensus-enforced 5% treasury
@@ -88,7 +92,7 @@ curl -fs localhost:8081/api/health || echo "WAM node is down"
 | Mainnet genesis | mined and committed — `d8d3debe…` |
 | Founder key | generated offline, on paper, never on a networked machine |
 | Founder reserve | fully time-locked; nothing spendable at launch |
-| Release | [v0.1.11](https://wamcoin.org/downloads/), built and published by CI from a tag |
+| Release | [v0.1.13](https://wamcoin.org/downloads/), built and published by CI from a tag |
 | Independent review | two developers outside the project, both still reading — [findings and what changed](review/REVIEW_RESPONSE.md) |
 | Registry | [SLIP-0044](https://github.com/satoshilabs/slips/blob/master/slip-0044.md) coin type **5718349** and [SLIP-0173](https://github.com/satoshilabs/slips/blob/master/slip-0173.md) prefix **`wam`** — merged into SatoshiLabs' registry, 2026-08-26 |
 | Paid security audit | **none** |

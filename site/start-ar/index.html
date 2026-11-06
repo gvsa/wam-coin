@@ -92,22 +92,25 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.2rem 0}
 <h3 id="">إن كنت تفضّل نافذةً على الطرفيّة</h3>
 <p>من الإصدار v0.1.11 صارت هناك محفظةٌ بنافذة، <code>wam-qt</code>، للينكس وويندوز وماك. تُزامن، وتُنشئ محفظةً وتُشفّرها، وتُرسل وتستقبل — وكلّ ما في هذه الصفحة يمكن فعله فيها بدل سطر الأوامر.</p>
 <p>وهي <strong>نفس العقدة من الداخل</strong>، فتُستعمل <strong>بدلاً من</strong> <code>wamd</code> لا بجانبه — ولا يُشغَّل الاثنان على مجلّد بياناتٍ واحدٍ في وقتٍ واحد أبداً.</p>
-<p>    wam-qt-v0.1.11-x86_64-linux-gnu.tar.gz     wam-qt-v0.1.11-x86_64-w64-mingw32.zip     wam-qt-v0.1.11-arm64-apple-darwin.tar.gz</p>
+<pre><code>wam-qt-v0.1.11-x86_64-linux-gnu.tar.gz
+wam-qt-v0.1.11-x86_64-w64-mingw32.zip
+wam-qt-v0.1.11-arm64-apple-darwin.tar.gz</code></pre>
 <p>وهي تنزيلٌ منفصل كي لا تصير العقدة أضعافاً لمن لا يفتح نافذةً أصلاً. على لينكس تحتاج مكتبات Qt 5 من توزيعتك، وملفّ الشرح داخل الأرشيف فيه السطر الواحد لـapt وdnf وpacman؛ وعلى ويندوز وماك لا تحتاج شيئاً.</p>
 <p>ويُقال بصراحة، فعمرها أربعة أيّام: فُتحت باليد على لينكس وويندوز، وعلى ماك بُنيت وأُقلعت وزامنت السلسلة من التكوين على جهاز البناء، <strong>ولم يجلس أمامها إنسانٌ بعد</strong>.</p>
+<p><strong>وإن كنت تُشغّل <code>wamd</code> وتريد الانتقال إلى النافذة، فاقرأ <a href="/mine/#moving-from-the-terminal-node-to-the-graphical-wallet">الانتقال في docs/MINE.md</a> قبل أن تبدأ.</strong> ثلاثةٌ تُوقف الناس في الطريق، ولا واحدٌ منها يقول عن نفسه شيئاً في حينه: المحفظة لا تفتح منفذ الاتّصال الذي يفتحه <code>wamd</code> لنفسه، فيقف المعدّن الفرديّ بلا رسالة؛ وتثبيتٌ أقدمُ من v0.1.10 على ويندوز أو ماك يحفظ السلسلة والمحفظة في مجلّدٍ اسمه <code>Bitcoin</code>، فمحفظةٌ تُفتح بلا <code>-datadir</code> تفتح مجلّداً فارغاً، ومحفظةٌ سليمةٌ تماماً تبدو ضائعة؛ وزرّ <strong>Receive</strong> يُعطي عنواناً جديداً في كلّ ضغطة، وهي محفظةٌ واحدةٌ بعناوين كثيرة لا محفظةٌ جديدة. والصفحة فيها الانتقال كلّه في خمسة أوامر.</p>
 <p>وبقيّة هذه الصفحة بالطرفيّة، وكلّ ما فيها يبقى صحيحاً.</p>
 <h3 id="">التنزيل</h3>
-<pre><code>curl -LO https://wamcoin.org/downloads/v0.1.11/wam-coin-v0.1.11-x86_64-linux-gnu.tar.gz
-curl -LO https://wamcoin.org/downloads/v0.1.11/SHA256SUMS</code></pre>
+<pre><code>curl -LO https://wamcoin.org/downloads/v0.1.13/wam-coin-v0.1.13-x86_64-linux-gnu.tar.gz
+curl -LO https://wamcoin.org/downloads/v0.1.13/SHA256SUMS</code></pre>
 <h3 id="">تأكّد أنه ملفّنا فعلاً</h3>
-<pre><code>curl -LO https://wamcoin.org/downloads/v0.1.11/SHA256SUMS.asc
+<pre><code>curl -LO https://wamcoin.org/downloads/v0.1.13/SHA256SUMS.asc
 curl -LO https://wamcoin.org/verify_release.sh
 curl -LO https://wamcoin.org/SIGNING-KEY.asc
 bash verify_release.sh .</code></pre>
 <p>يجب أن ترى كلمة <code>OK</code>. وإن رأيت <code>FAILED</code> فالتنزيل تشوّه أو بُدِّل — احذفه ونزّله من جديد. <strong>لا تتخطَّ هذه الخطوة.</strong> تكلّف ثانية واحدة، وهي الشيء الوحيد الفاصل بينك وبين ملف وضعه غيرنا مكانه.</p>
 <h3 id="">الفكّ والتشغيل</h3>
-<pre><code>tar -xzf wam-coin-v0.1.11-x86_64-linux-gnu.tar.gz
-cd wam-coin-v0.1.11/bin
+<pre><code>tar -xzf wam-coin-v0.1.13-x86_64-linux-gnu.tar.gz
+cd wam-coin-v0.1.13/bin
 ./wamd -printtoconsole</code></pre>
 <p><strong>أو <code>-daemon</code> بدلاً من <code>-printtoconsole</code> إن أردتها أن تعمل في الخلفيّة.</strong> فـ<code>-printtoconsole</code> يُريك العقدةَ تعمل، وبه تلاحظ الخطأَ قبل أن يخبرك به فحصٌ — لكنّها تموت إذا أغلقتَ الطرفيّة. و<code>-daemon</code> ينجو من ذلك ولا يُريك شيئاً. وتستطيع الاثنين: شغّلها بـ<code>-daemon</code> ثمّ <code>tail -f ~/.wam/debug.log</code> في أيّ نافذة، فترى النصَّ نفسَه. وملفُّ السجلّ يُكتب في الحالات الثلاث.</p>
 <blockquote><p><strong>وإن لم تبدأ، فالسببُ هذا في الغالب.</strong> التنزيلُ يحتاج أربعةَ أشياء من نظامك، ولا شيء غيرها:</p>
@@ -170,10 +173,10 @@ cp /path/to/your/backup.dat ~/.wam/wallets/mine/wallet.dat
 <p>والحاسوب الواحد يفوز نادراً، فالمعدّنون ينضمّون إلى <strong>مجمّع</strong>: يعمل الجميع معاً ويُقسَّم العائد بقدر ما أسهم كلٌّ منهم. دفعات صغيرة منتظمة بدل يانصيب.</p>
 <h3 id="">أولاً: المعدّن تنزيلٌ منفصل</h3>
 <p><strong>المعدّن ليس داخل الأرشيف الذي فككته.</strong> العقدة والمعدّن ملفّان منفصلان، وحتى ١٠ سبتمبر كانت هذه الصفحة تقول لك <code>./wam-miner</code> ولا تقول لك من أين تجلبه. اكتشفها من يعدّن تحت WSL، بعد أن جرّب <code>./wam-cli</code> داخل مجلّد المعدّن فقيل له «لا يوجد ملف بهذا الاسم» — وهو نفس اللبس من الطرف الآخر.</p>
-<table><tr><th>الأرشيف</th><th>ما فيه</th></tr><tr><td><code>wam-coin-v0.1.11-…</code></td><td><code>wamd</code> و<code>wam-cli</code> — العقدة</td></tr><tr><td><code>wam-miner-v0.1.11-…</code></td><td><code>wam-miner</code> — المعدّن وحده</td></tr></table>
-<pre><code>curl -LO https://wamcoin.org/downloads/v0.1.11/wam-miner-v0.1.11-x86_64-linux-gnu.tar.gz
-tar -xzf wam-miner-v0.1.11-x86_64-linux-gnu.tar.gz
-cd wam-miner-v0.1.11
+<table><tr><th>الأرشيف</th><th>ما فيه</th></tr><tr><td><code>wam-coin-v0.1.13-…</code></td><td><code>wamd</code> و<code>wam-cli</code> — العقدة</td></tr><tr><td><code>wam-miner-v0.1.13-…</code></td><td><code>wam-miner</code> — المعدّن وحده</td></tr></table>
+<pre><code>curl -LO https://wamcoin.org/downloads/v0.1.13/wam-miner-v0.1.13-x86_64-linux-gnu.tar.gz
+tar -xzf wam-miner-v0.1.13-x86_64-linux-gnu.tar.gz
+cd wam-miner-v0.1.13
 chmod +x wam-miner</code></pre>
 <p>و<code>chmod</code> هنا لأنّ ملفاً يُفكّ على قرص ويندوز — <code>/mnt/c/...</code> تحت WSL — يفقد صلاحية التنفيذ، فيقول لك <code>bash</code> عندها <code>Permission denied</code>، وهي رسالة تُقرأ «تنزيل معطوب» لا «نظام ملفات مرّ به الملف».</p>
 <h3 id="">وجّه معدّنك إلى المجمّع</h3>
@@ -194,7 +197,7 @@ chmod +x wam-miner</code></pre>
 <hr>
 <h2 id="">٧. أمران يجب أن تعرفهما</h2>
 <p><strong>هذه عملاتٌ حقيقية.</strong> الشبكة الرئيسية تعمل منذ الساعة 00:00 بتوقيت UTC من ١٥ سبتمبر ٢٠٢٦، وكل ما سبق يوصلك بها. الكتلة تدفع 50 WAM: منها 47.50 لمن وجدها و2.50 للخزينة، بقاعدةٍ تفحصها كل عقدة.</p>
-<p><strong>ولا يوجد سعر ولا منصّة.</strong> لا شيء يُباع، وقد لا يساوي شيئاً أبداً. عدِّن لأنك تريد أن تملك عملة سلسلةٍ تستطيع التحقّق منها بنفسك، لا لأنك تنتظر سوقاً.</p>
+<p><strong>هذا المشروع لا يضع سعراً ولا يدير سوقاً.</strong> وما تُعدِّنه قد لا يساوي شيئاً أبداً. عدِّن لأنك تريد أن تملك عملة سلسلةٍ تستطيع التحقّق منها بنفسك، لا لأنك تنتظر سوقاً.</p>
 <p>وما زالت شبكة تجربةٍ تعمل لمن يطوّر عليها، وهذه الصفحة لا تشرحها: حتى ١٩ سبتمبر كانت تُعلّم شبكة التجربة وتذكر الحقيقية في ذيلها، فكان القارئ يُنشئ عنوان <code>twam1</code> ويوجّهه إلى المجمّع الحيّ ويُعدّن بلا شيء.</p>
 <hr>
 <h2 id="">٨. حين يقع خلل</h2>

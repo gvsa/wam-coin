@@ -22,6 +22,38 @@ It rebuilds every site page whose source moved. `check_docs_version.py` will
 fail until the release exists; that is the correct order, because the
 documents name the tag and the tag is built from the documents.
 
+## 1b. If the node gained or lost an option, regenerate the example config
+
+```
+bash scripts/gen_wam_conf.sh <dir holding the newly built wamd>
+git add share/examples/wam.conf && git commit
+```
+
+`share/examples/wam.conf` is generated from `wamd -help` and lists **every**
+option the node accepts. Nothing runs `gen_wam_conf.sh` for you — not
+`release.yml`, not the sweep — so this is the one step in the whole runbook
+that exists only here.
+
+**Skip it and the failure is quiet in exactly the wrong way.** The operator
+who asked for this file reads it to find the setting he needs; an option the
+binary gained and the file never mentions reads to him as a thing the node
+cannot do. `check_example_conf.py` catches the mismatch afterwards, and
+afterwards is after the release.
+
+It applies whenever a build turns a capability on or off. v0.1.13 is the
+first time it bit: enabling ZMQ adds `-zmqpubhashblock`, `-zmqpubrawblock`,
+`-zmqpubrawtx`, `-zmqpubsequence` and their `*hwm` variants, which are the
+entire reason that release exists — and the committed config named none of
+them.
+
+The check needs a `wamd` to ask, so it cannot run on a machine with no Linux
+build. On this project's Windows laptop it exits 2, "nothing was checked",
+which is not a pass. Run it where the binary is:
+
+```
+python3 scripts/check_example_conf.py --bin <dir holding wamd>
+```
+
 ## 2. Tag, and say if it is mandatory
 
 ```
@@ -117,13 +149,27 @@ run by hand:
 * Actions → **platform-build** → **Run workflow**, with `Version` set to the
   same version as the tag
 
-**Both jobs now gate on `--solo` as well as on consensus.** Each starts a
-regtest node with the platform's own `wamd`, runs `wam-miner --check` against
-it, and mines two blocks with `--solo` that the node must accept with the
-reward arriving at the address given. If that fails on Windows or macOS, the
-artifact does not exist and there is nothing to attach — which is the point:
-before v0.1.10 both options were proved on one Linux laptop and shipped to
-the other two platforms untested.
+**Both jobs gate on `--check`, and deliberately not on `--solo`.** Each runs
+`wam-miner --check` against a node built on that platform: the coinbase, the
+BIP34 height, the treasury output, the witness commitment, the merkle root
+and the transactions — everything in a block except the proof of work. If
+that fails on Windows or macOS, the artifact does not exist and there is
+nothing to attach, which is the point: before v0.1.10 both options were
+proved on one Linux laptop and shipped to the other two platforms untested.
+
+**This paragraph said `--solo` until 2026-10-29, and it had been wrong since
+2026-09-24.** The jobs did mine two regtest blocks, and on 24 September the
+account was suspended within the hour — the repository, every release
+download, `raw.githubusercontent.com` and `wamcoin.org` all returned 404 to
+the public, on a release day. The chain was worthless and the intent was a
+correctness proof; neither is visible to an abuse detector, and GitHub's
+terms forbid mining on their runners whatever the chain. The workflow was
+fixed that day and this page was not, so for five weeks the runbook promised
+a gate that no longer existed.
+
+**Hashing and submission are proved by `scripts/test/test_platform_solo.sh`,
+on hardware this project owns.** That is where `--solo` lives now, and it is
+not optional — it is the half `--check` cannot reach.
 * when it is green, download **both** artifacts from the bottom of the run
   page — `wam-windows-x86_64` and `wam-macos-arm64`. Each holds finished
   archives, not loose binaries
@@ -233,8 +279,8 @@ Then check it as a stranger would — clean directory, empty keyring, nothing
 but what the announcement says to fetch:
 
 ```
-curl -LO https://wamcoin.org/downloads/v0.1.11/SHA256SUMS
-curl -LO https://wamcoin.org/downloads/v0.1.11/SHA256SUMS.asc
+curl -LO https://wamcoin.org/downloads/v0.1.13/SHA256SUMS
+curl -LO https://wamcoin.org/downloads/v0.1.13/SHA256SUMS.asc
 curl -LO https://wamcoin.org/verify_release.sh
 curl -LO https://wamcoin.org/SIGNING-KEY.asc
 bash verify_release.sh .
@@ -243,6 +289,33 @@ bash verify_release.sh .
 It must print `ok` twice and exit 0. If it does not, the release is public and
 broken: **Edit release → Save as draft** puts it back out of reach while you
 find out why.
+
+## 4b. Upload to our own hosts BEFORE publishing
+
+The release page is not where readers are sent. Every page this project
+publishes sends them to `wamcoin.org/downloads/<version>/`, which is
+`/var/www/wam-downloads/<version>/` on the two machines that serve the site.
+
+```
+for h in 169.58.159.165 13.140.33.187; do
+    ssh "root@$h" "mkdir -p /var/www/wam-downloads/<version>"
+    scp SHA256SUMS SHA256SUMS.asc wam-*.tar.gz wam-*.zip         "root@$h:/var/www/wam-downloads/<version>/"
+done
+bash scripts/check_release_ready.sh <version>
+```
+
+That check fetches every file named in the published SHA256SUMS over the
+network, as a stranger fetches it, and verifies the signature against the
+fingerprint in SECURITY.md. It exits 1 if anything a reader is sent to is
+missing and 2 if it could not look.
+
+On 16 October 2026 v0.1.12 was published before this step and the directory
+answered 404 for four minutes. Eight things had been verified first -- the
+checksums, the signature, the fingerprint, the tag object, the rendered
+announcement, the clean tree, the three mirrors, the bot's own code -- and
+not the URL a stranger follows. `release_watch` held the announcement and
+alarmed, which is why nothing incomplete reached the channels. The guard is
+the net; this step is so the net is never needed.
 
 ## 5. Afterwards
 

@@ -332,7 +332,7 @@ cfg = {
     "pollSeconds": 60,
     "heartbeatHours": 24,
     "stallMinutes": 60,
-    "githubRepo": "wamcoin-core-dev/wam-coin",
+    "githubRepo": "wamcoin-Project/wam-coin",
     "explorerUrl": "https://explorer.wamcoin.org",
     "stateFile": "/var/lib/wam-announce/state.json",
 }

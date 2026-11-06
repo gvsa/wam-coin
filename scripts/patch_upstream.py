@@ -51,7 +51,7 @@ from dataclasses import dataclass, field
 # inside reported /WAM:0.1.0/ to every peer it met.
 #
 # Raise it in the same commit that gets tagged, never separately.
-WAM_CLIENT_VERSION = "0.1.11"
+WAM_CLIENT_VERSION = "0.1.13"
 
 # ===========================================================================
 # Framework
@@ -223,7 +223,7 @@ ANCHOR_WAM025 = (
 )
 
 INSERT_WAM025 = (
-    '\n    // WAM: say where the old data directory is, for the release that renamed it.\n    //\n    // Until v0.1.10 the Windows and macOS builds kept the chain in a folder\n    // called Bitcoin, because the rename that gave Linux ~/.wam did not touch\n    // the other two branches of GetDefaultDataDir. Correcting the name moves\n    // the default, so a node that upgrades opens an empty directory and a\n    // wallet that is perfectly safe looks lost.\n    //\n    // Nothing is moved automatically and nothing is adopted. A folder called\n    // Bitcoin may be Bitcoin Core\'s own, and a node that guesses wrong about\n    // somebody else\'s wallet is worse than one that says where to look.\n    //\n    // The old path is derived from the new one rather than rebuilt from the\n    // platform, which is why there is no #ifdef here: the last component is\n    // WAM on exactly the two systems this applies to, and on Linux the folder\n    // is .wam, so the test is false there and always was correct.\n    {\n        const fs::path in_use{gArgs.GetDataDirBase()};\n        if (in_use.filename() == "WAM") {\n            const fs::path previous{in_use.parent_path() / "Bitcoin"};\n            if (fs::exists(previous / "wam.conf") && !fs::exists(in_use / "blocks")) {\n                InitWarning(strprintf(_("A data directory from an earlier WAM release "\n                    "was found at %s, and this version uses %s. Nothing has been moved "\n                    "or deleted. If your chain and your wallet are in the old one, move "\n                    "its contents across, or start with -datadir=%s."),\n                    fs::PathToString(previous), fs::PathToString(in_use),\n                    fs::PathToString(previous)));\n            }\n        }\n    }\n'
+    '\n    // WAM: say where the old data directory is, for the release that renamed it.\n    //\n    // Until v0.1.10 the Windows and macOS builds kept the chain in a folder\n    // called Bitcoin, because the rename that gave Linux ~/.wam did not touch\n    // the other two branches of GetDefaultDataDir. Correcting the name moves\n    // the default, so a node that upgrades opens an empty directory and a\n    // wallet that is perfectly safe looks lost.\n    //\n    // Nothing is moved automatically and nothing is adopted. A folder called\n    // Bitcoin may be Bitcoin Core\'s own, and a node that guesses wrong about\n    // somebody else\'s wallet is worse than one that says where to look.\n    //\n    // THE CONDITION WAS wam.conf ALONE, AND IT MISSED THE PERSON IT WAS\n    // WRITTEN FOR. A node always started with command-line flags never\n    // writes a wam.conf. On 2026-10-16 a miner moving from v0.1.8 to the\n    // graphical wallet had his chain, three wallets and 9,894 WAM in the\n    // old folder and no wam.conf anywhere. The warning stayed silent and\n    // the wallet would have opened empty. A wallets or a blocks directory\n    // is evidence of the same kind, and nothing but a node writes either.\n    //\n    // The old path is derived from the new one rather than rebuilt from the\n    // platform, which is why there is no #ifdef here: the last component is\n    // WAM on exactly the two systems this applies to, and on Linux the folder\n    // is .wam, so the test is false there and always was correct.\n    {\n        const fs::path in_use{gArgs.GetDataDirBase()};\n        if (in_use.filename() == "WAM") {\n            const fs::path previous{in_use.parent_path() / "Bitcoin"};\n            if (!fs::exists(in_use / "blocks")\n                && (fs::exists(previous / "wam.conf")\n                    || fs::exists(previous / "wallets")\n                    || fs::exists(previous / "blocks"))) {\n                InitWarning(strprintf(_("A data directory from an earlier WAM release "\n                    "was found at %s, and this version uses %s. Nothing has been moved "\n                    "or deleted. If your chain and your wallet are in the old one, move "\n                    "its contents across, or start with -datadir=%s."),\n                    fs::PathToString(previous), fs::PathToString(in_use),\n                    fs::PathToString(previous)));\n            }\n        }\n    }\n'
 )
 
 ANCHOR_WAM024 = (
@@ -791,7 +791,7 @@ def build_changes() -> list[Change]:
                         "[https://github.com/bitcoin/bitcoin/issues],[bitcoin],[https://bitcoincore.org/])"),
                 replacement=("AC_INIT([WAM Coin],m4_join([.], _CLIENT_VERSION_MAJOR, _CLIENT_VERSION_MINOR, "
                              "_CLIENT_VERSION_BUILD)m4_if(_CLIENT_VERSION_RC, [0], [], [rc]_CLIENT_VERSION_RC),"
-                             "[https://github.com/wamcoin-core-dev/wam-coin/issues],"
+                             "[https://github.com/wamcoin-Project/wam-coin/issues],"
                              "[wam],[https://wamcoin.org/])"),
             ),
         ]))
@@ -855,14 +855,14 @@ def build_changes() -> list[Change]:
             Edit(
                 file="src/clientversion.cpp",
                 description="point --version at this project's source, not Bitcoin's",
-                marker="github.com/wamcoin-core-dev/wam-coin",
+                marker="github.com/wamcoin-Project/wam-coin",
                 anchor='    const std::string URL_SOURCE_CODE = "<https://github.com/bitcoin/bitcoin>";',
                 replacement=(
                     '    // Telling a user the source is at bitcoin/bitcoin is not modesty,\n'
                     '    // it is wrong: the binary they are holding is not built from there.\n'
                     '    // Bitcoin Core keeps its credit in the copyright line above, which\n'
                     '    // CopyrightHolders() adds automatically for any fork.\n'
-                    '    const std::string URL_SOURCE_CODE = "<https://github.com/wamcoin-core-dev/wam-coin>";'),
+                    '    const std::string URL_SOURCE_CODE = "<https://github.com/wamcoin-Project/wam-coin>";'),
             ),
             Edit(
                 file="configure.ac",

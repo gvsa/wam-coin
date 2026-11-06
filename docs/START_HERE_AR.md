@@ -111,19 +111,29 @@ WAM نقودٌ لا تُصدرها شركة ولا يحفظها مصرف.
 بُنيت وأُقلعت وزامنت السلسلة من التكوين على جهاز البناء، **ولم يجلس أمامها
 إنسانٌ بعد**.
 
+**وإن كنت تُشغّل `wamd` وتريد الانتقال إلى النافذة، فاقرأ
+[الانتقال في docs/MINE.md](MINE.md#moving-from-the-terminal-node-to-the-graphical-wallet)
+قبل أن تبدأ.** ثلاثةٌ تُوقف الناس في الطريق، ولا واحدٌ منها يقول عن نفسه شيئاً
+في حينه: المحفظة لا تفتح منفذ الاتّصال الذي يفتحه `wamd` لنفسه، فيقف المعدّن
+الفرديّ بلا رسالة؛ وتثبيتٌ أقدمُ من v0.1.10 على ويندوز أو ماك يحفظ السلسلة
+والمحفظة في مجلّدٍ اسمه `Bitcoin`، فمحفظةٌ تُفتح بلا `-datadir` تفتح مجلّداً
+فارغاً، ومحفظةٌ سليمةٌ تماماً تبدو ضائعة؛ وزرّ **Receive** يُعطي عنواناً جديداً
+في كلّ ضغطة، وهي محفظةٌ واحدةٌ بعناوين كثيرة لا محفظةٌ جديدة. والصفحة فيها
+الانتقال كلّه في خمسة أوامر.
+
 وبقيّة هذه الصفحة بالطرفيّة، وكلّ ما فيها يبقى صحيحاً.
 
 ### التنزيل
 
 ```bash
-curl -LO https://wamcoin.org/downloads/v0.1.11/wam-coin-v0.1.11-x86_64-linux-gnu.tar.gz
-curl -LO https://wamcoin.org/downloads/v0.1.11/SHA256SUMS
+curl -LO https://wamcoin.org/downloads/v0.1.13/wam-coin-v0.1.13-x86_64-linux-gnu.tar.gz
+curl -LO https://wamcoin.org/downloads/v0.1.13/SHA256SUMS
 ```
 
 ### تأكّد أنه ملفّنا فعلاً
 
 ```bash
-curl -LO https://wamcoin.org/downloads/v0.1.11/SHA256SUMS.asc
+curl -LO https://wamcoin.org/downloads/v0.1.13/SHA256SUMS.asc
 curl -LO https://wamcoin.org/verify_release.sh
 curl -LO https://wamcoin.org/SIGNING-KEY.asc
 bash verify_release.sh .
@@ -136,8 +146,8 @@ bash verify_release.sh .
 ### الفكّ والتشغيل
 
 ```bash
-tar -xzf wam-coin-v0.1.11-x86_64-linux-gnu.tar.gz
-cd wam-coin-v0.1.11/bin
+tar -xzf wam-coin-v0.1.13-x86_64-linux-gnu.tar.gz
+cd wam-coin-v0.1.13/bin
 ./wamd -printtoconsole
 ```
 
@@ -368,13 +378,13 @@ cp /path/to/your/backup.dat ~/.wam/wallets/mine/wallet.dat
 
 | الأرشيف | ما فيه |
 |---|---|
-| `wam-coin-v0.1.11-…` | `wamd` و`wam-cli` — العقدة |
-| `wam-miner-v0.1.11-…` | `wam-miner` — المعدّن وحده |
+| `wam-coin-v0.1.13-…` | `wamd` و`wam-cli` — العقدة |
+| `wam-miner-v0.1.13-…` | `wam-miner` — المعدّن وحده |
 
 ```bash
-curl -LO https://wamcoin.org/downloads/v0.1.11/wam-miner-v0.1.11-x86_64-linux-gnu.tar.gz
-tar -xzf wam-miner-v0.1.11-x86_64-linux-gnu.tar.gz
-cd wam-miner-v0.1.11
+curl -LO https://wamcoin.org/downloads/v0.1.13/wam-miner-v0.1.13-x86_64-linux-gnu.tar.gz
+tar -xzf wam-miner-v0.1.13-x86_64-linux-gnu.tar.gz
+cd wam-miner-v0.1.13
 chmod +x wam-miner
 ```
 
@@ -443,8 +453,8 @@ stats    3.41 kH/s   accepted 20  rejected 0  blocks 1
 ١٥ سبتمبر ٢٠٢٦، وكل ما سبق يوصلك بها. الكتلة تدفع 50 WAM: منها 47.50 لمن
 وجدها و2.50 للخزينة، بقاعدةٍ تفحصها كل عقدة.
 
-**ولا يوجد سعر ولا منصّة.** لا شيء يُباع، وقد لا يساوي شيئاً أبداً. عدِّن لأنك
-تريد أن تملك عملة سلسلةٍ تستطيع التحقّق منها بنفسك، لا لأنك تنتظر سوقاً.
+**هذا المشروع لا يضع سعراً ولا يدير سوقاً.** وما تُعدِّنه قد لا يساوي شيئاً أبداً.
+عدِّن لأنك تريد أن تملك عملة سلسلةٍ تستطيع التحقّق منها بنفسك، لا لأنك تنتظر سوقاً.
 
 وما زالت شبكة تجربةٍ تعمل لمن يطوّر عليها، وهذه الصفحة لا تشرحها: حتى ١٩
 سبتمبر كانت تُعلّم شبكة التجربة وتذكر الحقيقية في ذيلها، فكان القارئ يُنشئ

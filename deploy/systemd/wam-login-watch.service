@@ -19,7 +19,7 @@
 
 [Unit]
 Description=Watch for logins, key changes and new accounts on this host
-Documentation=https://github.com/wamcoin-core-dev/wam-coin/blob/main/scripts/login_watch.py
+Documentation=https://github.com/wamcoin-Project/wam-coin/blob/main/scripts/login_watch.py
 After=network-online.target
 
 # If this unit fails, say so. A timer stays active however often the

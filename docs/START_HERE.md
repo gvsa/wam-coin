@@ -122,19 +122,30 @@ Said plainly, because it is four days old: it has been opened by hand on Linux
 and Windows, and on macOS it has been built, started and synced from genesis by
 the build machine, with no person yet sitting in front of it.
 
+**If you already run `wamd` and want to move to the window, read
+[the move, in docs/MINE.md](MINE.md#moving-from-the-terminal-node-to-the-graphical-wallet)
+first.** Three things stop people on the way across and none of them says so
+at the time: the wallet does not open the RPC port that `wamd` opens for
+itself, so a solo miner stops without a message; an installation older than
+v0.1.10 on Windows or macOS keeps its chain and wallet in a folder called
+`Bitcoin`, so a wallet started without `-datadir` opens an empty one and a
+wallet that is perfectly safe looks lost; and the *Receive* tab shows a new
+address every time it is pressed, which is one wallet with many addresses
+rather than a new wallet. The page has the whole move in five commands.
+
 The rest of this page is the terminal. Everything in it still applies.
 
 ### Download it
 
 ```bash
-curl -LO https://wamcoin.org/downloads/v0.1.11/wam-coin-v0.1.11-x86_64-linux-gnu.tar.gz
-curl -LO https://wamcoin.org/downloads/v0.1.11/SHA256SUMS
+curl -LO https://wamcoin.org/downloads/v0.1.13/wam-coin-v0.1.13-x86_64-linux-gnu.tar.gz
+curl -LO https://wamcoin.org/downloads/v0.1.13/SHA256SUMS
 ```
 
 ### Check that it is really our file
 
 ```bash
-curl -LO https://wamcoin.org/downloads/v0.1.11/SHA256SUMS.asc
+curl -LO https://wamcoin.org/downloads/v0.1.13/SHA256SUMS.asc
 curl -LO https://wamcoin.org/verify_release.sh
 curl -LO https://wamcoin.org/SIGNING-KEY.asc
 bash verify_release.sh .
@@ -147,8 +158,8 @@ it is the only thing standing between you and a file somebody else swapped in.
 ### Unpack and run
 
 ```bash
-tar -xzf wam-coin-v0.1.11-x86_64-linux-gnu.tar.gz
-cd wam-coin-v0.1.11/bin
+tar -xzf wam-coin-v0.1.13-x86_64-linux-gnu.tar.gz
+cd wam-coin-v0.1.13/bin
 ./wamd -printtoconsole
 ```
 
@@ -395,14 +406,14 @@ end.
 
 | archive | what is in it |
 |---|---|
-| `wam-coin-v0.1.11-…` | `wamd`, `wam-cli` — the node |
-| `wam-miner-v0.1.11-…` | `wam-miner` — the miner, and nothing else |
+| `wam-coin-v0.1.13-…` | `wamd`, `wam-cli` — the node |
+| `wam-miner-v0.1.13-…` | `wam-miner` — the miner, and nothing else |
 | `wam-qt-v0.1.11-…` | `wam-qt` — the wallet, with a window |
 
 ```bash
-curl -LO https://wamcoin.org/downloads/v0.1.11/wam-miner-v0.1.11-x86_64-linux-gnu.tar.gz
-tar -xzf wam-miner-v0.1.11-x86_64-linux-gnu.tar.gz
-cd wam-miner-v0.1.11
+curl -LO https://wamcoin.org/downloads/v0.1.13/wam-miner-v0.1.13-x86_64-linux-gnu.tar.gz
+tar -xzf wam-miner-v0.1.13-x86_64-linux-gnu.tar.gz
+cd wam-miner-v0.1.13
 chmod +x wam-miner
 ```
 
@@ -480,9 +491,9 @@ to belong on the list.
 and everything above connects you to it. A block pays 50 WAM: 47.50 to whoever
 found it, 2.50 to the treasury, by a rule every node checks.
 
-**There is no price and no exchange.** Nothing can be sold and nothing may
-ever be worth anything. Mine because you want to hold the coin of a chain you
-can verify yourself, not because you are expecting a market.
+**This project sets no price and runs no market.** What you mine may never be
+worth anything. Mine because you want to hold the coin of a chain you can
+verify yourself, not because you are expecting a market.
 
 A test network still runs for people developing against it, and this page does
 not cover it: until 19 September it taught the test chain and mentioned the
