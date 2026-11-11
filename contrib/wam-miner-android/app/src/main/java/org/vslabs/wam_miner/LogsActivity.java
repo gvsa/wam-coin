@@ -78,6 +78,9 @@ public class LogsActivity extends AppCompatActivity {
 
         logTextView.setText("--- WAM NATIVE CONSOLE INTERFACE LINE ACTIVE ---\nInitializing mining cores. Waiting for pool job templates...\n");
 
+        // Check if opened via the "Quit Miner" notification button
+        checkQuitPrompt(getIntent());
+
         // Handle modern hardware/gesture back intercept loop matching CompileSDK 33 requirements
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
@@ -140,5 +143,35 @@ public class LogsActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent); // Update the stored intent
+        checkQuitPrompt(intent);
+    }
+
+    private void checkQuitPrompt(Intent intent) {
+        if (intent != null && intent.getBooleanExtra("PROMPT_QUIT", false)) {
+            // Remove the extra so rotating the screen doesn't re-trigger the dialog
+            intent.removeExtra("PROMPT_QUIT");
+            showQuitConfirmationDialog();
+        }
+    }
+
+    private void showQuitConfirmationDialog() {
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Stop Miner?")
+                .setMessage("Are you sure you want to stop mining ?")
+                .setPositiveButton("Quit", (dialog, which) -> {
+                    // Send the actual stop command to MinerNativeService
+                    Intent stopIntent = new Intent(this, MinerNativeService.class);
+                    stopIntent.setAction(MinerNativeService.ACTION_STOP_NATIVE);
+                    startService(stopIntent);
+                    finish();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 }

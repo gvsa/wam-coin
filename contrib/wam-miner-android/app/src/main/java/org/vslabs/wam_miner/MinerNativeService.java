@@ -145,20 +145,27 @@ public class MinerNativeService extends Service {
     }
 
     private Notification buildForegroundNotification(String stratum, int port) {
+// 1. Tapping the notification body opens LogsActivity normally
         Intent notificationIntent = new Intent(this, LogsActivity.class);
         notificationIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
 
-        int pendingIntentFlags = PendingIntent.FLAG_UPDATE_CURRENT;
-        pendingIntentFlags |= PendingIntent.FLAG_IMMUTABLE;
+        int pendingIntentFlags = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
 
-        PendingIntent contentPendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, pendingIntentFlags);
+        PendingIntent contentPendingIntent = PendingIntent.getActivity(
+                this, 0, notificationIntent, pendingIntentFlags
+        );
 
-        // Map notification quit click directly into the system broadcast target engine
-        Intent broadcastQuitIntent = new Intent(ACTION_STOP_NATIVE);
-        PendingIntent quitPendingIntent = PendingIntent.getBroadcast(this, 1, broadcastQuitIntent, pendingIntentFlags);
+// 2. Tapping "Quit Miner" opens LogsActivity with a flag to show the confirmation dialog
+        Intent confirmQuitIntent = new Intent(this, LogsActivity.class);
+        confirmQuitIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        confirmQuitIntent.putExtra("PROMPT_QUIT", true);
+
+        PendingIntent quitPendingIntent = PendingIntent.getActivity(
+                this, 1, confirmQuitIntent, pendingIntentFlags
+        );
 
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("WAM Native Core Active")
+                .setContentTitle("WAM Miner Service")
                 .setContentText("Connected: " + stratum + ":" + port)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentIntent(contentPendingIntent)
