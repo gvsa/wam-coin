@@ -44,17 +44,20 @@ launch, on BitcoinTalk and in the channels:
 
 | | |
 |---|---|
-| Inflation beyond the 22,000,000 cap, or a way past the treasury rule | 50,000 WAM |
-| A consensus split, or a remote crash of nodes | 15,000 WAM |
-| Theft of funds held by software in this project | 12,500 WAM |
-| Credit without entitlement — paying out coins nobody earned | 10,000 WAM |
-| Bulk deanonymisation of miners or users | 2,500 WAM |
-| Denial of service against the pool, the explorer or a seed | 1,000 WAM |
+| Inflation beyond the 22,000,000 cap, or a way past the treasury rule | 3,000 WAM |
+| A consensus split, or a remote crash of nodes | 2,000 WAM |
+| Theft of funds held by software in this project | 1,500 WAM |
+| Credit without entitlement — paying out coins nobody earned | 1,000 WAM |
+| Bulk deanonymisation of miners or users | 600 WAM |
+| Denial of service against the pool, the explorer or a seed | 400 WAM |
 | Hardening, a misconfiguration, or a document that misleads | 250 WAM |
 
-They are a floor and not a ceiling: a finding that matters more than its rung
-can be paid more than its rung, and if that happens it will be said plainly
-that it was a judgement and not a tier.
+They are a floor and not a ceiling. A finding that matters more than its rung
+can be paid more than its rung, and when that happens it will be said plainly
+that it was a judgement and not a tier. That is not a formality: the two
+classes this project would most like to hear about — a way past consensus,
+and a way into the treasury — are the two whose damage has no ceiling, and
+the payment for them will not have one either.
 
 **What changed on 1 October 2026, and what did not.** The table above was
 three rows, and its top row held three different things at one price:
@@ -67,9 +70,62 @@ from 10,000 to 15,000, deanonymisation rose from 1,000 to 2,500, and the
 classes that previously had no rung of their own now have one — which tells a
 reviewer where to look, and that brings more reports rather than fewer.
 
+**What changed on 8 November 2026, and why, in full.** Every amount above
+except the last was reduced. The top rung went from 50,000 WAM to 3,000.
+Nothing already reported is re-read against this table: every finding below
+keeps the classification it was given, and the 10,250 paid on 8 November was
+judged under the old one and paid in full at the rungs the reporter named
+himself.
+
+A programme that quietly starts paying less is a programme nobody trusts
+twice, so the reasons are here rather than left to be guessed at. There are
+three, and they were studied from every side before anything was touched.
+
+*One. The treasury is finite, and we have now measured how fast it empties.*
+Consensus pays it 2.5 WAM a block until height 400,000 — 750,000 WAM for its
+whole life, of which one eighth, 93,750, is this programme's share. 31,500 of
+that is already paid, in the programme's first fifty-three days. Under the
+old table a single inflation finding, at 50,000, was more than half of
+everything the programme had for its entire life. A table that one report can
+empty is not a commitment; it is a number waiting to be withdrawn. This one
+can be paid in full seven times over from what is left.
+
+*Two. A bounty is not only a cost. It is a distribution of coin that was
+never mined, and that is not a reading — we have watched it.* An earlier
+bounty was offered to the market in full, not long after it was paid.
+Nothing in that broke a rule: a bounty is the finder's coin and his to sell
+on whatever day he chooses. But the effect on everyone else is not neutral.
+A sum of that size is hours of the whole network's output landing in one
+wallet and then moving, and the question miners ask before they point a CPU
+at a new chain is whether anything was handed out before they arrived. A
+lump arriving and leaving has that shape whatever the reason behind it.
+
+*Three. The amounts had drifted away from what this coin costs to make.*
+Miners take 47.5 WAM a block and the chain makes thirty blocks an hour, so
+every machine on this network together earns about 1,425 WAM an hour. That
+figure does not move with the hash rate; it is what consensus pays. 10,250
+WAM is seven hours of all of it, or — measured against one person instead of
+everyone, on the day it was paid — about 120 days of an average miner in our
+pool. And the direction runs one way only: the hash rate rises, difficulty
+follows it, and the block keeps paying the same 47.5 WAM until it halves at
+height 200,000, so the same sum costs more work to produce every month that
+passes. A figure fixed in coin is a figure that grows in labour, and the one
+above is a floor rather than a ceiling. A table has to be priced against
+something, and ours had stopped being priced against what the coin is made
+of.
+
+*What did not change.* The classes did not: the table still names what it
+pays for rather than leaving it to be argued about afterwards. The bottom
+rung did not move, because the smallest findings are the ones most often left
+unreported and 250 WAM is not what makes or breaks this budget. And the
+discretion above the table did not move either — it matters more now than it
+did when the top rung was 50,000, and it is the reason a lower ceiling is not
+the same thing as a cap.
+
 **Findings already accepted keep the classification they were given.** The
 10,000 and the 1,000 below were judged under the three-row table and are not
-re-read against this one.
+re-read against the one that replaced it, and nothing below is re-read
+against the table of 8 November.
 
 **One payment per root cause, not per symptom.** Three reports that are three
 faces of one state machine are one finding, which is how the 10,000 below was
@@ -90,8 +146,11 @@ it contradicted. He was right and the file was wrong.
 
 **What has been paid is in the ledger, and nothing else has.** 10,000 WAM went
 to chovy on 1–2 October 2026, 10,000 to Alboy on 11 October, 1,000 to
-Smooth Jazz Crypto on 13 October, and 250 to ahten on 15 October — 21,250 WAM
-to four people. The 1,000 for the pool API leak is the one still unpaid. Until 2 October this paragraph opened
+Smooth Jazz Crypto on 13 October, 250 to ahten on 15 October, and 10,250 to
+bobbyning on 8 November — 31,500 WAM to five people. What has been accepted and
+not yet paid says so in its own entry below, with what it is waiting on. This
+sentence used to count them, and a count is wrong again by the next payment;
+the entries cannot be. Until 2 October this paragraph opened
 "nothing has been paid yet", which stayed after it stopped being true and
 contradicted the line further down this same file. Between 14 and 15 September
 it claimed the opposite error: that 1,000 WAM had already been paid to the reviewer who
@@ -148,10 +207,10 @@ running, which comes first, because a chain with no nodes has nothing worth
 securing.
 
 **This programme's share of it is one eighth: 93,750 WAM, for the whole life
-of the programme.** 21,250 of that has been paid against the findings below.
-One of every class in the table above comes to 91,250, so the table is
-payable even if every class is found — which is the test a promise has to
-pass before it is made.
+of the programme.** 31,500 of that has been paid against the findings below,
+leaving 62,250. One of every class in the table above comes to 8,750, so what
+is left pays the whole table seven times over — which is the test a promise
+has to pass before it is made. The table it replaced passed that test once.
 
 **When the eighth is spent, the programme closes and this file says so.** It
 is not left open and unfunded. The ceiling can be raised later by announcement
@@ -338,6 +397,130 @@ rather than before it.
 Classified at 250, the hardening rung, which is where the reporter classified
 it. Held down by `pool/test/address-validation.test.js`.
 
+**250 WAM — the block spool was emptied at the start of the window it exists
+for, accepted 6 November 2026, payable.** `drainSpool` says in its own comment
+what the spool is for: dying between the node accepting a block and the payout
+being recorded. `_submitBlock` removed the entry the moment the node accepted
+the block — the first instant of that window rather than the last — and
+`_record` runs after it. A redis failure there returned UNAVAILABLE before
+`credited`, before `emit('share')` and before `emit('block')`. No event, and
+`recordBlock` is the only writer of `blocks:pending`, so nothing recorded the
+block. The resubmission hit JOB_NOT_FOUND because `refreshTemplate(true)` had
+already cleared the job, and the drain found an empty spool. 47.5 WAM on the
+chain, credited to nobody, with no path back: the one crash the spool was
+built for was the one it did not cover.
+
+Reported by 0xkerochan, with a harness that drives the real JobManager and
+ShareProcessor against a redis whose first write throws. Fixed on the option
+he named: the entry is released by the 'block' listener in `pool/server.js`
+after `recordBlock` returns, so it covers the whole accept-to-record window,
+and `unspoolRecorded` swallows its own failure because an entry that stays
+costs one round trip a minute while an entry removed early costs a block.
+Held down by `pool/test/block-spool.test.js`.
+
+Classified at 250, the hardening rung, which is where the reporter classified
+it — he wrote that he was not inflating it. The payment is waiting on a
+mainnet address from him.
+
+**10,250 WAM — a broadcast payment paid a second time, and three more faults
+in the same accounting, accepted 7 November 2026, PAID 8 November 2026.** Ten
+transactions of 1,025 WAM, all in block 37,299, and in
+`docs/TREASURY_LEDGER.md` with the rest.
+
+ioredis `pipeline()` is a batch, not a transaction, and its `exec()` resolves
+with `[error, result]` pairs: a command that fails arrives as data, not as a
+throw. `_processPayments` broadcast the transaction, wrote `payment:inflight`,
+then committed the balance decrements through such a pipeline. If that commit
+failed, nothing threw, nothing paused, every balance stayed as it was, and the
+run ten minutes later paid the same miners again from the same balances. The
+marker written for exactly this case was read in one place in the whole
+repository, `startupReconcile`, so it only ever spoke after a restart.
+
+Three more in the same report. `recordShare`'s accounting had the identical
+shape with a smaller blast radius, so a miner was told `valid:true` on the
+first submission of a share that was never recorded. `recordBlock` asked
+`blocks:pending` and `blocks:confirmed:hashes` whether a block was already
+accounted for, and a block sitting in `blocks:maturing` answered neither. And
+`shutdown()` did not wait for the accounting chain, so a SIGTERM arriving
+between a block being accepted and its payout being recorded lost it the way a
+power cut would — except that this is the ordinary way the pool is restarted,
+which makes it the likelier of the two.
+
+Reported by bobbyning from a read of `pool/` at `6d613ae`, without running
+anything. Fixed in `pool/lib/shareProcessor.js`, `pool/lib/jobManager.js` and
+`pool/server.js`: the marker is read before every payment run and pauses the
+pool if it is there, the payment commit and `recordShare` read what their
+`exec()` returns, the
+accounting is a MULTI, a duplicate share is answered with code 22 instead of
+"resubmit", and `_mature`'s `lrem` was moved outside its MULTI and gated on
+the replies — a MULTI is one unit against a lost connection but does not abort
+on a command that fails at run time, so with the `lrem` inside it, a failed
+credit could still erase the record of what was owed. Held down by
+`pool/test/payment-safety.test.js`, `pool/test/maturation-claim.test.js` and
+`pool/test/cross-job-replay.test.js`, each run against the old code to confirm
+it fails there.
+
+Classified at 10,000 for the payment commit and 250 for the share called
+accepted while its accounting had failed — both rungs the reporter named
+himself. His appendix A was the spool finding above, reported a day earlier
+and credited there, though his observation about `shutdown()` was new and is
+fixed with it. His appendix B, the block stranded in `blocks:maturing`, is
+fixed and credited to him by name; he did not price it and no amount was added
+for it.
+
+**400 WAM — a found block's payout table could be destroyed instead of written,
+and the pool would report success, accepted 9 November 2026, unpaid.**
+
+`recordBlock` committed a found block as four commands in a redis pipeline and
+never read the `[error, result]` pairs that `exec()` resolves with. A pipeline
+is a batch and not a transaction — this repository's own comments say so in
+three places — so when the first command was refused server-side, the three
+after it were applied anyway. That first command is the one that writes the
+payout table. The round, which is the only other statement of who had earned
+what, was deleted; the pool fee was booked for a block nobody would ever be
+paid for; and the function returned the record as though the block were
+settled. Because it did not throw, `pool/server.js` then released the
+block-spool entry, so the last copy that could have re-offered the block went
+with it. Nothing was logged.
+
+Reading the replies is not the fix, and that is the part worth writing down.
+By the time a reply can be read the round is already gone, and the retry it
+would trigger recomputes the payouts from an empty round. The order is the
+fix, and an order only means something if nothing can run between its parts.
+`wamRecordBlock` in `pool/lib/atomic.js` writes the table with `HSETNX` and
+lets nothing destructive run unless that succeeded. A refused table now costs
+nothing: the round stands, the spool keeps the block, and the retry rebuilds
+the same table from the same shares. The one command that can still fail after
+the table is written is the fee counter, which is last for that reason — a
+counter short by one block, repairable from `blocks:pending`, and loud.
+
+Reported by Radenlingga (@stokraden45506) on 9 November 2026 against
+`c10e015`, with a reproduction that drives this repository's own
+`ShareProcessor` over a double with real pipeline semantics. He ran nothing
+against the live pool, the explorer or the network. Held down by
+`pool/test/record-block-commit.test.js`, which was run against the old commit
+first: three of its five cases fail there.
+
+**He also corrected this file.** The entry above said of the 8 November fix
+that "every `exec()` is wrapped and its replies read". That was not true. It
+was true of the payment commit and of `recordShare`; this call site and
+`_orphan`'s bookkeeping were never touched, and the sentence covered them. He
+read the code against the claim and found the gap. The sentence now says what
+was actually done, `_orphan` reads its replies and logs them, and nothing in
+`pool/` calls `exec()` unread.
+
+Classified at 400 — the rung for denial of service against the pool — and said
+as a judgement rather than a reading of the wording. The reporter suggested
+1,000 by the precedent of the maturation gap above, with 250 as his own floor.
+The maturation entry was classified at 1,000 *because 1,000 was the
+denial-of-service rung* in the table of that day, in those words. That rung is
+400 in the table published on 8 November, the day before this report arrived.
+So the band is the same one and the precedent is kept rather than set aside.
+Not 250: this is not hardening, it is one block's payout table, which is the
+one thing here that cannot be rebuilt. And not read as a duplicate of the
+7 November report: the fix for that report is what he read, and what he found
+is where it stopped.
+
 **1,000 WAM — the pool API leak, accepted 13 September 2026, unpaid.** Three of
 four `/api/*` endpoints returned every miner's full payout address while the
 pool's own page said otherwise. Fixed at the response boundary in
@@ -400,7 +583,7 @@ To check a download:
 ```
 gpg --import SIGNING-KEY.asc
 gpg --verify SHA256SUMS.asc SHA256SUMS
-curl -LO https://wamcoin.org/downloads/v0.1.13/SHA256SUMS.asc
+curl -LO https://wamcoin.org/downloads/v0.1.14/SHA256SUMS.asc
 curl -LO https://wamcoin.org/verify_release.sh
 curl -LO https://wamcoin.org/SIGNING-KEY.asc
 bash verify_release.sh .

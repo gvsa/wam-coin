@@ -221,6 +221,21 @@ run "supply arithmetic"          "$PY" scripts/verify_supply.py
 run "pool, miner and node agree on addresses" \
     "$PY" scripts/check_address_agreement.py
 
+# And the phone runs the same miner as the desktop. contrib/ carries its own
+# copy of miner/src for the Gradle build, and on 8 November two reported and
+# paid JSON faults were fixed in one of the two trees. The announcement was
+# true of one copy; the hang it described was still in the sources of the
+# app. An outsider found it by diffing, because nothing here was.
+run "the phone runs the same miner" \
+    "$PY" scripts/check_android_miner.py
+
+# And the miner's own tests are actually run. Until 9 November 2026 nothing
+# in this repository opened miner/test/ -- three test programs, one of them
+# extended the day before to hold down a paid finding, and no gate that could
+# have told us whether any of them still passed.
+run "the miner's unit tests" \
+    bash scripts/test_miner.sh
+
 # How much has been paid in bounties is stated in four places by hand. On
 # 2026-10-13 the front page's footer said 21,000 WAM, which was right and
 # counted three payments, while the paragraph directly above it said the
@@ -324,6 +339,13 @@ run "no page promises and forgets"  "$PY" scripts/check_promises.py
 # docs/TREASURY_LEDGER.md.
 run "treasury claims match the ledger" "$PY" scripts/check_treasury_claims.py
 
+# And two plans cut in one sitting cannot take the same coin. --parts keeps
+# the parts of one payment apart; until 9 November nothing kept two separate
+# plans apart, and three people were owed that day. The failure would have
+# arrived at broadcast, after the key had been used.
+run "two plans cannot spend one output" \
+    "$PY" scripts/test/test_treasury_exclude.py
+
 # That one reads what we SAY about the money. This reads the LEDGER itself,
 # against the chain, and it is the half that was missing. docs/TREASURY_LEDGER.md
 # does not merely record the spends: it hands the reader an identity and tells
@@ -347,6 +369,16 @@ run "the ledger is what the chain says"  "$PY" scripts/check_treasury_ledger.py 
 # filenames on /start/. Every one was found by a person looking at a rendered
 # page. The documents were right each time; only the page was wrong.
 run "the pages say what the documents say" "$PY" scripts/test/test_build_pages.py
+
+# That one asks whether the generator renders correctly. This asks whether
+# anybody ran it. On 8 November 2026 SECURITY.md gained a fifth paid bounty
+# and four published figures moved with it; the commit shipped and
+# site/security/index.html was not rebuilt, so the page told readers "21,250
+# WAM to four people" while the document it is made from said 31,500 to five.
+# The live-site check further down passed throughout, because the live site
+# and the repository were stale together -- which is what a comparison
+# between two copies of the same mistake is worth.
+run "every generated page is what its source builds" "$PY" scripts/build_pages.py --check
 
 # And the one document generated from a binary rather than written. An
 # operator asked for an example wam.conf on 2026-10-13 and we shipped none:

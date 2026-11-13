@@ -59,6 +59,8 @@ const path = require('path');
 const BlockTemplate = require('../lib/blockTemplate');
 const ShareProcessor = require('../lib/shareProcessor');
 const { attachAtomic, attachUnsupported } = require('./fakeAtomic');
+const { RECORD_BLOCK } = require('../lib/atomic');
+const { attachMulti } = require('./fakeMulti');
 
 const GRN = '\x1b[32m', RED = '\x1b[31m', BLD = '\x1b[1m', OFF = '\x1b[0m';
 let pass = 0;
@@ -98,6 +100,29 @@ function fakeRedis() {
             sets.get(k).add(v);
             return sets.get(k).size > before ? 1 : 0;
         },
+        // The claim is given back when the accounting that should have
+        // followed it did not happen, so a resubmission of the same share
+        // can actually be credited instead of being refused as a duplicate.
+        async srem(k, v) {
+            if (!sets.has(k)) return 0;
+            return sets.get(k).delete(v) ? 1 : 0;
+        },
+        // recordShare's accounting is a MULTI now, and attachMulti runs the
+        // queued commands through these, so they have to exist at the top
+        // level rather than only inside the pipeline below.
+        async hincrbyfloat(k, f, v) {
+            if (!hashes.has(k)) hashes.set(k, new Map());
+            const cur = (hashes.get(k).get(f) || 0) + Number(v);
+            hashes.get(k).set(f, cur);
+            return cur;
+        },
+        async lpush(k, v) {
+            if (!lists.has(k)) lists.set(k, []);
+            lists.get(k).unshift(v);
+            return lists.get(k).length;
+        },
+        async ltrim() { return 'OK'; },
+        async zadd() { return 1; },
         async del(k) { sets.delete(k); hashes.delete(k); lists.delete(k); return 1; },
         pipeline() {
             const q = [];
@@ -132,6 +157,7 @@ function fakeRedis() {
     };
     attachUnsupported(api, 'it models the share-claim sets and nothing of ' +
                            'block accounting');
+    attachMulti(api);
     return api;
 }
 
@@ -207,12 +233,57 @@ function processor(redis) {
         const share = { worker: 'w.1', difficulty: 0.000002, jobId: '1',
                         powHash: 'ab'.repeat(32) };
         await sp.recordShare(share);
-        await sp.recordShare(Object.assign({}, share, { jobId: '2' }));
-        await sp.recordShare(Object.assign({}, share, { jobId: '3' }));
+
+        // AND THE REFUSAL IS AN ERROR THE CALLER CAN SEE.
+        //
+        // These two used to resolve. A bare `return` from the duplicate
+        // branch looks exactly like a success to processShare, which then
+        // set credited = true and answered the miner `valid: true` for work
+        // that went into neither the round nor the PPLNS window -- no error
+        // code, nothing in his logs. Tagged rather than generic, because
+        // "already counted, do not resend" and "write failed, please
+        // resend" need opposite answers and jobManager picks between them
+        // on this flag. Reported by bobbyning, 2026-11-07.
+        for (const jobId of ['2', '3']) {
+            await assert.rejects(
+                () => sp.recordShare(Object.assign({}, share, { jobId })),
+                (err) => err.duplicateShare === true,
+                `a replay under jobId ${jobId} resolved instead of being refused`);
+        }
+
         assert.strictEqual(redis._credit('w.1'), 0.000002,
             `the same proof of work was credited ${redis._credit('w.1') / 0.000002} `
             + 'times; PPLNS takes the excess from every other miner in the round');
         assert.strictEqual(redis._powCount(), 1);
+    });
+
+    await test('a failed accounting gives the claim back, so the resubmission lands', async () => {
+        // The other half of the same fault. The SADD is written first on
+        // purpose -- a redis that cannot answer must not be a free pass --
+        // but nothing used to undo it. If the accounting then failed, the
+        // proof of work stayed claimed for the rest of the round with
+        // nothing credited against it, and the resubmission the miner was
+        // invited to send came back "already credited" and was swallowed.
+        const redis = fakeRedis();
+        const sp = processor(redis);
+        const share = { worker: 'w.1', difficulty: 0.000002, jobId: '1',
+                        powHash: 'ef'.repeat(32) };
+
+        redis._multiFails = true;
+        await assert.rejects(() => sp.recordShare(share),
+            'a share whose accounting failed must be refused, not resolved');
+        redis._multiFails = undefined;
+
+        assert.strictEqual(redis._powCount(), 0,
+            'the claim must be given back when nothing was credited for it');
+        assert.strictEqual(redis._credit('w.1'), 0,
+            'and nothing may be credited by a transaction that did not apply');
+
+        // Now the miner does what he was told to do.
+        await sp.recordShare(share);
+        assert.strictEqual(redis._credit('w.1'), 0.000002,
+            'the resubmission must be creditable; otherwise "please resubmit" '
+            + 'is an instruction the pool refuses to honour');
     });
 
     await test('two different solutions are still two credits', async () => {
@@ -285,12 +356,26 @@ function processor(redis) {
     });
 
     await test('the claim set is dropped with the round', () => {
-        const src = fs.readFileSync(require.resolve('../lib/shareProcessor'), 'utf8');
-        const roundDel = src.indexOf("del(this.k('round'))");
-        const powDel = src.indexOf("del(this.k('round:pow'))");
-        assert.ok(powDel > -1 && powDel - roundDel < 400 && powDel > roundDel,
-            'the proof-of-work set is not deleted where the round is, so it '
-            + 'grows without end');
+        // This used to search shareProcessor.js for the two literal strings
+        // "del(this.k('round'))" and "del(this.k('round:pow'))" and check they
+        // were within 400 characters of each other. It passed for a year over
+        // four lines that could lose a block's whole payout table, because a
+        // substring search cannot see what a command DOES -- and it broke the
+        // day those two lines moved into a script, which is the only honest
+        // thing it ever did.
+        //
+        // The behaviour is now asserted where behaviour belongs:
+        // record-block-commit.test.js drives recordBlock and reads the keys
+        // back. What is left here is the one structural fact this file is
+        // about -- the claim set is destroyed in the same breath as the round
+        // it belongs to, with nothing between them that could fail.
+        const del = RECORD_BLOCK.split('\n')
+            .find((line) => line.includes("'DEL'"));
+        assert.ok(del, 'the record-block script no longer deletes anything');
+        assert.ok(del.includes('KEYS[2]') && del.includes('KEYS[3]'),
+            'the round and the proof-of-work set are no longer deleted by one '
+            + 'command, so the claim set can outlive the round it belongs to '
+            + 'and grow without end');
     });
 
     console.log();
