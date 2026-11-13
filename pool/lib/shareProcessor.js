@@ -34,11 +34,26 @@
 //  <p>:blocks:orphaned so the loss is auditable rather than silent.
 
 const EventEmitter = require('events');
+const path = require('path');
 
 const { computeBlockRewards, estimateHashrate, pplnsWindowDifficulty } = require('./rewards');
+const { PaymentJournal, reconcile } = require('./journal');
 const { COIN, COINBASE_MATURITY } = require('./constants');
 const { defineAtomicCommands, CLAIM_AND_RECORD_NAME,
-        RECORD_BLOCK_NAME } = require('./atomic');
+        RECORD_BLOCK_NAME, CREDIT_MATURED_NAME,
+        CREDIT_SHARE_NAME, COMMIT_PAYMENT_NAME } = require('./atomic');
+
+// blocks:confirmed is a sample, not a count: it is trimmed, and the count
+// lives in blocks:confirmed:count because a number is not a collection.
+// The limit was written out as 4999 inside the credit; it is a constant
+// now because the script needs it as an argument and two copies of a
+// bound is how one of them goes stale.
+const CONFIRMED_LIST_LIMIT = 5000;
+
+// The journal of payments, for the same reason: it was written out as 999
+// inside the commit, and the commit is now a script that takes it as an
+// argument.
+const PAYMENTS_LIST_LIMIT = 1000;
 
 class ShareProcessor extends EventEmitter {
     /**
@@ -56,6 +71,16 @@ class ShareProcessor extends EventEmitter {
         this.log = logger;
 
         this.prefix = config.redisPrefix || 'wam';
+
+        // The one record of what has been paid that redis cannot rewrite.
+        // Everything else the payment path relies on -- the in-flight
+        // marker, the committed txids, the balances -- is in redis, and
+        // redis on its defaults comes back from a crash a few minutes
+        // younger than it was. See pool/lib/journal.js.
+        this.journal = new PaymentJournal(
+            config.paymentJournal
+                || path.join(__dirname, '..', 'state', 'payments.journal'),
+            logger);
         this.mode = (config.rewardMode || 'pplns').toLowerCase();
         // ?? and not ||. A zero fee is a real configuration -- this pool
         // ran at 0% from launch night onward -- and `0 || 1` is 1, so the
@@ -176,7 +201,18 @@ class ShareProcessor extends EventEmitter {
 
     async startupReconcile() {
         const raw = await this.redis.get(this.k('payment:inflight'));
-        if (!raw) {
+
+        // THE MARKER IS NOT ENOUGH, BECAUSE THE MARKER IS IN REDIS.
+        //
+        // A restart after a crash is exactly the moment redis is most
+        // likely to have come back younger than the money: the snapshot on
+        // disk is minutes old, appendonly is off by default, and a failover
+        // picks a replica that was behind. The rollback takes the marker
+        // with it, so this check used to read nothing and release payments
+        // over balances that had already been paid.
+        const lost = await this._reconcileJournal(raw);
+
+        if (!raw && !lost) {
             // The only path that releases payments. start() pauses them before
             // calling this, so reaching here is the single proof that the last
             // run finished cleanly.
@@ -184,9 +220,74 @@ class ShareProcessor extends EventEmitter {
             return true;
         }
 
-        this._reportUnfinishedRun(raw);
+        if (raw) this._reportUnfinishedRun(raw);
         this.paused = true;
         return false;
+    }
+
+    /**
+     * Ask the journal whether redis still agrees with it.
+     *
+     * Returns true if something was found that payments must stop for. Every
+     * complaint is logged either way: the ones that are not fatal are how an
+     * operator learns the detector has gone blind, which is worth knowing
+     * before the day it is needed.
+     */
+    async _reconcileJournal(inflightRaw) {
+        let complaints;
+        try {
+            complaints = await reconcile(this.journal, this.redis,
+                                         this.k('payments:done'), inflightRaw);
+        } catch (err) {
+            // Not being able to ask is not an answer. The reconciliation is
+            // the only thing standing between a rolled-back redis and a
+            // second payment, so a failure to run it stops payments the same
+            // way a failure of the check itself would.
+            this.log.error('=========================================================');
+            this.log.error('THE PAYMENT JOURNAL COULD NOT BE READ.');
+            this.log.error(`  ${this.journal.path}`);
+            this.log.error(`  ${err.message}`);
+            this.log.error('');
+            this.log.error('  Payments stop here. The journal is what notices that');
+            this.log.error('  redis has gone back to an older state, and a check that');
+            this.log.error('  cannot run is not a check that passed.');
+            this.log.error('=========================================================');
+            return true;
+        }
+
+        let fatal = false;
+        for (const complaint of complaints) {
+            if (complaint.fatal) fatal = true;
+            else this.log.warn(complaint.text);
+        }
+        if (!fatal) return false;
+
+        this.log.error('=========================================================');
+        this.log.error('REDIS NO LONGER AGREES WITH THE PAYMENT JOURNAL.');
+        for (const complaint of complaints.filter((c) => c.fatal)) {
+            this.log.error(`  ${complaint.text}`);
+        }
+        this.log.error('');
+        this.log.error('  Redis is not durable on its defaults: a crash, a power');
+        this.log.error('  cut or a failover to a replica that was behind brings it');
+        this.log.error('  back as it was at the last save. That takes the balances,');
+        this.log.error('  the in-flight marker and the record of what was paid, all');
+        this.log.error('  together -- so what is left looks consistent and is simply');
+        this.log.error('  older than the money.');
+        this.log.error('');
+        this.log.error('  PAYMENTS ARE PAUSED. Compare the wallet against the');
+        this.log.error('  journal before anything else:');
+        this.log.error('');
+        this.log.error(`    tail -n 40 ${this.journal.path}`);
+        this.log.error('    wam-cli listtransactions "*" 50');
+        this.log.error(`    redis-cli HGETALL ${this.k('balances')}`);
+        this.log.error('');
+        this.log.error('  Every transaction the journal names and the wallet');
+        this.log.error('  confirms has been paid. Whatever redis still shows as');
+        this.log.error('  owed for those payouts is owed twice, and must be');
+        this.log.error('  deducted by hand before payments are released.');
+        this.log.error('=========================================================');
+        return true;
     }
 
     /**
@@ -213,13 +314,20 @@ class ShareProcessor extends EventEmitter {
         this.log.error(`  total      ${(intent.total / COIN).toFixed(8)} WAM`);
         this.log.error(`  recipients ${names.length}`);
         this.log.error('');
-        this.log.error('  The transaction may or may not have been broadcast, and the');
-        this.log.error('  balances may or may not have been cleared. Check the wallet:');
+        this.log.error('  The transaction may or may not have been broadcast. Check');
+        this.log.error('  the wallet:');
         this.log.error('');
         this.log.error('    wam-cli listtransactions "*" 20');
         this.log.error('');
-        this.log.error('  If a matching send exists, the miners were paid. Deduct the');
-        this.log.error('  balances by hand, then clear the marker:');
+        this.log.error('  THE BALANCES WERE NOT DEDUCTED. This marker is written');
+        this.log.error('  before the broadcast and removed only inside the commit,');
+        this.log.error('  which is one script: if it is still here, the commit did');
+        this.log.error('  not run. That used to be a guess -- the deletion sat in the');
+        this.log.error('  middle of a MULTI and could outlive the deduction it was');
+        this.log.error('  supposed to vouch for -- and it is now a fact.');
+        this.log.error('');
+        this.log.error('  So if a matching send exists, the miners were paid and still');
+        this.log.error('  owed. Deduct the amounts above by hand, then clear it:');
         this.log.error('');
         this.log.error(`    redis-cli DEL ${this.k('payment:inflight')}`);
         this.log.error('');
@@ -311,49 +419,23 @@ class ShareProcessor extends EventEmitter {
         //
         // Scoped to the round and deleted with it, so the set is bounded by
         // the shares in one block and never grows without end.
-        if (share.powHash) {
-            let fresh;
-            try {
-                fresh = await this.redis.sadd(this.k('round:pow'), share.powHash);
-            } catch (err) {
-                // A redis that cannot answer must not become a free pass: the
-                // share is refused rather than credited blind.
-                this.log.error(`could not check the proof of work for a share `
-                                  + `from ${share.worker}: ${err.message}`);
-                throw err;
-            }
-            if (fresh === 0) {
-                // A DUPLICATE IS A REFUSAL, AND IT USED TO RETURN LIKE A
-                // SUCCESS.
-                //
-                // This was a bare `return`, which resolves -- so processShare
-                // set `credited = true`, emitted 'share', and answered the
-                // miner `valid: true`. For work that went into neither the
-                // round nor the PPLNS window, with no error code and nothing
-                // in his logs. That is the exact failure the comment above
-                // the _record call in jobManager was written about: "the
-                // miner used to be told accepted while the redis write was
-                // still a promise nobody waited for" -- sitting on the dedup
-                // set instead.
-                //
-                // It is tagged rather than generic because the caller has to
-                // tell it apart from a redis failure: one means "this share
-                // is already counted, do not send it again", the other means
-                // "send it again". Answering the first with the second is how
-                // a miner ends up in a resubmission loop.
-                //
-                // Reported by bobbyning, 2026-11-07.
-                this.log.warn(`share from ${share.worker} carries a proof of `
-                                 + `work already credited this round `
-                                 + `(${share.powHash.slice(0, 16)}...) -- not `
-                                 + `credited again`);
-                this.stats = this.stats || {};
-                this.stats.replayedShares = (this.stats.replayedShares || 0) + 1;
-                throw Object.assign(
-                    new Error('proof of work already credited this round'),
-                    { duplicateShare: true });
-            }
-        }
+        // THE CLAIM IS TAKEN WHERE THE ACCOUNTING HAPPENS, NOT HERE.
+        //
+        // This used to SADD round:pow by itself and refuse a duplicate on
+        // the spot. That is correct about duplicates and wrong about
+        // failures: between this claim and the accounting that follows it
+        // there was a window in which the claim was held, the write refused,
+        // the claim handed back, and the miner invited to resubmit a proof
+        // that had already been credited. Five submissions, one proof, fifty
+        // credited where ten was owed.
+        //
+        // _record now takes the claim inside the same script that writes, so
+        // the window does not exist. A duplicate still throws with
+        // duplicateShare, from there instead of from here, and the caller
+        // cannot tell the difference.
+        //
+        // Reported by bobbyning (the two earlier routes) and by dang150296
+        // (the window), 2026-10-04, 2026-10-11 and 2026-11-10.
 
         const now = Math.floor(Date.now() / 1000);
         const entry = JSON.stringify({
@@ -388,23 +470,56 @@ class ShareProcessor extends EventEmitter {
         // on any failure so the resubmission can actually land.
         //
         // Reported by bobbyning, 2026-11-07.
-        const pipe = this.redis.multi();
-        pipe.hincrbyfloat(this.k('round'), share.worker, share.difficulty);
-        pipe.lpush(this.k('pplns'), entry);
-        pipe.ltrim(this.k('pplns'), 0, windowSize - 1);
-        pipe.zadd(this.k('hashrate'), now, entry);
-
-        let replies;
+        // THE CLAIM AND THE ACCOUNTING ARE ONE DECISION NOW.
+        //
+        // They were three: SADD took the claim above, this MULTI did the
+        // accounting, and any failure handed the claim back so the miner
+        // could resubmit. Each is reasonable and together they paid for one
+        // proof five times.
+        //
+        // A MULTI is one unit against a lost connection and no unit at all
+        // against a command refused at run time: redis applies the rest and
+        // returns the error. So with round, pplns or hashrate holding the
+        // wrong type, the difficulty was credited, the window entry written,
+        // the claim released, and the miner told to send it again. He did.
+        // Measured at four fault positions: five submissions of one proof
+        // credited 50 where 10 was owed.
+        //
+        // And it needs no corruption. If only the EXEC reply is lost, the
+        // accounting ran, the claim came back, and the resubmission was
+        // credited again.
+        //
+        // wamCreditShare checks everything refusable BEFORE taking the
+        // claim, so a refusal leaves no claim and no credit and the miner may
+        // safely resubmit; then it takes the claim and writes in the same
+        // script, so a proof already counted -- duplicate, race, or a
+        // re-sent command whose reply was lost -- returns 0 and changes
+        // nothing.
+        //
+        // Reported by dang150296 (Urriki1502), 10 November 2026.
+        let counted;
         try {
-            replies = await pipe.exec();
+            counted = Number(await this.redis[CREDIT_SHARE_NAME](
+                this.k('round:pow'), this.k('round'),
+                this.k('pplns'), this.k('hashrate'),
+                share.powHash || entry, share.worker, String(share.difficulty),
+                entry, String(windowSize), String(now)));
         } catch (err) {
-            await this._releasePowClaim(share);
+            // Nothing was written and no claim was taken, so "send it again"
+            // is the truth rather than an invitation to be paid twice.
             throw err;
         }
-        const failed = (replies || []).filter((r) => Array.isArray(r) && r[0]);
-        if (failed.length) {
-            await this._releasePowClaim(share);
-            throw failed[0][0];
+
+        if (counted !== 1) {
+            // Already counted this round. Not an error in the accounting --
+            // the work is simply not owed twice.
+            this.log.warn(`share from ${share.worker} carries a proof of work `
+                          + 'already credited this round -- not credited again');
+            this.stats = this.stats || {};
+            this.stats.replayedShares = (this.stats.replayedShares || 0) + 1;
+            throw Object.assign(
+                new Error('proof of work already credited this round'),
+                { duplicateShare: true });
         }
     }
 
@@ -659,7 +774,39 @@ class ShareProcessor extends EventEmitter {
             let record;
             try {
                 record = JSON.parse(pending[hash]);
-            } catch {
+            } catch (err) {
+                // A RECORD WE CANNOT READ IS NOT A RECORD WE MAY DESTROY.
+                //
+                // This was `hdel` and nothing else: no log line, no copy, and
+                // the only statement of who was owed what for that block gone
+                // for good. The field is written by one place, recordBlock,
+                // and it writes JSON.stringify of a record it just built, so
+                // a field that will not parse means something else happened
+                // to the datastore -- which is exactly when the contents are
+                // worth keeping rather than tidying away.
+                //
+                // recordBlock already does the right thing with a block it
+                // cannot price: it parks it in blocks:failed for an operator.
+                // This now does the same, and only deletes the pending field
+                // once the copy is safe, so an interruption leaves the block
+                // in pending rather than nowhere.
+                //
+                // Reported by dang150296 (Urriki1502), 10 November 2026.
+                this.log.error(
+                    `block ${hash} has an unreadable payout record ` +
+                    `(${err.message}). It is moved to ` +
+                    `${this.k('blocks:failed')} for an operator to look at, ` +
+                    'not deleted.');
+                try {
+                    await this.redis.hset(this.k('blocks:failed'), hash,
+                                          pending[hash]);
+                } catch (saveErr) {
+                    this.log.error(
+                        `and the copy could not be written (${saveErr.message}), ` +
+                        'so it is left in pending untouched. Nothing was lost ' +
+                        'and nothing will be until somebody looks.');
+                    continue;
+                }
                 await this.redis.hdel(this.k('blocks:pending'), hash);
                 continue;
             }
@@ -844,97 +991,62 @@ class ShareProcessor extends EventEmitter {
             return;
         }
 
-        // multi(), not pipeline(), for the reason the payment commit states
-        // further down: an ioredis pipeline is a batch, not a transaction --
-        // the commands go out together and redis applies them one by one, so
-        // a connection lost halfway leaves the first few applied and the rest
-        // not. Here that means some miners credited and not others, or every
-        // balance credited while the lrem that ends the block's maturation
-        // never runs. The argument for MULTI was written for the payment
-        // deduction and was never carried to the credit, which is the same
-        // money moving the other way.
+        // ONE SCRIPT, AN APPLIED MARKER INSIDE IT, AND EVERY REFUSAL
+        // DECIDED BEFORE THE FIRST WRITE.
         //
-        // Reported by bobbyning, 2026-11-07.
-        const pipe = this.redis.multi();
-
+        // This was a MULTI whose replies were read afterwards. MULTI is one
+        // unit against a lost connection and is NOT one against a command
+        // that fails at run time: redis applies the rest and hands the error
+        // back. So a balance field holding a non-integer credited one miner,
+        // refused the next, and still marked the block confirmed -- while the
+        // message this code printed said the block was not marked confirmed.
+        //
+        // And reading replies cannot see the other half of it. ioredis, on
+        // its defaults, RE-SENDS commands whose reply never arrived when a
+        // connection drops. Every command here is an increment, so the second
+        // delivery doubled the balances and wrote the evidence twice, and the
+        // call returned success. Nothing in the pool could tell the two
+        // deliveries apart, because nothing recorded that the first had
+        // happened.
+        //
+        // wamCreditMatured does both: SADD on a set of credited blocks is the
+        // marker and it is tested inside the script, so a re-send credits
+        // nobody twice; and every type and every number that could be refused
+        // is checked before a single balance moves, so a refusal changes
+        // nothing at all.
+        //
+        // Reported by dang150296 (Urriki1502), 10 November 2026, reproduced
+        // against a real Redis with this pool's own sources.
+        const payouts = [];
         for (const [worker, amount] of Object.entries(record.payouts)) {
             if (amount <= 0) continue;
             // Workers authorize as "<address>.<label>"; balances are per address.
-            const address = worker.split('.')[0];
-            pipe.hincrby(this.k('balances'), address, amount);
+            payouts.push(worker.split('.')[0], String(amount));
         }
 
-        pipe.lpush(this.k('blocks:confirmed'), evidence);
-        pipe.ltrim(this.k('blocks:confirmed'), 0, 4999);
-        // A COUNT CANNOT COME OUT OF A LIST THAT IS TRIMMED.
-        //
-        // This is the third time this project has published a block count
-        // that stopped moving, and each time the count was the size of a
-        // bounded thing:
-        //
-        //   lrange(blocks:confirmed, 0, 49).length   froze at 50
-        //   llen(blocks:confirmed)                   froze at 5000, here
-        //
-        // llen was the right answer to the first bug and the wrong answer in
-        // general: it reports the length of a list that the line above
-        // deliberately caps. On 1 October the dashboard had read BLOCKS FOUND
-        // 5000 for two days while blocks kept arriving, and the founder saw it
-        // the same way he saw the first one -- by watching a number that
-        // should have moved.
-        //
-        // Raising the cap would put the same bug further away, which is the
-        // shape of fix this project does not accept. A counter is not a
-        // collection: it is incremented once per event and nothing trims it.
-        // The list stays, because the page also wants the recent blocks to
-        // show, and a sample and a count are two different questions.
-        pipe.incr(this.k('blocks:confirmed:count'));
-        // AND A SET OF THE HASHES, FOR THE QUESTION "WAS THIS ALREADY PAID?"
-        //
-        // The list above is trimmed at 5000 and the counter is a number, so
-        // neither can answer it. recordBlock has to be able to: the spool
-        // drain offers a recovered block for payout without knowing whether
-        // the crash happened before or after the original accounting, and
-        // "already in pending" only covers a block that has not matured yet.
-        // Without this, a block recovered after maturing would be paid twice.
-        //
-        // A set of 32-byte hex strings, one per block ever confirmed. At 720
-        // blocks a day that is about 1.7 MB a year, which is the cheapest
-        // honest answer available.
-        pipe.sadd(this.k('blocks:confirmed:hashes'), record.blockHash);
-
-        // THE EVIDENCE IS ERASED AFTER THE CREDIT, NOT WITH IT.
-        //
-        // The lrem used to be the last command in this transaction. MULTI
-        // makes the batch one unit against a lost connection, but it does
-        // NOT abort on a command that fails at run time -- redis applies the
-        // rest and hands the error back in the reply array. So a failing
-        // lpush followed by a succeeding lrem took the block out of
-        // blocks:maturing without ever putting it in blocks:confirmed, and
-        // the block was then in pending, maturing and confirmed: nowhere.
-        // The crash-window walk caught exactly that at position 5.
-        //
-        // Split, with the replies read in between. If any part of the credit
-        // failed, the evidence stays and this throws. If the credit went
-        // through and the process dies before the lrem, the block is in both
-        // confirmed and maturing -- refused twice over rather than lost,
-        // which is the direction that costs nobody money.
-        let replies;
+        let credited;
         try {
-            replies = await pipe.exec();
+            credited = Number(await this.redis[CREDIT_MATURED_NAME](
+                this.k('blocks:credited'), this.k('balances'),
+                this.k('blocks:confirmed'), this.k('blocks:confirmed:count'),
+                this.k('blocks:confirmed:hashes'), this.k('blocks:maturing'),
+                record.blockHash, evidence, String(CONFIRMED_LIST_LIMIT),
+                ...payouts));
         } catch (err) {
-            this.log.error(`the credit for block ${record.height} did not go ` +
-                           `through (${err.message}); the payout table is kept ` +
-                           `in ${this.k('blocks:maturing')}`);
+            this.log.error(`the credit for block ${record.height} was refused ` +
+                           `(${err.message}) and nothing was changed; the ` +
+                           `payout table is still in ${this.k('blocks:maturing')}`);
             throw err;
         }
-        const failed = (replies || []).filter((r) => Array.isArray(r) && r[0]);
-        if (failed.length) {
-            this.log.error(`${failed.length} of ${replies.length} commands in ` +
-                           `the credit for block ${record.height} failed ` +
-                           `(first: ${failed[0][0].message}); the payout table ` +
-                           `is kept in ${this.k('blocks:maturing')} and the ` +
-                           'block is not marked confirmed');
-            throw failed[0][0];
+
+        if (credited !== 1) {
+            // The marker was already there. Either another run did it, or this
+            // is the same command arriving a second time after a dropped
+            // connection. Both mean the money has moved once and must not
+            // move again.
+            this.log.info(`block ${record.height} was already credited; this ` +
+                          'call changed nothing');
+            return;
         }
 
         try {
@@ -975,10 +1087,13 @@ class ShareProcessor extends EventEmitter {
     async _processPayments() {
         // AN UNFINISHED RUN BLOCKS THE NEXT RUN, NOT JUST THE NEXT START-UP.
         //
-        // payment:inflight is written before the broadcast and cleared in the
-        // same MULTI that deducts the balances, so finding it HERE means one
+        // payment:inflight is written before the broadcast and cleared by the
+        // same script that deducts the balances, so finding it HERE means one
         // thing exactly: a previous run got far enough to broadcast and not
-        // far enough to commit.
+        // far enough to commit. It used to be the same MULTI, which is a
+        // weaker sentence than it sounds -- the deletion could survive a
+        // deduction that was refused -- and that is the fault this marker
+        // exists to catch, arriving through the marker itself.
         //
         // The marker was built for that and then read in exactly one place --
         // startupReconcile(), once, at boot. A process that keeps running
@@ -1006,6 +1121,16 @@ class ShareProcessor extends EventEmitter {
                            'than run without knowing whether one is in flight');
             return;
         }
+        // And the same question the start-up check asks, asked again here,
+        // because the pool does not have to restart for redis to go back:
+        // a failover, a `redis-cli DEBUG RELOAD`, a restore while the pool
+        // keeps running, all leave this process connected to a server that
+        // has forgotten what it paid.
+        if (await this._reconcileJournal(inflight)) {
+            this.paused = true;
+            return;
+        }
+
         if (inflight) {
             this._reportUnfinishedRun(inflight);
             this.paused = true;
@@ -1168,6 +1293,29 @@ class ShareProcessor extends EventEmitter {
             intent.hex = signedHex;
             await this.redis.set(this.k('payment:inflight'), JSON.stringify(intent));
 
+            // And written down where redis cannot take it back, for the same
+            // reason and one step further: the line above is the record that
+            // a payment is in the air, and it lives in the one store that
+            // comes back from a crash younger than it was. This one is
+            // fsynced to disk before the money moves.
+            //
+            // Tagged as a refusal, not as an unknown. Nothing has been
+            // broadcast at this point, so the catch below must take the
+            // branch that clears the marker and leaves the balances alone --
+            // and must NOT take the branch that asks the node whether the
+            // transaction exists and re-sends it if not.
+            try {
+                this.journal.recordBroadcast(txid, batchTotal,
+                                             Object.fromEntries(batch));
+            } catch (err) {
+                throw Object.assign(
+                    new Error('the payment journal could not be written ' +
+                              `(${err.message}), so nothing was broadcast: ` +
+                              'a payment that cannot be recorded outside redis ' +
+                              'is a payment that cannot be proved once'),
+                    { ambiguous: false });
+            }
+
             await this.daemon.cmd('sendrawtransaction', [signedHex]);
         } catch (err) {
             // THIS BLOCK USED TO ASSUME. Its comment read "the call failed, so
@@ -1220,6 +1368,22 @@ class ShareProcessor extends EventEmitter {
                 // said no, so no transaction exists and the intent really is
                 // stale. Clearing it here is safe; leaving it would halt
                 // payments over a transient RPC error.
+                //
+                // The journal line was written before the broadcast, so a
+                // refusal leaves an entry for a transaction that never
+                // existed. Said so here, or every run from now on would read
+                // it as money in the air and stop.
+                if (txid) {
+                    try {
+                        this.journal.recordAbandoned(txid, err.message);
+                    } catch (e) {
+                        this.log.error(
+                            `${txid} was refused by the node and the journal ` +
+                            `could not be told (${e.message}). Payments will ` +
+                            'stop on the next run until the line is added or ' +
+                            'the entry removed by hand.');
+                    }
+                }
                 await this.redis.del(this.k('payment:inflight'));
                 this.log.error(`the payment was refused, balances left ` +
                                `untouched: ${err.message}`);
@@ -1231,93 +1395,124 @@ class ShareProcessor extends EventEmitter {
         // returned would lose every miner's money if the call failed.
         // Deduct exactly what was sent, not what was owed. For a balance that
         // hit the cap those differ, and the difference is the miner's money.
-        // multi(), not pipeline(). ioredis pipelines are a batch, not a
-        // transaction: the commands go out together and redis applies them one
-        // by one, so a connection lost halfway leaves the first few applied and
-        // the rest not. The comment on the del below used to claim that its
-        // survival implied the deduction survived, and with a pipeline that is
-        // simply untrue -- the deduction and the del could be split. MULTI/EXEC
-        // is applied as one unit, which is what the claim needs to be worth
-        // making.
-        const pipe = this.redis.multi();
+        //
+        // ONE SCRIPT, AND THE MARKER COMES OUT LAST.
+        //
+        // This was a MULTI, which is one unit against a lost connection and
+        // no unit at all against a command refused at run time: redis applies
+        // the rest and hands the error back. `DEL payment:inflight` sat in
+        // the middle of it, so a balance field holding a non-integer refused
+        // its HINCRBY while the deletion below it ran anyway. The block that
+        // follows read the replies, found the failure and paused -- which was
+        // right, and useless, because the marker that pause depends on was
+        // already gone. The restart found nothing to reconcile, released
+        // payments, rebuilt the same batch from balances that had never been
+        // deducted, and paid it a second time.
+        //
+        // Reading replies cannot fix an order. In wamCommitPayment every
+        // refusable value is checked before the first write, and the two
+        // markers are deleted after the last one, so a refusal leaves the
+        // money owed, the marker standing, and the pool exactly where the
+        // marker says it is.
+        //
+        // Reported by dang150296 (Urriki1502), 2026-11-10, with two confirmed
+        // regtest transactions for one owed balance.
+        const paidOut = [];
         for (const [address, amount] of batch) {
-            pipe.hincrby(this.k('balances'), address, -amount);
-            pipe.hincrby(this.k('paid'), address, amount);
+            paidOut.push(address, String(amount));
         }
-        pipe.lpush(this.k('payments'), JSON.stringify({
+        const journalEntry = JSON.stringify({
             txid, time: Date.now(), total: batchTotal, recipients: batch.length,
             payouts: Object.fromEntries(batch)
-        }));
-        pipe.ltrim(this.k('payments'), 0, 999);
-        // Cleared in the same pipeline that clears the balances: if this
-        // survives, so did the deduction, and if neither did the intent record
-        // is still there to be found.
-        pipe.del(this.k('payment:inflight'));
-        // A run that paid clears the postponement: the record means "the last
-        // run did not pay, and here is why", never "it once did not pay".
-        pipe.del(this.k('payment:postponed'));
+        });
 
         // THE COMMIT IS AS AMBIGUOUS AS THE BROADCAST WAS, AND IS NOW
         // TREATED THAT WAY.
         //
-        // This line used to sit outside every try in the function. A rejected
+        // This call used to sit outside every try in the function. A rejected
         // exec() travelled up to the interval handler, which logs and nothing
         // else, and the run ended with the money gone, the balances intact
         // and `paused` untouched -- so the next tick paid the same batch
         // again. The broadcast above has had a careful answer to "do we know"
         // since October; the commit had none.
         //
-        // A rejected EXEC is not proof that it did not apply: redis may have
-        // run it and lost the reply. Both outcomes are therefore stopped
-        // here, and the marker is still in redis for the operator to settle
-        // against the wallet. A delayed payment is the safe failure; a
-        // duplicate one is not.
-        //
         // Reported by bobbyning, 2026-11-07.
-        let replies;
+        //
+        // There are now two shapes of failure and they are not the same
+        // question. A refusal from the script is a sentence the script wrote,
+        // and it is proof that NOTHING was applied. Anything else is a lost
+        // answer, and a lost answer is unknown -- except that it can no
+        // longer be unknown in the dangerous direction: ioredis re-sends the
+        // command, and a second delivery of the same txid returns 0 and
+        // changes nothing.
+        let committed;
         try {
-            replies = await pipe.exec();
+            committed = Number(await this.redis[COMMIT_PAYMENT_NAME](
+                this.k('payments:done'), this.k('balances'), this.k('paid'),
+                this.k('payments'), this.k('payment:inflight'),
+                this.k('payment:postponed'),
+                txid, journalEntry, String(PAYMENTS_LIST_LIMIT), ...paidOut));
         } catch (err) {
             this.paused = true;
+            const refused = String(err && err.message)
+                .includes('wamCommitPayment refused:');
             this.log.error('=========================================================');
-            this.log.error('THE PAYMENT WAS SENT AND THE COMMIT DID NOT ANSWER.');
-            this.log.error(`  txid  ${txid}`);
-            this.log.error(`  ${err.message}`);
-            this.log.error('');
-            this.log.error('  The transaction is on the node. Whether the balances');
-            this.log.error('  were deducted is unknown, so payments stop here rather');
-            this.log.error('  than risk sending it twice.');
+            if (refused) {
+                this.log.error('THE PAYMENT WAS SENT AND THE COMMIT WAS REFUSED.');
+                this.log.error(`  txid  ${txid}`);
+                this.log.error(`  ${err.message}`);
+                this.log.error('');
+                this.log.error('  Nothing was applied: the refusal happened before the');
+                this.log.error('  first write, so the balances still carry these amounts');
+                this.log.error('  and the next run would pay them a second time. That is');
+                this.log.error('  why payments stop here.');
+                this.log.error('');
+                this.log.error('  Repair what the message names, then deduct by hand from');
+                this.log.error(`  the record kept at ${this.k('payment:inflight')}:`);
+            } else {
+                this.log.error('THE PAYMENT WAS SENT AND THE COMMIT DID NOT ANSWER.');
+                this.log.error(`  txid  ${txid}`);
+                this.log.error(`  ${err.message}`);
+                this.log.error('');
+                this.log.error('  The transaction is on the node. Whether the balances');
+                this.log.error('  were deducted is unknown, so payments stop here rather');
+                this.log.error('  than risk sending it twice.');
+                this.log.error('');
+                this.log.error(`  If ${txid} is in ${this.k('payments:done')} the commit`);
+                this.log.error('  did apply and only its answer was lost.');
+            }
             this.log.error('');
             this.log.error(`    wam-cli gettransaction ${txid}`);
+            this.log.error(`    redis-cli SISMEMBER ${this.k('payments:done')} ${txid}`);
             this.log.error(`    redis-cli HGETALL ${this.k('balances')}`);
             this.log.error('');
-            this.log.error('  If the balances still carry these amounts, deduct them');
-            this.log.error(`  by hand, then: redis-cli DEL ${this.k('payment:inflight')}`);
+            this.log.error('  When the balances match the transaction:');
+            this.log.error(`    redis-cli DEL ${this.k('payment:inflight')}`);
             this.log.error('=========================================================');
             return;
         }
 
-        // ioredis resolves exec() with one [error, result] pair per command,
-        // so a command that failed inside the transaction arrives as data
-        // rather than as a throw. Reading the array is the only way to find
-        // out; not reading it is how a half-applied commit would look exactly
-        // like a clean one.
-        const failed = (replies || []).filter((r) => Array.isArray(r) && r[0]);
-        if (failed.length) {
-            this.paused = true;
-            this.log.error('=========================================================');
-            this.log.error('THE PAYMENT WAS SENT AND THE COMMIT PARTLY FAILED.');
-            this.log.error(`  txid  ${txid}`);
-            this.log.error(`  ${failed.length} of ${replies.length} commands failed, ` +
-                           `first: ${failed[0][0].message}`);
-            this.log.error('');
-            this.log.error('  Payments are paused. Check the balances against the');
-            this.log.error('  transaction before clearing the marker:');
-            this.log.error('');
-            this.log.error(`    wam-cli gettransaction ${txid}`);
-            this.log.error(`    redis-cli DEL ${this.k('payment:inflight')}`);
-            this.log.error('=========================================================');
-            return;
+        if (committed !== 1) {
+            // The txid was already in payments:done, and the only way it gets
+            // there is this script. So the commit landed and its answer was
+            // lost; ioredis sent the command again and the marker refused it,
+            // which is the whole reason the marker is tested inside the
+            // script rather than by this caller.
+            this.log.warn(`the commit for ${txid} had already been applied; ` +
+                          'this call changed nothing');
+        }
+
+        // The money is committed. A journal line that cannot be written now
+        // costs nothing in itself -- redis is ahead of the file, not behind
+        // it, so nothing can be paid twice by it -- and the next
+        // reconciliation sees a broadcast with no outcome, finds the txid in
+        // payments:done and writes the missing line itself.
+        try {
+            this.journal.recordCommitted(txid);
+        } catch (err) {
+            this.log.warn(`${txid} is committed and the journal could not be ` +
+                          `told (${err.message}). The next payment run will ` +
+                          'find it in payments:done and write the line.');
         }
 
         this.log.info(`payment sent, txid ${txid}`);

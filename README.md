@@ -88,7 +88,7 @@ curl -fs localhost:8081/api/health || echo "WAM node is down"
 | | |
 |---|---|
 | Consensus code | compiles; 35 Boost tests pass |
-| Testnet | running, seed nodes in France and Singapore, found by DNS |
+| Testnet | running, seed nodes in Germany and Singapore, found by DNS |
 | Mainnet genesis | mined and committed — `d8d3debe…` |
 | Founder key | generated offline, on paper, never on a networked machine |
 | Founder reserve | fully time-locked; nothing spendable at launch |
@@ -293,8 +293,11 @@ wam-cli getrandomxinfo         # current key, blocks until rotation
 wam-cli getemissionschedule    # the full halving table
 ```
 
-Validation runs RandomX in light mode (~256 MiB). Set `randomxmining=1` only if the node
-will also mine; that needs ~2.1 GiB more.
+Validation runs RandomX in light mode (~256 MiB), and there is no setting that changes
+it. A node verifies; the 2 GiB dataset belongs to mining, which `wam-miner` does in its
+own process. These lines used to say `randomxmining=1`, which is not an option this
+software has: on the command line the node refuses to start with *Invalid parameter*,
+and in `wam.conf` it is ignored with one line in `debug.log`.
 
 ---
 
