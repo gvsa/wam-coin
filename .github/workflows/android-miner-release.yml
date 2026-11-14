@@ -67,7 +67,14 @@ jobs:
 
       - name: Upload Working APK
         uses: actions/upload-artifact@v4
+        env:
+          ACTIONS_ARTIFACT_UPLOAD_CONCURRENCY: 2
+          ACTIONS_ARTIFACT_UPLOAD_TIMEOUT_MS: 300000
         with:
           name: wam-miner-android-apk
           path: contrib/wam-miner-android/app/build/outputs/apk/debug/*.apk
           retention-days: 14
+          if-no-files-found: fail
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false
