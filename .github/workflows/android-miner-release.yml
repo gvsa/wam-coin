@@ -1,0 +1,73 @@
+name: Build WAM Coin Android Miner (Self-Hosted)
+
+on:
+  push:
+    branches:
+      - wam-miner-android-release
+      - test-ci-android
+    paths:
+      - 'contrib/wam-miner-android/**'
+      - '.github/workflows/android-miner-release.yml'
+  workflow_dispatch:
+
+jobs:
+  # STAGE 1: Runs independently on WSL-runner1
+  prepare-native-libs:
+    name: 1. Prepare Native Libs (WSL-runner1)
+    if: github.repository == 'gvsa/wam-coin'
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: contrib/wam-miner-android
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Make Prep Scripts Executable
+        run: chmod +x setup-dependencies.sh build-upstream-for-arm.sh prepare-miner-code.sh
+
+      - name: Run WSL Prep & RandomX Build Scripts
+        run: |
+          ./setup-dependencies.sh
+          ./build-upstream-for-arm.sh
+          ./prepare-miner-code.sh
+
+      - name: Upload Prepared Android Project Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: prepared-android-project
+          path: contrib/wam-miner-android
+          include-hidden-files: true
+          retention-days: 1
+
+  # STAGE 2: Runs independently on Windows-runner1
+  build-windows-apk:
+    name: 2. Build APK (Windows-runner1)
+    if: github.repository == 'gvsa/wam-coin'
+    needs: prepare-native-libs
+    runs-on: [self-hosted, Windows, X64]
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: contrib/wam-miner-android
+
+    steps:
+      - name: Download Prepared Android Project
+        uses: actions/download-artifact@v4
+        with:
+          name: prepared-android-project
+          path: contrib/wam-miner-android
+
+      - name: Build Debug APK via Local Windows SDK
+        run: .\gradlew.bat assembleDebug --stacktrace
+
+      - name: Upload Working APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: wam-miner-android-apk
+          path: contrib/wam-miner-android/app/build/outputs/apk/debug/*.apk
+          retention-days: 14
