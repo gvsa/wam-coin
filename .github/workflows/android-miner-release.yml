@@ -74,7 +74,7 @@ jobs:
           name: wam-miner-android-apk
           path: contrib/wam-miner-android/app/build/outputs/apk/debug/*.apk
           retention-days: 14
-          if-no-files-found: fail
+          if-no-files-found: error
           compression-level: 0
           overwrite: false
           include-hidden-files: false
