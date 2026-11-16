@@ -99,8 +99,11 @@ jobs:
         if: steps.cache-win-sdk.outputs.cache-hit != 'true'
         run: |
           @echo off
-          (for /l %%i in (1,1,15) do @echo y) | "%ANDROID_HOME%\cmdline-tools\16.0\bin\sdkmanager.bat" --licenses >nul
-          call "%ANDROID_HOME%\cmdline-tools\16.0\bin\sdkmanager.bat" "build-tools;28.0.3" "platform-tools" "platforms;android-28" "cmake;3.22.1" "ndk;21.4.7075529"
+          if not defined ANDROID_HOME set "ANDROID_HOME=C:\Android\android-sdk"
+          for /f "delims=" %%F in ('dir /b /s "%ANDROID_HOME%\sdkmanager.bat"') do set "SDKMGR=%%F"
+          echo Using sdkmanager: "%SDKMGR%"
+          (for /l %%i in (1,1,15) do @echo y) | "%SDKMGR%" --licenses >nul
+          call "%SDKMGR%" "build-tools;28.0.3" "platform-tools" "platforms;android-28" "cmake;3.22.1" "ndk;21.4.7075529"
 
       - name: Decode Keystore
         shell: python
