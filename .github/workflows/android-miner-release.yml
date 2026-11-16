@@ -1,0 +1,91 @@
+name: Build WAM Coin Android Miner (Self-Hosted)
+
+on:
+  push:
+    branches:
+      - wam-miner-android-test
+    paths:
+      - 'contrib/wam-miner-android/**'
+      - '.github/workflows/android-miner-release.yml'
+  workflow_dispatch:
+
+jobs:
+  # STAGE 1: Runs independently on WSL/Linux
+  prepare-miner:
+    name: 1. Prepare miner for Gradle Build
+    if: github.repository == 'gvsa/wam-coin'
+    runs-on: [self-hosted, Linux, gvs]
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: contrib/wam-miner-android
+
+    steps:
+      - name: Clean Workspace
+        working-directory: ${{ github.workspace }}
+        run: rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.[!.]*
+        
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Make Prep Scripts Executable
+        run: chmod +x setup-dependencies.sh build-upstream-for-arm.sh prepare-miner-code.sh
+
+      - name: Setup build environment
+        run: |
+          ./setup-dependencies.sh
+
+      - name: Build librandomx for arm
+        run: |
+          ./build-upstream-for-arm.sh
+
+      - name: Prepare the miner code for Gradle Build
+        run: |
+          ./prepare-miner-code.sh
+
+      - name: Upload Prepared Android Project Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: prepared-android-project
+          path: contrib/wam-miner-android
+          include-hidden-files: true
+          retention-days: 1
+
+  # STAGE 2: Runs independently on Windows
+  build-windows-apk:
+    name: 2. Build Signed APK on Windows
+    if: github.repository == 'gvsa/wam-coin'
+    needs: prepare-miner
+    runs-on: [self-hosted, Windows, gvs]
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: contrib/wam-miner-android
+
+    steps:
+      - name: Clean Workspace
+        shell: cmd
+        working-directory: ${{ github.workspace }}
+        run: |
+          @echo off
+          for /d %%D in (*) do rmdir /s /q "%%D"
+          del /f /q /a * >nul 2>&1
+          exit /b 0
+
+      - name: Download Prepared Android Project
+        uses: actions/download-artifact@v4
+        with:
+          name: prepared-android-project
+          path: contrib/wam-miner-android
+
+      - name: Build Signed APK via Android SDK
+        run: .\gradlew.bat assembleRelease --stacktrace
+
+      - name: Upload Signed APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: wam-miner-android-apk
+          path: contrib/wam-miner-android/app/build/outputs/apk/release/wam-miner-android.apk
+          retention-days: 14
