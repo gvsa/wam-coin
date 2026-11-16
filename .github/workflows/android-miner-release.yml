@@ -81,7 +81,7 @@ jobs:
           path: contrib/wam-miner-android
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
@@ -96,14 +96,24 @@ jobs:
           (for /l %%i in (1,1,10) do @echo y) | "%ANDROID_HOME%\cmdline-tools\latest\bin\sdkmanager.bat" --licenses >nul
 
       - name: Decode Keystore
+        shell: python
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PATH: ${{ secrets.ANDROID_KEYSTORE_PATH }}
         run: |
-          @echo off
-          echo %KEYSTORE_B64% > keystore.b64
-          certutil -decode keystore.b64 "%ANDROID_KEYSTORE_PATH%"
-          del keystore.b64
+          import os
+          import base64
+
+          keystore_path = os.environ["ANDROID_KEYSTORE_PATH"]
+          parent_dir = os.path.dirname(keystore_path)
+
+          if parent_dir:
+              os.makedirs(parent_dir, exist_ok=True)
+
+          keystore_bytes = base64.b64decode(os.environ["KEYSTORE_B64"])
+
+          with open(keystore_path, "wb") as f:
+              f.write(keystore_bytes)
 
       - name: Build Signed APK via Android SDK
         env:
