@@ -90,10 +90,11 @@ jobs:
             contrib/wam-miner-android/**/*.gradle*
             contrib/wam-miner-android/**/gradle-wrapper.properties
 
-      - name: Accept Android SDK Licenses
+      - name: Accept Licenses & Install CMake 3.22.1
         run: |
           @echo off
-          (for /l %%i in (1,1,10) do @echo y) | "%ANDROID_HOME%\cmdline-tools\latest\bin\sdkmanager.bat" --licenses >nul
+          (for /l %%i in (1,1,10) do @echo y) | "%ANDROID_HOME%\cmdline-tools\16.0\bin\sdkmanager.bat" --licenses >nul
+          call "%ANDROID_HOME%\cmdline-tools\16.0\bin\sdkmanager.bat" "cmake;3.22.1"
 
       - name: Decode Keystore
         shell: python
