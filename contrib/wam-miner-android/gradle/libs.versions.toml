@@ -7,7 +7,7 @@ appcompat = "1.4.2"
 material = "1.6.1"
 activityKtx = "1.4.0"
 constraintlayout = "2.1.4"
-ndkVersionTarget = "23.1.7779620"
+ndkVersionTarget = "21.4.7075529"
 cardview = "1.0.0"
 gson = "2.10.1"
 
