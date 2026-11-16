@@ -58,15 +58,15 @@ jobs:
     name: 2. Build Signed APK on Windows
     if: github.repository == 'gvsa/wam-coin'
     needs: prepare-miner
-    runs-on: [self-hosted, Windows, gvs]
+    runs-on: windows-2025
     timeout-minutes: 20
     defaults:
       run:
+        shell: cmd
         working-directory: contrib/wam-miner-android
 
     steps:
       - name: Clean Workspace
-        shell: cmd
         working-directory: ${{ github.workspace }}
         run: |
           @echo off
@@ -80,13 +80,36 @@ jobs:
           name: prepared-android-project
           path: contrib/wam-miner-android
 
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+          cache-dependency-path: |
+            contrib/wam-miner-android/**/*.gradle*
+            contrib/wam-miner-android/**/gradle-wrapper.properties
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Decode Keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PATH: ${{ secrets.ANDROID_KEYSTORE_PATH }}
+        run: |
+          @echo off
+          echo %KEYSTORE_B64% > keystore.b64
+          certutil -decode keystore.b64 "%ANDROID_KEYSTORE_PATH%"
+          del keystore.b64
+
       - name: Build Signed APK via Android SDK
         env:
-            ANDROID_KEYSTORE_PATH: ${{ secrets.ANDROID_KEYSTORE_PATH }}
-            ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-            ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-            ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: .\gradlew.bat assembleRelease --stacktrace
+          ANDROID_KEYSTORE_PATH: ${{ secrets.ANDROID_KEYSTORE_PATH }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: gradlew.bat assembleRelease --stacktrace
 
       - name: Upload Signed APK
         uses: actions/upload-artifact@v4
