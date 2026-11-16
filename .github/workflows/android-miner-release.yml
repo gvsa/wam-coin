@@ -114,14 +114,12 @@ jobs:
           import os
           import base64
 
-          keystore_path = os.environ["ANDROID_KEYSTORE_PATH"]
-          parent_dir = os.path.dirname(keystore_path)
+          keystore_bytes = base64.b64decode(os.environ["KEYSTORE_B64"])
+          target = os.path.join("app", os.environ["ANDROID_KEYSTORE_PATH"])
+          os.makedirs(os.path.dirname(target), exist_ok=True)
 
-          if parent_dir:
-              os.makedirs(parent_dir, exist_ok=True)
-
-          with open(keystore_path, "wb") as f:
-              f.write(base64.b64decode(os.environ["KEYSTORE_B64"]))
+          with open(target, "wb") as f:
+              f.write(keystore_bytes)
 
       - name: Build Signed APK via Android SDK
         env:
