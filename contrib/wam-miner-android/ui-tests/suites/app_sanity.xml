@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suite name="WAM Miner Sanity Suite" parallel="none"
+	thread-count="1">
+	<test name="Sanity Checks" preserve-order="true">
+		<classes>
+			<class name="org.vslabs.wam_miner.tests.WamMinerSanityTest" />
+			<class name="org.vslabs.wam_miner.tests.ConfigValidationTest" />
+			<class name="org.vslabs.wam_miner.tests.MiningExecutionTest" />
+		</classes>
+	</test>
+</suite>

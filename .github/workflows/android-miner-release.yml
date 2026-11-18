@@ -135,3 +135,91 @@ jobs:
           name: wam-miner-android-apk
           path: contrib/wam-miner-android/app/build/outputs/apk/release/wam-miner-android.apk
           retention-days: 14
+
+    # STAGE 3: Runs sanity test on a windows runner with appium already installed
+  qa:
+    name: 3. Run Appium Sanity Tests
+    if: github.repository == 'gvsa/wam-coin'
+    needs: build-windows-apk
+    runs-on: [self-hosted, Windows, gvs]
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: cmd
+        working-directory: contrib/wam-miner-android
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download Signed APK
+        uses: actions/download-artifact@v4
+        with:
+          name: wam-miner-android-apk
+          path: contrib/wam-miner-android/app/build/outputs/apk/release
+
+      - name: Start Appium & Run Sanity Suite (app_sanity.xml)
+        working-directory: contrib/wam-miner-android/ui-tests
+        run: |
+          @echo off
+          setlocal enabledelayedexpansion
+
+          REM 1. Resolve full path of the downloaded APK
+          set "APK_REL=..\app\build\outputs\apk\release\wam-miner-android.apk"
+          if not exist "%APK_REL%" (
+            echo Error: APK not found at %APK_REL%!
+            exit /b 1
+          )
+          for %%F in ("%APK_REL%") do set "APK_FILE=%%~fF"
+
+          set "APPIUM_IP=127.0.0.1"
+          set "APPIUM_PORT=4723"
+          set "STATUS_URL=http://%APPIUM_IP%:%APPIUM_PORT%/status"
+
+          REM 2. Start Appium in the background
+          start /b "" cmd /c "appium.cmd --address %APPIUM_IP% --port %APPIUM_PORT% --log-level info > appium.log 2> appium-err.log"
+
+          REM 3. Poll Appium status up to 15 times (30 seconds)
+          set "READY=0"
+          for /l %%i in (1,1,15) do (
+            curl -s "%STATUS_URL%" | findstr /R "\"ready\":[ ]*true" >nul 2>&1
+            if not errorlevel 1 (
+              set "READY=1"
+              echo Appium server is ready at %STATUS_URL%!
+              goto :appium_ready
+            )
+            ping -n 3 127.0.0.1 >nul
+          )
+
+          if "%READY%"=="0" (
+            echo Error: Appium server failed to start within 30 seconds.
+            if exist appium-err.log type appium-err.log
+            exit /b 1
+          )
+
+          :appium_ready
+          echo Testing APK: %APK_FILE%
+          call mvn test "-DsuiteXmlFile=suites/app_sanity.xml" "-Dapk.path=%APK_FILE%"
+          exit /b %ERRORLEVEL%
+
+      - name: Upload Appium Logs & Test Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-test-logs
+          path: |
+            contrib/wam-miner-android/ui-tests/appium.log
+            contrib/wam-miner-android/ui-tests/appium-err.log
+            contrib/wam-miner-android/ui-tests/target/surefire-reports/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Cleanup Appium & Uninstall App
+        if: always()
+        run: |
+          @echo off
+          for /f "tokens=5" %%P in ('netstat -ano ^| findstr :4723 ^| findstr LISTENING') do (
+            taskkill /F /PID %%P >nul 2>&1
+          )
+          adb uninstall org.vslabs.wam_miner >nul 2>&1
+          exit /b 0

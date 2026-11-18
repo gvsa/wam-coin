@@ -1,0 +1,6 @@
+{
+	"address": "wam1qc5ga4d2945urn842enqe46rvfdm0n0wzydxcuq",
+	"stratum": "wampool.vslabs.co.in",
+	"port": "3335",
+	"worker": "appium_test_worker"
+}
