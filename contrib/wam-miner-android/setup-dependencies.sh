@@ -36,5 +36,5 @@ export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
 # Run Android Package Configs
 echo "Installing Android components..."
 yes | sdkmanager --sdk_root=${ANDROID_HOME} --licenses
-sdkmanager --sdk_root=${ANDROID_HOME} "build-tools;28.0.3" "platform-tools" "platforms;android-28" "cmake;3.22.1"
+sdkmanager --sdk_root=${ANDROID_HOME} "build-tools;30.0.3" "platform-tools" "platforms;android-30" "cmake;3.22.1"
 sdkmanager --sdk_root=${ANDROID_HOME} --install "ndk;21.4.7075529"

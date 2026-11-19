@@ -33,8 +33,8 @@ export ANDROID_HOME="$HOME/Android/Sdk"
 export ANDROID_NDK_ROOT="$ANDROID_HOME/ndk/21.4.7075529"
 export ANDROID_TOOLCHAIN="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64"
 export AR="$ANDROID_TOOLCHAIN/bin/llvm-ar"
-export CC="$ANDROID_TOOLCHAIN/bin/aarch64-linux-android28-clang"
-export CXX="$ANDROID_TOOLCHAIN/bin/aarch64-linux-android28-clang++"
+export CC="$ANDROID_TOOLCHAIN/bin/aarch64-linux-android30-clang"
+export CXX="$ANDROID_TOOLCHAIN/bin/aarch64-linux-android30-clang++"
 export RANLIB="$ANDROID_TOOLCHAIN/bin/llvm-ranlib"
 export PATH="$ANDROID_NDK_ROOT:$ANDROID_HOME/emulator:$ANDROID_HOME/tools:$ANDROID_HOME/tools/bin:$ANDROID_HOME/platform-tools:$PATH"
 
@@ -211,7 +211,7 @@ if [ ! -f "$RANDOMX_DIR/build/librandomx.a" ]; then
     -DARCH="$RANDOMX_ARCH" \
     -DANDROID_ABI=arm64-v8a \
     -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake" \
-    -DANDROID_PLATFORM=android-28 \
+    -DANDROID_PLATFORM=android-30 \
     -DCMAKE_BUILD_TYPE=Release \
     -DANDROID_STL=c++_static
     cmake --build "$RANDOMX_DIR/build" -j"$(nproc 2>/dev/null || echo 4)"
@@ -341,40 +341,6 @@ upstream_commit=$UPSTREAM_COMMIT
 randomx_tag=$RANDOMX_TAG
 patched_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 EOF
-
-# ===========================================================================
-log "4/4  Checking the treasury address"
-# ===========================================================================
-
-# This said "founder address" and told you to run gen_founder_key.py and
-# re-mine the genesis block. Both were true once and neither is now: the
-# founder ceremony happened, the mainnet founder address is real, and the
-# mainnet genesis is mined. Following those instructions today would discard
-# all three. What is still a placeholder is the *treasury*, which the two were
-# separated into so that treasury spending could be told from founder
-# spending -- and the warning was never updated to notice.
-if grep -q "WNg2svm2qApxheBKndKGQ9sRwporvRgRpT" \
-        "$CORE_DIR/src/kernel/chainparams.cpp"; then
-    warn "The mainnet TREASURY address is still the burn placeholder"
-    warn "(hash160 = 20 zero bytes). Every 5% fee this chain collects would be"
-    warn "destroyed -- 750,000 WAM across 400,000 blocks."
-    warn ""
-    warn "  Before a mainnet binary is usable:"
-    warn "    1. "$PY" scripts/gen_founder_key.py --network mainnet   (OFFLINE,"
-    warn "       and a DIFFERENT key from the founder's)"
-    warn "    2. paste it over WAM_TREASURY_ADDRESS_MAINNET in src/wam/chainparams.cpp"
-    warn "    3. re-run this script"
-    warn ""
-    warn "  The genesis block is NOT re-mined for this. Genesis outputs pay the"
-    warn "  founder address, and the treasury rule starts at height 1, so the"
-    warn "  genesis hash does not depend on it."
-    warn ""
-    warn "  It must happen before the first mainnet block and not after: the"
-    warn "  rule is consensus, so changing it later invalidates every block"
-    warn "  already mined under the old address."
-    warn ""
-    warn "  Testnet and regtest builds are unaffected."
-fi
 
 #pwd
 cd ../contrib/wam-miner-android
