@@ -29,7 +29,7 @@ set -euo pipefail
 
 #./setup-dependencies.sh
 
-export ANDROID_HOME="$HOME/Android/Sdk"
+export ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
 export ANDROID_NDK_ROOT="$ANDROID_HOME/ndk/21.4.7075529"
 export ANDROID_TOOLCHAIN="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64"
 export AR="$ANDROID_TOOLCHAIN/bin/llvm-ar"
@@ -37,6 +37,9 @@ export CC="$ANDROID_TOOLCHAIN/bin/aarch64-linux-android30-clang"
 export CXX="$ANDROID_TOOLCHAIN/bin/aarch64-linux-android30-clang++"
 export RANLIB="$ANDROID_TOOLCHAIN/bin/llvm-ranlib"
 export PATH="$ANDROID_NDK_ROOT:$ANDROID_HOME/emulator:$ANDROID_HOME/tools:$ANDROID_HOME/tools/bin:$ANDROID_HOME/platform-tools:$PATH"
+
+[ -x "$CXX" ] || { echo "ERROR: Android NDK compiler not found at $CXX" >&2; exit 1; }
+[ -f "$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake" ] || { echo "ERROR: android.toolchain.cmake missing" >&2; exit 1; }
 
 # remove any existing build
 rm -rf ../../build

@@ -3,38 +3,74 @@
 # Exit immediately if a command exits with a non-zero status
 set -e
 
-# setup dependencies with correct official repository links
-sudo apt update
-sudo apt install -y openjdk-17-jdk wget unzip \
+# Install Linux native build tools (needed on both dev machines and runners)
+sudo apt-get update
+sudo apt-get install -y wget unzip \
     build-essential libtool autotools-dev automake pkg-config bsdmainutils \
     cmake curl git python3 \
     libevent-dev libboost-dev libsqlite3-dev
 
-
-# setup Android paths
-mkdir -p "$HOME/Android/Sdk"
-export ANDROID_HOME="$HOME/Android/Sdk"
-
-# Build Android Sdk Directory Structure
-export ANDROID_HOME="$HOME/Android/Sdk"
-mkdir -p "$ANDROID_HOME/cmdline-tools"
-
-# Download and extract Android Command Line Tools safely
-if [ ! -d "$ANDROID_HOME/cmdline-tools/latest" ]; then
-    echo "Downloading Android Command Line Tools..."
-    wget -q --show-progress https://dl.google.com/android/repository/commandlinetools-linux-6200805_latest.zip
-    
-    # Unzip to a temporary area so we can structure it properly
-    unzip -q commandlinetools-linux-6200805_latest.zip -d "$ANDROID_HOME/cmdline-tools"
-    mv "$ANDROID_HOME/cmdline-tools/tools" "$ANDROID_HOME/cmdline-tools/latest"
-    rm commandlinetools-linux-6200805_latest.zip
+# Check if Java is installed, JAVA_HOME is set, and major version is <= 11
+NEED_JDK11=0
+if [ -z "${JAVA_HOME:-}" ] || ! command -v java >/dev/null 2>&1; then
+    NEED_JDK11=1
+else
+    # Extract major version (handles both "1.8.0_xxx" -> 8 and "11.0.x" / "17.0.x" -> 11 / 17)
+    JAVA_MAJOR=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}' | awk -F '.' '{if ($1 == "1") print $2; else print $1}')
+    if [ -n "$JAVA_MAJOR" ] && [ "$JAVA_MAJOR" -gt 11 ]; then
+        echo "Detected Java version $JAVA_MAJOR (> 11). AGP 7.2.2 requires JDK 11."
+        NEED_JDK11=1
+    fi
 fi
 
-# Add sdkmanager directly to the active path so the script can see it right now
-export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+if [ "$NEED_JDK11" -eq 1 ]; then
+    echo "Installing openjdk-11-jdk..."
+    sudo apt-get install -y openjdk-11-jdk
+    # Ensure JAVA_HOME and PATH use JDK 11 if a newer JDK was previously default
+    JDK11_PATH=$(dirname "$(dirname "$(readlink -f /usr/lib/jvm/java-11-openjdk-*/bin/java | head -n 1)")")
+    if [ -d "$JDK11_PATH" ]; then
+        export JAVA_HOME="$JDK11_PATH"
+        export PATH="$JAVA_HOME/bin:$PATH"
+        echo "Set JAVA_HOME to '$JAVA_HOME'."
+    fi
+else
+    echo "JAVA_HOME is set to '$JAVA_HOME' (Java $JAVA_MAJOR). Skipping JDK installation."
+fi
 
-# Run Android Package Configs
-echo "Installing Android components..."
-yes | sdkmanager --sdk_root=${ANDROID_HOME} --licenses
-sdkmanager --sdk_root=${ANDROID_HOME} "build-tools;30.0.3" "platform-tools" "platforms;android-30" "cmake;3.22.1"
-sdkmanager --sdk_root=${ANDROID_HOME} --install "ndk;21.4.7075529"
+# 1. Bootstrap Android Command Line Tools only if ANDROID_HOME is completely missing
+if [ -z "${ANDROID_HOME:-}" ]; then
+    echo "ANDROID_HOME is not set. Setting up local Android SDK..."
+    export ANDROID_HOME="$HOME/Android/Sdk"
+    mkdir -p "$ANDROID_HOME/cmdline-tools"
+
+    if [ ! -d "$ANDROID_HOME/cmdline-tools/latest" ]; then
+        echo "Downloading Android Command Line Tools..."
+        wget -q https://google.com
+        unzip -q commandlinetools-linux-11076708_latest.zip -d "$ANDROID_HOME/cmdline-tools"
+        mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
+        rm commandlinetools-linux-11076708_latest.zip
+    fi
+fi
+
+# Locate sdkmanager (handles both local SDK and GitHub runner /usr/local/lib/android/sdk)
+SDKMGR="$(command -v sdkmanager || echo "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager")"
+
+# Use sudo only if ANDROID_HOME is not writable by the current user (e.g., GitHub runners)
+SUDO_SDK=""
+if [ ! -w "$ANDROID_HOME" ]; then
+    SUDO_SDK="sudo"
+fi
+
+# 2. Always verify & install the exact required NDK, CMake, and Platform versions
+if [ ! -d "$ANDROID_HOME/ndk/21.4.7075529" ] || [ ! -d "$ANDROID_HOME/cmake/3.22.1" ] || [ ! -d "$ANDROID_HOME/platforms/android-33" ]; then
+    echo "Installing required Android SDK/NDK/CMake components into $ANDROID_HOME..."
+    (yes || true) | $SUDO_SDK "$SDKMGR" --sdk_root="$ANDROID_HOME" --licenses >/dev/null
+    $SUDO_SDK "$SDKMGR" --sdk_root="$ANDROID_HOME" \
+        "build-tools;33.0.2" \
+        "platform-tools" \
+        "platforms;android-33" \
+        "cmake;3.22.1" \
+        "ndk;21.4.7075529"
+else
+    echo "Required NDK 21.4.7075529, CMake 3.22.1, and Android 33 are already installed."
+fi
