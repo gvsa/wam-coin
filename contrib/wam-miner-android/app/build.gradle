@@ -5,6 +5,7 @@ plugins {
 android {
     namespace 'org.vslabs.wam_miner'
     compileSdk 33
+    buildToolsVersion "33.0.2"
 
     // Note: Removed the manual jniLibs.srcDirs since CMake will automatically
     // compile and bundle your native libraries into the APK for you.
