@@ -26,22 +26,16 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Set up JDK 11 (Required for AGP 7.2.2 & Gradle 7.4)
+      - name: Set up JDK 17 (Compiles Java 11 bytecode target)
         uses: actions/setup-java@v4
         with:
-          java-version: '11'
+          java-version: '17'
           distribution: 'temurin'
           cache: gradle
           cache-dependency-path: |
             contrib/wam-miner-android/**/*.gradle*
             contrib/wam-miner-android/**/gradle-wrapper.properties
             contrib/wam-miner-android/gradle/libs.versions.toml
-
-      - name: Make Prep Scripts Executable
-        run: chmod +x setup-dependencies.sh build-upstream-for-arm.sh prepare-miner-code.sh gradlew
-
-      - name: Install Native Build Tools
-        run: ./setup-dependencies.sh
 
       - name: Cache Android SDK & NDK Packages
         id: cache-sdk
@@ -53,14 +47,13 @@ jobs:
             /usr/local/lib/android/sdk/cmake/3.22.1
             /usr/local/lib/android/sdk/ndk/21.4.7075529
             /usr/local/lib/android/sdk/licenses
-          key: linux-android-sdk-33-ndk21-cmake3221
+          key: linux-android-sdk-33-ndk21-cmake3221-v1
 
-      - name: Accept Licenses & Install Android SDK Packages
-        if: steps.cache-sdk.outputs.cache-hit != 'true'
-        run: |
-          SDKMGR="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          yes | "$SDKMGR" --licenses > /dev/null
-          "$SDKMGR" "build-tools;33.0.2" "platform-tools" "platforms;android-33" "cmake;3.22.1" "ndk;21.4.7075529"
+      - name: Make Prep Scripts Executable
+        run: chmod +x setup-dependencies.sh build-upstream-for-arm.sh prepare-miner-code.sh gradlew
+
+      - name: Install Native Build Tools & Android NDK/CMake
+        run: ./setup-dependencies.sh
 
       - name: Build librandomx for arm
         run: ./build-upstream-for-arm.sh
@@ -69,7 +62,7 @@ jobs:
         run: ./prepare-miner-code.sh
 
       - name: Decode Keystore
-        shell: python3
+        shell: python
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PATH: ${{ secrets.ANDROID_KEYSTORE_PATH }}

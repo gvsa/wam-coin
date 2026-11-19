@@ -10,26 +10,24 @@ sudo apt-get install -y wget unzip \
     cmake curl git python3 \
     libevent-dev libboost-dev libsqlite3-dev
 
-# Check if Java is installed, JAVA_HOME is set, and major version is <= 11
-NEED_JDK11=0
+# Check if Java is installed, JAVA_HOME is set, and major version is >= 17 (needed by modern sdkmanager)
+NEED_JDK17=0
 if [ -z "${JAVA_HOME:-}" ] || ! command -v java >/dev/null 2>&1; then
-    NEED_JDK11=1
+    NEED_JDK17=1
 else
-    # Extract major version (handles both "1.8.0_xxx" -> 8 and "11.0.x" / "17.0.x" -> 11 / 17)
     JAVA_MAJOR=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}' | awk -F '.' '{if ($1 == "1") print $2; else print $1}')
-    if [ -n "$JAVA_MAJOR" ] && [ "$JAVA_MAJOR" -gt 11 ]; then
-        echo "Detected Java version $JAVA_MAJOR (> 11). AGP 7.2.2 requires JDK 11."
-        NEED_JDK11=1
+    if [ -z "$JAVA_MAJOR" ] || [ "$JAVA_MAJOR" -lt 17 ]; then
+        echo "Detected Java version ${JAVA_MAJOR:-unknown} (< 17). Modern sdkmanager requires JDK 17+."
+        NEED_JDK17=1
     fi
 fi
 
-if [ "$NEED_JDK11" -eq 1 ]; then
-    echo "Installing openjdk-11-jdk..."
-    sudo apt-get install -y openjdk-11-jdk
-    # Ensure JAVA_HOME and PATH use JDK 11 if a newer JDK was previously default
-    JDK11_PATH=$(dirname "$(dirname "$(readlink -f /usr/lib/jvm/java-11-openjdk-*/bin/java | head -n 1)")")
-    if [ -d "$JDK11_PATH" ]; then
-        export JAVA_HOME="$JDK11_PATH"
+if [ "$NEED_JDK17" -eq 1 ]; then
+    echo "Installing openjdk-17-jdk..."
+    sudo apt-get install -y openjdk-17-jdk
+    JDK17_PATH=$(dirname "$(dirname "$(readlink -f /usr/lib/jvm/java-17-openjdk-*/bin/java | head -n 1)")")
+    if [ -d "$JDK17_PATH" ]; then
+        export JAVA_HOME="$JDK17_PATH"
         export PATH="$JAVA_HOME/bin:$PATH"
         echo "Set JAVA_HOME to '$JAVA_HOME'."
     fi
