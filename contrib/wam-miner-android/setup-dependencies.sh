@@ -43,7 +43,7 @@ if [ -z "${ANDROID_HOME:-}" ]; then
 
     if [ ! -d "$ANDROID_HOME/cmdline-tools/latest" ]; then
         echo "Downloading Android Command Line Tools..."
-        wget -q https://google.com
+        wget -q --show-progress https://dl.google.com/android/repository/commandlinetools-linux-6200805_latest.zip
         unzip -q commandlinetools-linux-11076708_latest.zip -d "$ANDROID_HOME/cmdline-tools"
         mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
         rm commandlinetools-linux-11076708_latest.zip
@@ -59,16 +59,19 @@ if [ ! -w "$ANDROID_HOME" ]; then
     SUDO_SDK="sudo"
 fi
 
-# 2. Always verify & install the exact required NDK, CMake, and Platform versions
-if [ ! -d "$ANDROID_HOME/ndk/21.4.7075529" ] || [ ! -d "$ANDROID_HOME/cmake/3.22.1" ] || [ ! -d "$ANDROID_HOME/platforms/android-33" ]; then
-    echo "Installing required Android SDK/NDK/CMake components into $ANDROID_HOME..."
-    (yes || true) | $SUDO_SDK "$SDKMGR" --sdk_root="$ANDROID_HOME" --licenses >/dev/null
-    $SUDO_SDK "$SDKMGR" --sdk_root="$ANDROID_HOME" \
+# Always verify & install SDK 33, Build-Tools 33.0.2, CMake 3.22.1, and NDK 21.4.7075529
+if [ ! -d "$ANDROID_HOME/ndk/21.4.7075529" ] || \
+   [ ! -d "$ANDROID_HOME/cmake/3.22.1" ] || \
+   [ ! -d "$ANDROID_HOME/platforms/android-33" ] || \
+   [ ! -d "$ANDROID_HOME/build-tools/33.0.2" ]; then
+    echo "Installing Android SDK 33, NDK 21.4.7075529, and CMake 3.22.1 into $ANDROID_HOME..."
+    (yes || true) | $SUDO_SDK env JAVA_HOME="$JAVA_HOME" "$SDKMGR" --sdk_root="$ANDROID_HOME" --licenses >/dev/null
+    $SUDO_SDK env JAVA_HOME="$JAVA_HOME" "$SDKMGR" --sdk_root="$ANDROID_HOME" \
         "build-tools;33.0.2" \
         "platform-tools" \
         "platforms;android-33" \
         "cmake;3.22.1" \
         "ndk;21.4.7075529"
 else
-    echo "Required NDK 21.4.7075529, CMake 3.22.1, and Android 33 are already installed."
+    echo "Android SDK 33, NDK 21.4.7075529, and CMake 3.22.1 are already installed."
 fi
