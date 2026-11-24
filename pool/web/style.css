@@ -114,7 +114,7 @@ main {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 14px 16px;
+  padding: 12px 14px;
 }
 .tile .label {
   font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em;
@@ -224,6 +224,9 @@ table { border-collapse: collapse; width: 100%; }
 .fineprint { font-size: 12px; color: var(--muted); margin: 12px 0 0; }
 .fineprint code { font-family: var(--mono); font-size: 11.5px; }
 
+.code2
+{ padding: 12px; font-family: var(--mono); font-size: 12px;}
+
 footer {
   max-width: 1180px; margin: 0 auto; padding: 20px 24px 40px;
   display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
@@ -238,3 +241,38 @@ footer {
 .freshness.ok   { color: var(--ok); }
 .freshness.warn { color: var(--warn); }
 .freshness.bad  { color: var(--danger); font-weight: 600; }
+.top-banner {
+  position: sticky;
+  top: 0;
+  width: 100%;
+  background-color: #ffcc00;
+  color: #000;
+  padding: 10px;
+  text-align: center;
+  font-family: sans-serif;
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+}
+
+/* Target links globally */
+a:link {
+  color: #006469; /* Bright accent color suited for dark/crypto themes */
+  text-decoration: none;
+  transition: color 0.2s ease, text-decoration 0.2s ease;
+}
+
+a:visited {
+  color: #00acb565; /* Keeps visited links the same color to prevent UI clutter */
+}
+
+a:hover {
+  color: #002fff; /* Lighter glow effect on hover */
+  text-decoration: underline;
+}
+
+a:active {
+  color: #ffe600; /* Flash of color on click */
+}

@@ -35,7 +35,7 @@
 // How many blocks back the published share is measured over. 50 is about an
 // hour at the 120-second target: long enough that one lucky pool does not
 // look like a majority, short enough that a real shift shows the same day.
-const WINDOW = 50;
+const WINDOW = 60;
 
 // And the long one, because the short one is not the number the project's own
 // public condition is written against.
@@ -56,6 +56,8 @@ const WINDOW = 50;
 // that it covers every block there has ever been, which is what makes it the
 // honest denominator today.
 const LONG_WINDOW = 5040;
+
+const K_BLOCKS = 1000;
 
 // Heights fetched per refresh. The explorer answers page loads on the same
 // event loop, and a cold start asking for fifty blocks at once is a page that
@@ -270,8 +272,8 @@ class Concentration {
                 ? last - first : null,
             distinct: ranked.length,
             topPercent: total ? (100 * ranked[0][1]) / total : null,
-            top: ranked.slice(0, 5).map(([addr, n]) => ({
-                finder: addr.length > 16 ? `${addr.slice(0, 10)}…${addr.slice(-4)}` : addr,
+            top: ranked.map(([addr, n]) => ({
+                finder: addr.length > 16 ? `${addr.slice(0, 5)}…${addr.slice(-4)}` : addr,
                 blocks: n,
                 percent: (100 * n) / total
             }))
@@ -294,8 +296,13 @@ class Concentration {
         // list of targets.
         const recent = this._tally(WINDOW);
         const long = this._tally(LONG_WINDOW);
+        const kBlock = this._tally(K_BLOCKS);
         return {
             ...recent,
+            kBlocks: {
+                ...kBlock,
+                complete: this._complete(this.tip, K_BLOCKS)
+            },
             sevenDay: {
                 ...long,
                 complete: this._complete(this.tip, LONG_WINDOW),

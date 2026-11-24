@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>WAM Coin Mining Pool</title>
-<link rel="stylesheet" href="style.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>⛏</text></svg>">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="VSLabs WAM Coin Mining Pool">
+  <title>VSLabs WAM Coin Mining Pool</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>⛏</text></svg>">
 </head>
 <body>
 
@@ -13,7 +15,7 @@
   <div class="brand">
     <span class="mark">W</span>
     <div>
-      <h1>WAM Coin Pool</h1>
+      <h1>WAM Coin Mining Pool hosted by VSLabs</h1>
       <p class="sub" id="chainLabel">connecting…</p>
     </div>
   </div>
@@ -66,6 +68,32 @@
   <section class="split">
 
     <div class="card">
+      <h2>How to mine WAM Coin</h2>
+      <table class="kv">
+        <tr><td>Get started with the <a href="setup.html" target="_blank">QuickStart Guide</a> or join the <a href="https://discord.gg" target="_blank">Pool Discord</a> (link updated 28/10)</td></tr>
+        <tr><td>Step 1 - Setup and run wamd</td></tr>
+        <tr><td>Step 2 - Use wam-cli to create wallet</td></tr>
+        <tr><td>Step 3 - Run wam-miner (command below)</td></tr>
+        <tr><td><pre class="code" id="connectCmd">…</pre></td></tr>
+      </table>
+      <table class="kv" id="portTable">
+        <tr><th>Port</th><th>Start diff</th><th>For</th></tr>
+      </table>
+
+      <h2 class="mt">Links</h2>
+      <hr>
+      <table class="kv">
+        <tr><td><a href="https://vslabs.co.in" target="_blank">WAM Coin Network Explorer</a></td></tr>
+        <tr><td><a href="https://wamcoin.org" target="_blank">WAM Coin Homepage</a></td></tr>
+        <tr><td><a href="https://gitlab.com" target="_blank">Wam Coin code (Gitlab)</a></td></tr>
+        <tr><td><a href="https://github.com" target="_blank">Wam Coin code (Github)</a></td></tr>
+      </table>
+      <p class="fineprint">
+        The code &amp; links are all sourced from the WAM Coin home page
+      </p>
+    </div>
+
+    <div class="card">
       <h2>Block reward split</h2>
       <div class="rewardbar" id="rewardBar" role="img" aria-label="Reward distribution">
         <div class="seg miner"    id="segMiner"></div>
@@ -88,19 +116,8 @@
         The 5% treasury output is created by the coinbase transaction and enforced
         by consensus rule WAM-1. The pool never holds it and never distributes it.
       </p>
-    </div>
 
-    <div class="card">
-      <h2>Connect a miner</h2>
-      <table class="kv" id="portTable">
-        <tr><th>Port</th><th>Start diff</th><th>For</th></tr>
-      </table>
-      <pre class="code" id="connectCmd">…</pre>
-      <p class="fineprint">
-        Authorize with <code>&lt;your W… address&gt;.&lt;worker name&gt;</code> as the
-        username. Any password works.
-      </p>
-
+      <hr>
       <h2 class="mt">RandomX epoch</h2>
       <table class="kv">
         <tr><td>Current seed height</td><td class="num" id="seedHeight">—</td></tr>

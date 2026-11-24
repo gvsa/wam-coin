@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Quickstart Guide to mining WAM Coin | VSLabs">
+    <title>Quickstart Guide to mining WAM Coin | VSLabs</title>
+    <!-- Relative link to inherit the main site's compiled styles -->
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* MINIMAL OVERRIDE FOR BLACK BACKGROUND */
+                :root, html, body {
+                    background-color: #000000 !important;
+                    color: #f4f4f5 !important;
+
+
+                    /* Force CSS variables to use light/dark values for a dark background */
+                --text: #f4f4f5 !important;
+                --text-main: #f4f4f5 !important;
+                --text-muted: #71717a !important;
+                --panel-bg: #141414 !important;
+                --border-muted: #27272a !important;
+
+                }
+
+                /* Block layout structural refinements mapping to the pool's palette */
+                .content-card {
+                    background: var(--panel-bg, #141414);
+                    border: 1px solid var(--border-muted, #27272a);
+                    border-radius: 6px;
+                    padding: 1.5rem;
+                    margin-top: 1rem;
+                    /* Expanded Layout: No shrinking, no text wrapping */
+                    width: max-content;
+                    min-width: 100%;
+                }
+
+                .command-group {
+                    margin-bottom: 1.5rem;
+                    padding-bottom: 1.5rem;
+                    border-bottom: 1px solid var(--border-muted, #27272a);
+                }
+
+                .command-group:last-child {
+                    margin-bottom: 0;
+                    padding-bottom: 0;
+                    border-bottom: none;
+                }
+
+                .command-group h3 {
+                    margin-top: 0;
+                    margin-bottom: 0.75rem;
+                    font-size: 0.95rem;
+                    font-weight: 500;
+                    color: var(--text-muted, #71717a);
+                }
+
+                .code-container {
+                    position: relative;
+                    background-color: #000000; /* Pure black terminal background */
+                    border: 1px solid var(--border-muted, #27272a);
+                    border-radius: 4px;
+                    padding: 1rem 5.5rem 1rem 1rem; /* Right padding preserves room for copy button */
+                    overflow-x: visible; /* Forced expansion instead of scrollbars */
+                    width: max-content;
+                    min-width: 100%;
+                    box-sizing: border-box;
+                }
+
+                pre {
+                    margin: 0;
+                    white-space: pre;
+                    word-break: normal;
+                }
+
+                code {
+                    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+                    font-size: 0.925rem;
+                    color: var(--text-main, #f4f4f5);
+                }
+
+                .pool-link {
+                    color: var(--accent-green, #4ade80);
+                    text-decoration: none;
+                }
+
+                .pool-link:hover {
+                    text-decoration: underline;
+                }
+
+                /* Disclaimer specific styling */
+                .disclaimer-box {
+                    border-left: 3px solid var(--border-muted, #27272a);
+                    padding: 0.5rem 0 0.5rem 0.75rem;
+                    margin: 1rem 0 1.5rem 0;
+                    font-size: 0.875rem;
+                    color: var(--text-muted, #71717a);
+                    line-height: 1.4;
+                }
+
+                /* Copy to Clipboard Button Styles */
+                .copy-btn {
+                    position: absolute;
+                    top: 50%;
+                    right: 0.75rem;
+                    transform: translateY(-50%);
+                    background: #1c1c1e;
+                    border: 1px solid #2c2c2e;
+                    border-radius: 4px;
+                    color: #a1a1aa;
+                    padding: 0.35rem 0.65rem;
+                    font-size: 0.75rem;
+                    font-family: inherit;
+                    cursor: pointer;
+                    transition: all 0.15s ease;
+                }
+
+                .copy-btn:hover {
+                    background: #2c2c2e;
+                    color: #f4f4f5;
+                    border-color: #3a3a3c;
+                }
+
+                .copy-btn.copied {
+                    background: #14532d;
+                    border-color: #166534;
+                    color: #4ade80;
+                }
+    </style>
+</head>
+<body>
+
+<div class="container"
+     style="margin: 2rem auto; padding: 0 1rem; width: max-content; max-width: 100%;">
+    <h1 style="font-size: 1.5rem; font-weight: 500; color: var(--text, #f4f4f5); margin-bottom: 0.5rem;">
+        <span style="color: var(--accent-green, #4ade80);">#</span> How to mine WAM Coin</h1>
+
+    <!-- Disclaimer Section -->
+    <div class="disclaimer-box">
+        <strong>Disclaimer:</strong> All downloads are provided by the <a
+            href="https://github.com/wamcoin-Project/wam-coin" target="_blank">official WAM Coin
+        github repository</a>.
+    </div>
+
+    <!-- Platform Selection Tabs -->
+    <div class="tabs"
+         style="display: flex; gap: 1rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-muted, #27272a); padding-bottom: 0.5rem;">
+        <button class="tab-btn active" onclick="switchPlatform('mac', event)"
+                style="background: none; border: none; font-family: inherit; font-size: 0.95rem; color: var(--accent-green, #4ade80); cursor: pointer; padding: 0.25rem 0.5rem;">
+            macOS (M series only)
+        </button>
+        <button class="tab-btn" onclick="switchPlatform('linux', event)"
+                style="background: none; border: none; font-family: inherit; font-size: 0.95rem; color: var(--text-muted, #71717a); cursor: pointer; padding: 0.25rem 0.5rem;">
+            Linux
+        </button>
+        <button class="tab-btn" onclick="switchPlatform('windows', event)"
+                style="background: none; border: none; font-family: inherit; font-size: 0.95rem; color: var(--text-muted, #71717a); cursor: pointer; padding: 0.25rem 0.5rem;">
+            Windows
+        </button>
+    </div>
+
+    <!-- Single Shared Block Content Card -->
+    <div class="content-card">
+        <div class="command-group">
+            <h3 id="label-cmd0">1. Download the files</h3>
+            <div class="code-container">
+                <pre><code id="code-cmd0">Download wamd + wam-cli: <a
+                        href="https://github.com/wamcoin-Project/wam-coin/releases/download/v0.1.13/wam-coin-v0.1.13-arm64-apple-darwin.tar.gz"
+                        target="_blank" class="pool-link">macOS wam-coin</a>
+Download wam-miner: <a href="https://github.com/wamcoin-Project/wam-coin/releases/download/v0.1.13/wam-miner-v0.1.13-arm64-apple-darwin.tar.gz"
+                       target="target">macOS wam-miner</a></code></pre>
+            </div>
+        </div>
+        <div class="command-group">
+            <h3 id="label-cmd1">Step 1 — Run the WAM Daemon<br>(Keep it running for all wallet
+                operations, not required for mining)</h3>
+            <div class="code-container">
+                <pre><code id="code-cmd1">./wamd -daemon</code></pre>
+                <button class="copy-btn" onclick="copyToClipboard('code-cmd1', this)">Copy</button>
+            </div>
+        </div>
+        <div class="command-group">
+            <h3 id="label-cmd2">Step 2 — Create a WAM Wallet and note down the address
+                <p style="margin: 0.25rem 0 0 0; font-size: 0.85rem; font-weight: normal;">The
+                    address will look something like this:
+                    wam1q0dkfqdkx8qgwsxlyl7g54383p64js5ywk5jcly</p>
+            </h3>
+            <div class="code-container">
+                <pre><code id="code-cmd2">./wam-cli createwallet "A-NAME-FOR-YOUR-WAM-WALLET"</code></pre>
+                <button class="copy-btn" onclick="copyToClipboard('code-cmd2', this)">Copy</button>
+            </div>
+        </div>
+        <div class="command-group">
+            <h3 id="label-cmd3">Step 3 — Start mining with 2 cores <br> <span
+                    style="font-size: 0.85rem; font-weight: normal; color: var(--text-muted, #71717a);">(you can change the core-count value passed to parameter -t at the end of the command)</span>
+            </h3>
+            <div class="code-container">
+                <pre><code id="code-cmd3">./wam-miner -o stratum+tcp://wampool.vslabs.co.in:3333 -u YOUR_W_ADDRESS --large-pages -t 2</code></pre>
+                <button class="copy-btn" onclick="copyToClipboard('code-cmd3', this)">Copy</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Centralized command dataset mapped dynamically to platform configurations
+    const commandData = {
+        mac: {
+            cmd0: 'Download wamd + wam-cli: <a href="https://github.com/wamcoin-Project/wam-coin/releases/download/v0.1.13/wam-coin-v0.1.13-arm64-apple-darwin.tar.gz" target="_blank" class="pool-link">macOS wam-coin</a>' 
+            + '\nDownload wam-miner: <a href="https://github.com/wamcoin-Project/wam-coin/releases/download/v0.1.13/wam-miner-v0.1.13-arm64-apple-darwin.tar.gz" target="target">macOS wam-miner</a>',
+            cmd1: "./wamd -daemon",
+            cmd2: "./wam-cli createwallet \"A-NAME-FOR-YOUR-WAM-WALLET\"",
+            cmd3: "./wam-miner -o stratum+tcp://wampool.vslabs.co.in:3333 -u YOUR_W_ADDRESS --large-pages -t 2"
+        },
+        linux: {
+            cmd0: 'Download wamd + wam-cli: <a href="https://github.com/wamcoin-Project/wam-coin/releases/download/v0.1.13/wam-coin-v0.1.13-x86_64-linux-gnu.tar.gz" target="_blank" class="pool-link">Linux wam-coin</a>' 
+            + '\nDownload wam-miner: <a href="https://github.com/wamcoin-Project/wam-coin/releases/download/v0.1.13/wam-miner-v0.1.13-x86_64-linux-gnu.tar.gz" target="target">Linux wam-miner</a>',
+            cmd1: "./wamd -daemon",
+            cmd2: "./wam-cli createwallet \"A-NAME-FOR-YOUR-WAM-WALLET\"",
+            cmd3: "./wam-miner -o stratum+tcp://wampool.vslabs.co.in:3333 -u YOUR_W_ADDRESS --large-pages -t 2"
+        },
+        windows: {
+            cmd0: 'Download wamd + wam-cli: <a href="https://github.com/wamcoin-Project/wam-coin/releases/download/v0.1.13/wam-coin-v0.1.13-x86_64-w64-mingw32.zip" target="_blank" class="pool-link">Windows wam-coin</a>' 
+            + '\nDownload wam-miner: <a href="https://github.com/wamcoin-Project/wam-coin/releases/download/v0.1.13/wam-miner-v0.1.13-x86_64-w64-mingw32.zip" target="target">Windows wam-miner</a>',
+            cmd1: ".\\wamd.exe -daemon",
+            cmd2: ".\\wam-cli.exe createwallet \"A-NAME-FOR-YOUR-WAM-WALLET\"",
+            cmd3: ".\\wam-miner.exe -o stratum+tcp://wampool.vslabs.co.in:3333 -u YOUR_W_ADDRESS --large-pages -t 2"
+        }
+    };
+
+    function switchPlatform(platformId, event) {
+        // Toggle active tabs text color smoothly
+        const buttons = document.querySelectorAll('.tab-btn');
+        buttons.forEach(btn => {
+            btn.style.color = 'var(--text-muted, #71717a)';
+        });
+        event.currentTarget.style.color = 'var(--accent-green, #4ade80)';
+
+        // FIXED: Using innerHTML for raw HTML block rendering and textContent strictly for commands
+        const data = commandData[platformId];
+        document.getElementById('code-cmd0').innerHTML = data.cmd0;
+        document.getElementById('code-cmd1').innerHTML = data.cmd1;
+        document.getElementById('code-cmd2').innerHTML = data.cmd2;
+        document.getElementById('code-cmd3').innerHTML = data.cmd3;
+    }
+
+    // Clip-to-Clipboard execution engine with visual state timeout handler
+    function copyToClipboard(elementId, buttonElement) {
+        const textToCopy = document.getElementById(elementId).textContent;
+        
+navigator.clipboard.writeText(textToCopy).then(() => {
+// Apply success styles
+buttonElement.textContent = 'Copied!';
+buttonElement.classList.add('copied');
+// Revert state change timeout block after 2 seconds
+setTimeout(() => {
+buttonElement.textContent = 'Copy';
+buttonElement.classList.remove('copied');
+}, 2000);
+}).catch(err => {
+console.error('Failed to copy code block string parameters: ', err);
+});
+}
+</script>
+</body>
+</html>

@@ -148,7 +148,7 @@ function renderTiles(s) {
 
   text($('tHashrate'), hashrate(c.networkHashPerSecond));
   text($('tDifficulty'), `difficulty ${Number(c.difficulty || 0)
-    .toLocaleString(undefined, { maximumFractionDigits: 2 })}`);
+    .toLocaleString(undefined, { maximumFractionDigits: 6 })}`);
 
   if (sup) {
     text($('tSupply'), `${wam(sup.circulating, 0)} WAM`);
@@ -267,7 +267,7 @@ function renderBlocks(blocks) {
     cell(tr, String(b.txCount ?? '—'), 'num');
     cell(tr, bytes(b.size), 'num');
     cell(tr, Number(b.difficulty || 0).toLocaleString(undefined,
-      { maximumFractionDigits: 2 }), 'num');
+      { maximumFractionDigits: 4 }), 'num');
 
     const td = document.createElement('td');
     const span = document.createElement('span');
@@ -382,6 +382,7 @@ async function renderConcentration() {
   }
   const pc = c.topPercent;
   const sd = c.sevenDay;
+  const kd = c.kBlocks;
 
   // NEITHER LINE IS THE HEADLINE.
   //
@@ -446,9 +447,10 @@ async function renderConcentration() {
   // The heights move every two minutes. Printing them turns "is this
   // thing even running" into something a reader settles by looking twice.
   const blocks = (w) => {
-    if (!w.fromHeight || !w.toHeight) return `${w.blocksRead} blocks`;
-    const n = (x) => x.toLocaleString('en-US');
-    return `blocks ${n(w.fromHeight)}–${n(w.toHeight)}`;
+    return `${w.blocksRead} blocks`
+//    if (!w.fromHeight || !w.toHeight) return `${w.blocksRead} blocks`;
+//    const n = (x) => x.toLocaleString('en-US');
+//    return `blocks ${n(w.fromHeight)}–${n(w.toHeight)}`;
   };
 
   const sevenSpan = sd && span(sd.spanSeconds);
@@ -458,7 +460,14 @@ async function renderConcentration() {
            sd.topPercent, sd.distinct)
     : 'the long window: reading…');
 
-  const nowSpan = span(c.spanSeconds);
+const kBlockSpan = kd && span(kd.spanSeconds);
+  text($('concK'), kd && kd.blocksRead
+    ? line('the 1K-block window',
+           `${blocks(kd)}, ${kBlockSpan}`,
+           kd.topPercent, kd.distinct)
+    : 'the 1K-block window: reading…');
+
+    const nowSpan = span(c.spanSeconds);
   text($('concSummary'),
     line('right now',
          nowSpan ? `${blocks(c)}, ${nowSpan}` : blocks(c),

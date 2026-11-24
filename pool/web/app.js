@@ -336,8 +336,7 @@ function renderStats(s) {
   const chosen = tlsPort || (ports.length ? ports[0] : { port: 3333, tls: false });
   const scheme = chosen.tls ? 'stratum+ssl' : 'stratum+tcp';
   text($('connectCmd'),
-    `xmrig -a rx/wam -o ${scheme}://${host}:${chosen.port} \\\n` +
-    `      -u YOUR_W_ADDRESS.rig1 -p x --keepalive`);
+    `To run with 2 cores: \nwam-miner -o ${scheme}://${host}:${chosen.port} -u YOUR_W_ADDRESS -t 2`);
 
   // ---- randomx -----------------------------------------------------------
   const rx = s.randomx || {};
@@ -412,7 +411,7 @@ function renderMiners(miners) {
     // Reported by Radenlingga, 14 November 2026.
     cell(tr, m.id == null ? '—' : String(m.id), 'num');
     cell(tr, m.userAgent || 'unknown');
-    cell(tr, difficulty(m.difficulty), 'num');
+    cell(tr, m.difficulty, 'num');
     cell(tr, String(m.validShares), 'num');
     cell(tr, String(m.invalidShares), 'num');
     cell(tr, duration(m.connectedFor), 'num');
